@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Trash2, Plus, GripVertical, X, FolderOpen, Search, Loader2, CheckCircle2, AlertCircle, GitBranch, FileCode, Bot } from 'lucide-react'
+import { ArrowLeft, Trash2, Plus, GripVertical, X, FolderOpen, Search, Loader2, CheckCircle2, AlertCircle, GitBranch, FileCode, Bot, Wand2 } from 'lucide-react'
 import { daemonClient } from '@/shared/lib/daemon-client'
 import type { InstalledAgent, ScanResult } from '@/entities/card/project-types'
 import { toast } from 'sonner'
@@ -40,6 +40,7 @@ export function WorkspaceSettingsPage() {
   const [daemonOnline, setDaemonOnline] = useState<boolean | null>(null)
   const [scanning, setScanning] = useState<string | null>(null)
   const [scanResults, setScanResults] = useState<Record<string, ScanResult>>({})
+  const [bootstrapping, setBootstrapping] = useState<string | null>(null)
 
   useEffect(() => {
     if (workspace) {
@@ -135,6 +136,31 @@ export function WorkspaceSettingsPage() {
       })
     } finally {
       setScanning(null)
+    }
+  }
+
+  const handleBootstrapProject = async (projectPath: string, projectId: string) => {
+    setBootstrapping(projectId)
+    try {
+      const result = await daemonClient.bootstrapProject(projectPath)
+      if (result.filesCreated.length > 0) {
+        toast.success(`Bootstrap concluido: ${result.project}`, {
+          description: `Criados: ${result.filesCreated.join(', ')}`,
+          duration: 5000,
+        })
+      } else {
+        toast.info('Nenhum arquivo criado', {
+          description: `Todos os arquivos ja existem: ${result.filesSkipped.join(', ')}`,
+        })
+      }
+      // Re-scan to refresh badges
+      handleScanProject(projectPath, projectId)
+    } catch (err) {
+      toast.error('Erro no bootstrap', {
+        description: err instanceof Error ? err.message : 'Verifique se o daemon esta rodando',
+      })
+    } finally {
+      setBootstrapping(null)
     }
   }
 
@@ -251,16 +277,29 @@ export function WorkspaceSettingsPage() {
                         </Badge>
                       )}
                       {daemonOnline && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 text-xs shrink-0"
-                          onClick={() => handleScanProject(proj.path, proj.id)}
-                          disabled={scanning === proj.id}
-                        >
-                          {scanning === proj.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5 mr-1" />}
-                          Scan
-                        </Button>
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs shrink-0"
+                            onClick={() => handleBootstrapProject(proj.path, proj.id)}
+                            disabled={bootstrapping === proj.id}
+                            title="Gerar AGENTS.md, CLAUDE.md e commands automaticamente"
+                          >
+                            {bootstrapping === proj.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5 mr-1" />}
+                            Setup
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs shrink-0"
+                            onClick={() => handleScanProject(proj.path, proj.id)}
+                            disabled={scanning === proj.id}
+                          >
+                            {scanning === proj.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5 mr-1" />}
+                            Scan
+                          </Button>
+                        </>
                       )}
                       <Button
                         variant="ghost"

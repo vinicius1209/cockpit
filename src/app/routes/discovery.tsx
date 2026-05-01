@@ -399,6 +399,26 @@ export function DiscoveryPage() {
             <div className="flex items-center gap-3">
               <h2 className="text-sm font-semibold">{result.cards.length} descobertas</h2>
               <Separator orientation="vertical" className="h-4" />
+              {result.diff && (
+                <div className="flex items-center gap-1.5">
+                  {result.diff.newCount > 0 && (
+                    <Badge className="text-[10px] bg-green-500/15 text-green-500 border-0">
+                      {result.diff.newCount} novas
+                    </Badge>
+                  )}
+                  {result.diff.existingCount > 0 && (
+                    <Badge variant="outline" className="text-[10px]">
+                      {result.diff.existingCount} conhecidas
+                    </Badge>
+                  )}
+                  {result.diff.resolvedCount > 0 && (
+                    <Badge className="text-[10px] bg-blue-500/15 text-blue-500 border-0">
+                      {result.diff.resolvedCount} resolvidas
+                    </Badge>
+                  )}
+                </div>
+              )}
+              <Separator orientation="vertical" className="h-4" />
               <div className="flex items-center gap-1.5">
                 {result.scanResult.stack.map((s) => (
                   <Badge key={s} variant="secondary" className="text-[10px]">{s}</Badge>
@@ -419,18 +439,39 @@ export function DiscoveryPage() {
             </Button>
           </div>
 
+          {/* Resolved findings banner */}
+          {result.diff && result.diff.resolvedCount > 0 && (
+            <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 px-4 py-3">
+              <p className="text-sm font-medium text-blue-500 mb-1">
+                <CheckCircle2 className="h-3.5 w-3.5 inline mr-1.5" />
+                {result.diff.resolvedCount} problema{result.diff.resolvedCount > 1 ? 's' : ''} resolvido{result.diff.resolvedCount > 1 ? 's' : ''} desde o ultimo scan
+              </p>
+              <div className="space-y-0.5">
+                {result.diff.resolved.slice(0, 5).map((r) => (
+                  <p key={r.fingerprint} className="text-xs text-muted-foreground line-through">
+                    {r.title}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Cards grid */}
           <div className="space-y-2">
             {result.cards.map((card, i) => {
               const typeConfig = CARD_TYPE_CONFIG[card.type as CardType]
               const prioConfig = CARD_PRIORITY_CONFIG[card.priority as CardPriority]
               const imported = importedCards.has(i)
+              const diffFinding = result.diff?.findings.find(
+                (f) => f.title === card.title && f.type === card.type,
+              )
+              const isNew = diffFinding?.status === 'new'
 
               return (
                 <div
                   key={i}
                   className={`group flex items-start gap-3 rounded-lg border p-3 transition-colors ${
-                    imported ? 'opacity-40 bg-muted/20' : 'hover:bg-muted/30'
+                    imported ? 'opacity-40 bg-muted/20' : isNew ? 'border-green-500/30 bg-green-500/5 hover:bg-green-500/10' : 'hover:bg-muted/30'
                   }`}
                 >
                   {/* Type indicator */}
@@ -442,6 +483,11 @@ export function DiscoveryPage() {
                   {/* Content */}
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center gap-1.5">
+                      {isNew && (
+                        <Badge className="text-[10px] px-1.5 py-0 bg-green-500/15 text-green-500 border-0">
+                          nova
+                        </Badge>
+                      )}
                       <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${typeConfig?.bgColor} ${typeConfig?.color} border-0`}>
                         {typeConfig?.label || card.type}
                       </Badge>

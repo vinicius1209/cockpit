@@ -50,9 +50,31 @@ export interface DiscoveryCard {
   metadata: Record<string, string>
 }
 
+export interface DiffFinding extends DiscoveryCard {
+  fingerprint: string
+  status: 'new' | 'existing' | 'resolved'
+  firstSeen: string
+  linkedCardId: string | null
+}
+
+export interface ResolvedFinding extends DiscoveryCard {
+  fingerprint: string
+  firstSeen: string
+  resolvedAt: string
+}
+
+export interface DiscoveryDiff {
+  newCount: number
+  existingCount: number
+  resolvedCount: number
+  findings: DiffFinding[]
+  resolved: ResolvedFinding[]
+}
+
 export interface DiscoveryResult {
   project: string
   scannedAt: string
   cards: DiscoveryCard[]
   scanResult: ScanResult
+  diff?: DiscoveryDiff
 }

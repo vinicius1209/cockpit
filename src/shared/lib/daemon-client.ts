@@ -37,4 +37,10 @@ export const daemonClient = {
       method: 'POST',
       body: JSON.stringify({ agent, prompt, projectPath }),
     }),
+
+  bootstrapProject: (path: string, force = false) =>
+    daemonFetch<{ project: string; path: string; filesCreated: string[]; filesSkipped: string[] }>('/projects/bootstrap', {
+      method: 'POST',
+      body: JSON.stringify({ path, force }),
+    }),
 }
