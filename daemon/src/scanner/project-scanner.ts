@@ -2,6 +2,12 @@ import { readdir, stat, readFile } from 'node:fs/promises'
 import { join, basename } from 'node:path'
 import { homedir } from 'node:os'
 
+export interface SubProject {
+  name: string
+  path: string
+  indicator: string
+}
+
 export interface ProjectScanResult {
   path: string
   name: string
@@ -14,6 +20,7 @@ export interface ProjectScanResult {
   structure: string[]
   todos: TodoItem[]
   readme: string | null
+  subProjects: SubProject[]
 }
 
 export interface GitInfo {
@@ -49,13 +56,14 @@ export async function scanProject(projectPath: string): Promise<ProjectScanResul
   const absPath = expandPath(projectPath)
   const name = basename(absPath)
 
-  const [git, pkg, agentConfigs, structure, todos, readme] = await Promise.all([
+  const [git, pkg, agentConfigs, structure, todos, readme, subProjects] = await Promise.all([
     scanGit(absPath),
     readPackageJson(absPath),
     scanAgentConfigs(absPath),
     scanStructure(absPath),
     scanTodos(absPath),
     readReadme(absPath),
+    detectSubProjects(absPath),
   ])
 
   const stack = detectStack(pkg?.dependencies || {}, pkg?.devDependencies || {})
@@ -72,7 +80,33 @@ export async function scanProject(projectPath: string): Promise<ProjectScanResul
     structure,
     todos,
     readme,
+    subProjects,
   }
+}
+
+const SUB_PROJECT_INDICATORS = ['package.json', 'pom.xml', 'Cargo.toml', 'go.mod', 'pyproject.toml', 'build.gradle', 'build.gradle.kts'] as const
+
+async function detectSubProjects(projectPath: string): Promise<SubProject[]> {
+  const results: SubProject[] = []
+  try {
+    const entries = await readdir(projectPath, { withFileTypes: true })
+    const dirs = entries.filter((e) => e.isDirectory() && !e.name.startsWith('.') && e.name !== 'node_modules')
+
+    await Promise.all(
+      dirs.map(async (dir) => {
+        const dirPath = join(projectPath, dir.name)
+        for (const indicator of SUB_PROJECT_INDICATORS) {
+          if (await fileExists(join(dirPath, indicator))) {
+            results.push({ name: dir.name, path: dirPath, indicator })
+            break
+          }
+        }
+      }),
+    )
+  } catch {
+    // skip unreadable dirs
+  }
+  return results.sort((a, b) => a.name.localeCompare(b.name))
 }
 
 async function scanGit(projectPath: string): Promise<GitInfo | null> {

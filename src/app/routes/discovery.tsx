@@ -60,6 +60,9 @@ export function DiscoveryPage() {
   const [importedCards, setImportedCards] = useState<Set<number>>(new Set())
   const [daemonOnline, setDaemonOnline] = useState<boolean | null>(null)
   const [agents, setAgents] = useState<InstalledAgent[]>([])
+  const [activeSubProject, setActiveSubProject] = useState<string | null>(null)
+  const [currentPhase, setCurrentPhase] = useState('')
+  const [progressEvents, setProgressEvents] = useState<{ phase: string; message: string }[]>([])
 
   useEffect(() => {
     daemonClient.health()
@@ -84,19 +87,79 @@ export function DiscoveryPage() {
     setError(null)
     setResult(null)
     setImportedCards(new Set())
+    setProgressEvents([])
+    setCurrentPhase('')
+    setActiveSubProject(null)
 
+    const agent = useAgent === 'none' ? undefined : useAgent
+
+    // Fast-path: scanner only (synchronous, ~1s)
+    if (!agent) {
+      try {
+        const discoveryResult = await daemonClient.runDiscovery(selectedProject.path)
+        setResult(discoveryResult)
+        toast.success(`Discovery concluido: ${discoveryResult.cards.length} descobertas`, {
+          description: discoveryResult.scanResult.stack.join(', ') || selectedProject.name,
+        })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Erro ao rodar discovery'
+        setError(msg)
+        toast.error('Falha no discovery', { description: msg })
+      } finally {
+        setIsRunning(false)
+      }
+      return
+    }
+
+    // Slow-path: with agent → job queue + SSE
     try {
-      const agent = useAgent === 'none' ? undefined : useAgent
-      const discoveryResult = await daemonClient.runDiscovery(selectedProject.path, agent)
-      setResult(discoveryResult)
-      toast.success(`Discovery concluido: ${discoveryResult.cards.length} descobertas`, {
-        description: discoveryResult.scanResult.stack.join(', ') || selectedProject.name,
-      })
+      const { jobId } = await daemonClient.startDiscovery(selectedProject.path, agent)
+      const DAEMON_URL = import.meta.env.VITE_DAEMON_URL || 'http://localhost:4800'
+      const es = new EventSource(`${DAEMON_URL}/discovery/stream/${jobId}`)
+
+      es.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          if (data.message) {
+            setCurrentPhase(data.message)
+            setProgressEvents((prev) => [...prev, { phase: data.phase, message: data.message }])
+          }
+          if (data.phase === 'completed' && data.result) {
+            setResult(data.result as DiscoveryResult)
+            setIsRunning(false)
+            toast.success(`Discovery concluido: ${(data.result as DiscoveryResult).cards.length} descobertas`)
+            es.close()
+          }
+          if (data.phase === 'failed') {
+            setError(data.error || data.message || 'Erro desconhecido')
+            setIsRunning(false)
+            toast.error('Falha no discovery', { description: data.error || data.message })
+            es.close()
+          }
+        } catch {
+          // skip malformed events
+        }
+      }
+
+      es.onerror = () => {
+        es.close()
+        // Try to recover result
+        daemonClient.getDiscoveryJob(jobId)
+          .then((job) => {
+            const j = job as { status: string; result: DiscoveryResult | null; error: string | null }
+            if (j.status === 'completed' && j.result) {
+              setResult(j.result)
+            } else if (j.status === 'failed') {
+              setError(j.error || 'Erro desconhecido')
+            }
+          })
+          .catch(() => setError('Conexao com daemon perdida'))
+          .finally(() => setIsRunning(false))
+      }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro ao rodar discovery'
+      const msg = err instanceof Error ? err.message : 'Erro ao iniciar discovery'
       setError(msg)
       toast.error('Falha no discovery', { description: msg })
-    } finally {
       setIsRunning(false)
     }
   }
@@ -108,7 +171,7 @@ export function DiscoveryPage() {
 
     const cardsInColumn = getColumnCards(activeWorkspaceId, inboxColumn.id)
 
-    addCard({
+    const cardId = addCard({
       workspace_id: activeWorkspaceId,
       column_id: inboxColumn.id,
       project_id: selectedProject?.id || null,
@@ -123,6 +186,15 @@ export function DiscoveryPage() {
       spec_content: null,
       interview_notes: null,
     })
+
+    // Link finding to card via fingerprint
+    const diffFinding = result?.diff?.findings.find(
+      (f) => f.title === discoveryCard.title && f.type === discoveryCard.type,
+    )
+    if (diffFinding?.fingerprint && selectedProject) {
+      daemonClient.linkFinding(selectedProject.path, diffFinding.fingerprint, cardId)
+        .catch(() => { /* best-effort linking */ })
+    }
 
     setImportedCards((prev) => new Set([...prev, index]))
   }
@@ -365,18 +437,51 @@ export function DiscoveryPage() {
 
       {/* ── Loading state ── */}
       {isRunning && (
-        <div className="flex flex-col items-center justify-center py-16 space-y-4">
-          <div className="relative">
-            <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-              <Radar className="h-8 w-8 text-primary animate-pulse" />
+        <div className="flex flex-col items-center justify-center py-16 space-y-5">
+          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <Radar className="h-8 w-8 text-primary animate-pulse" />
+          </div>
+          <p className="text-sm font-medium">{currentPhase || `Escaneando ${selectedProject?.name}...`}</p>
+
+          {/* Phase stepper */}
+          {useAgent !== 'none' && (
+            <div className="flex items-center gap-4 text-xs">
+              {[
+                { id: 'scanning', label: 'Scanner' },
+                { id: 'running-agent', label: 'Agent' },
+                { id: 'diffing', label: 'Diff' },
+              ].map((step, idx) => {
+                const done = progressEvents.some((p) => p.phase === step.id)
+                const active = progressEvents.length > 0 && progressEvents[progressEvents.length - 1].phase === step.id
+                return (
+                  <div key={step.id} className="flex items-center gap-1.5">
+                    {idx > 0 && <div className={`h-px w-6 ${done ? 'bg-primary' : 'bg-border'}`} />}
+                    <div className={`flex items-center gap-1 ${active ? 'text-primary' : done ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}>
+                      {done && !active ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                      ) : active ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <CircleDot className="h-3.5 w-3.5" />
+                      )}
+                      {step.label}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-medium">Escaneando {selectedProject?.name}...</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {useAgent === 'none' ? 'Analisando codigo, git e dependencias' : `Usando ${useAgent} para analise profunda`}
-            </p>
-          </div>
+          )}
+
+          {/* Live progress log */}
+          {progressEvents.length > 1 && (
+            <div className="w-full max-w-md rounded-lg border bg-muted/30 p-3 max-h-28 overflow-y-auto">
+              {progressEvents.map((p, i) => (
+                <p key={i} className="text-[11px] text-muted-foreground font-mono">
+                  <span className="text-primary/60">[{p.phase}]</span> {p.message}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -401,6 +506,11 @@ export function DiscoveryPage() {
               <Separator orientation="vertical" className="h-4" />
               {result.diff && (
                 <div className="flex items-center gap-1.5">
+                  {result.diff.baselineCount > 0 && (
+                    <Badge variant="outline" className="text-[10px]">
+                      {result.diff.baselineCount} baseline
+                    </Badge>
+                  )}
                   {result.diff.newCount > 0 && (
                     <Badge className="text-[10px] bg-green-500/15 text-green-500 border-0">
                       {result.diff.newCount} novas
@@ -439,6 +549,37 @@ export function DiscoveryPage() {
             </Button>
           </div>
 
+          {/* Sub-project filter */}
+          {(() => {
+            const subProjects = [...new Set(result.cards.map((c) => c.subProject).filter(Boolean))] as string[]
+            if (subProjects.length <= 1) return null
+            return (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Badge
+                  variant={activeSubProject === null ? 'default' : 'outline'}
+                  className="cursor-pointer text-[10px]"
+                  onClick={() => setActiveSubProject(null)}
+                >
+                  Todos
+                </Badge>
+                {subProjects.map((sp) => (
+                  <Badge
+                    key={sp}
+                    variant={activeSubProject === sp ? 'default' : 'outline'}
+                    className="cursor-pointer text-[10px]"
+                    onClick={() => setActiveSubProject(activeSubProject === sp ? null : sp)}
+                  >
+                    <FolderOpen className="h-2.5 w-2.5 mr-0.5" />
+                    {sp}
+                    <span className="ml-1 opacity-60">
+                      {result.cards.filter((c) => c.subProject === sp).length}
+                    </span>
+                  </Badge>
+                ))}
+              </div>
+            )
+          })()}
+
           {/* Resolved findings banner */}
           {result.diff && result.diff.resolvedCount > 0 && (
             <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 px-4 py-3">
@@ -458,7 +599,10 @@ export function DiscoveryPage() {
 
           {/* Cards grid */}
           <div className="space-y-2">
-            {result.cards.map((card, i) => {
+            {result.cards
+              .filter((card) => !activeSubProject || card.subProject === activeSubProject)
+              .map((card) => {
+              const i = result.cards.indexOf(card)
               const typeConfig = CARD_TYPE_CONFIG[card.type as CardType]
               const prioConfig = CARD_PRIORITY_CONFIG[card.priority as CardPriority]
               const imported = importedCards.has(i)
@@ -498,6 +642,12 @@ export function DiscoveryPage() {
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                           <Bot className="h-2.5 w-2.5 mr-0.5" />
                           agent
+                        </Badge>
+                      )}
+                      {card.subProject && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-muted-foreground">
+                          <FolderOpen className="h-2.5 w-2.5 mr-0.5" />
+                          {card.subProject}
                         </Badge>
                       )}
                     </div>

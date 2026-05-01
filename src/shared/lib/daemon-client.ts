@@ -43,4 +43,19 @@ export const daemonClient = {
       method: 'POST',
       body: JSON.stringify({ path, force }),
     }),
+
+  linkFinding: (projectPath: string, fingerprint: string, cardId: string) =>
+    daemonFetch<{ linked: boolean }>('/discovery/link', {
+      method: 'POST',
+      body: JSON.stringify({ projectPath, fingerprint, cardId }),
+    }),
+
+  startDiscovery: (projectPath: string, agent?: string) =>
+    daemonFetch<{ jobId: string; status: string }>('/discovery/start', {
+      method: 'POST',
+      body: JSON.stringify({ projectPath, agent }),
+    }),
+
+  getDiscoveryJob: (jobId: string) =>
+    daemonFetch<Record<string, unknown>>(`/discovery/jobs/${jobId}`),
 }

@@ -8,6 +8,7 @@ export interface DiscoveryCard {
   priority: 'critical' | 'high' | 'medium' | 'low'
   source: 'scanner' | 'agent'
   metadata: Record<string, string>
+  subProject?: string
 }
 
 export interface DiscoveryResult {
@@ -20,9 +21,10 @@ export interface DiscoveryResult {
 export async function runDiscovery(projectPath: string, agentName?: string): Promise<DiscoveryResult> {
   const scanResult = await scanProject(projectPath)
   const cards: DiscoveryCard[] = []
+  const subProjectNames = scanResult.subProjects.map((sp) => sp.name)
 
   // 1. Cards from TODOs/FIXMEs
-  cards.push(...todosToCards(scanResult.todos))
+  cards.push(...todosToCards(scanResult.todos, subProjectNames))
 
   // 2. Cards from git status
   if (scanResult.git && scanResult.git.uncommittedChanges > 5) {
@@ -62,15 +64,18 @@ export async function runDiscovery(projectPath: string, agentName?: string): Pro
   }
 }
 
-function todosToCards(todos: TodoItem[]): DiscoveryCard[] {
-  // Group TODOs by type
+function inferSubProject(filePath: string, subProjectNames: string[]): string | undefined {
+  const firstSegment = filePath.split('/')[0]
+  return subProjectNames.includes(firstSegment) ? firstSegment : undefined
+}
+
+function todosToCards(todos: TodoItem[], subProjectNames: string[]): DiscoveryCard[] {
   const fixmes = todos.filter((t) => t.type === 'FIXME' || t.type === 'BUG')
   const hacks = todos.filter((t) => t.type === 'HACK')
   const regularTodos = todos.filter((t) => t.type === 'TODO')
 
   const cards: DiscoveryCard[] = []
 
-  // FIXMEs are individual high-priority cards
   for (const fixme of fixmes.slice(0, 10)) {
     cards.push({
       title: `FIXME: ${fixme.text.replace(/\/\/\s*(FIXME|BUG):?\s*/i, '').slice(0, 80)}`,
@@ -79,10 +84,10 @@ function todosToCards(todos: TodoItem[]): DiscoveryCard[] {
       priority: 'high',
       source: 'scanner',
       metadata: { file: fixme.file, line: String(fixme.line) },
+      subProject: inferSubProject(fixme.file, subProjectNames),
     })
   }
 
-  // HACKs are grouped
   if (hacks.length > 0) {
     cards.push({
       title: `${hacks.length} HACKs encontrados no codigo`,
@@ -94,7 +99,6 @@ function todosToCards(todos: TodoItem[]): DiscoveryCard[] {
     })
   }
 
-  // TODOs are summarized
   if (regularTodos.length > 5) {
     cards.push({
       title: `${regularTodos.length} TODOs pendentes no codigo`,
@@ -114,6 +118,10 @@ async function runAgentDiscovery(scanResult: ProjectScanResult, agentName: strin
   const agent = agents.find((a) => a.name === agentName)
   if (!agent) return []
 
+  const subProjectList = scanResult.subProjects.length > 0
+    ? `\nSub-projetos: ${scanResult.subProjects.map((sp) => `${sp.name} (${sp.indicator})`).join(', ')}`
+    : ''
+
   const prompt = `Analise este projeto e retorne SOMENTE um JSON array com problemas, debitos tecnicos e melhorias encontrados.
 
 Projeto: ${scanResult.name}
@@ -121,7 +129,7 @@ Stack: ${scanResult.stack.join(', ')}
 Branch: ${scanResult.git?.branch || 'unknown'}
 Git status: ${scanResult.git?.status || 'unknown'}
 Dependencias: ${Object.keys(scanResult.dependencies).join(', ')}
-Estrutura (resumo): ${scanResult.structure.slice(0, 20).join(', ')}
+Estrutura (resumo): ${scanResult.structure.slice(0, 20).join(', ')}${subProjectList}
 
 Formato de resposta (JSON puro, sem markdown):
 [
@@ -129,7 +137,8 @@ Formato de resposta (JSON puro, sem markdown):
     "title": "descricao curta",
     "description": "descricao detalhada",
     "type": "bugfix|improvement|chore|discovery",
-    "priority": "critical|high|medium|low"
+    "priority": "critical|high|medium|low",
+    "subProject": "nome-do-sub-projeto-se-aplicavel-ou-null"
   }
 ]`
 
@@ -142,7 +151,6 @@ Formato de resposta (JSON puro, sem markdown):
 
     if (result.exitCode !== 0) return []
 
-    // Try to parse JSON from output
     const jsonMatch = result.output.match(/\[[\s\S]*\]/)
     if (!jsonMatch) return []
 
@@ -156,6 +164,7 @@ Formato de resposta (JSON puro, sem markdown):
       priority: (['critical', 'high', 'medium', 'low'].includes(item.priority) ? item.priority : 'medium') as DiscoveryCard['priority'],
       source: 'agent' as const,
       metadata: { agent: agentName },
+      subProject: item.subProject && item.subProject !== 'null' ? item.subProject : undefined,
     }))
   } catch {
     return []

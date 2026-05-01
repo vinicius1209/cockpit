@@ -5,7 +5,7 @@ export interface Finding {
   card: DiscoveryCard
   firstSeen: string
   lastSeen: string
-  status: 'new' | 'existing' | 'resolved'
+  status: 'new' | 'existing' | 'resolved' | 'baseline'
   linkedCardId: string | null
 }
 
@@ -15,6 +15,7 @@ export interface ScanHistory {
   scannedAt: string
   findingsCount: number
   newCount: number
+  baselineCount: number
   resolvedCount: number
   findings: Finding[]
 }
@@ -22,15 +23,15 @@ export interface ScanHistory {
 export interface DiffResult {
   findings: Finding[]
   newFindings: Finding[]
+  baselineFindings: Finding[]
   resolvedFindings: Finding[]
   existingFindings: Finding[]
   scanHistory: ScanHistory
 }
 
 function generateFingerprint(card: DiscoveryCard): string {
-  // Normalize: use type + a simplified title + source for fingerprinting
-  const normalized = `${card.type}::${card.title.toLowerCase().trim().slice(0, 100)}::${card.source}`
-  // Simple hash
+  const subProj = card.subProject || ''
+  const normalized = `${card.type}::${subProj}::${card.title.toLowerCase().trim().slice(0, 100)}::${card.source}`
   let hash = 0
   for (let i = 0; i < normalized.length; i++) {
     const char = normalized.charCodeAt(i)
@@ -50,6 +51,7 @@ export function diffScan(
   const now = new Date().toISOString()
   const previousScans = historyStore.get(projectPath) || []
   const lastScan = previousScans[previousScans.length - 1]
+  const isFirstScan = previousScans.length === 0
 
   // Build fingerprint map from current scan
   const currentFingerprints = new Map<string, DiscoveryCard>()
@@ -68,6 +70,7 @@ export function diffScan(
 
   const findings: Finding[] = []
   const newFindings: Finding[] = []
+  const baselineFindings: Finding[] = []
   const existingFindings: Finding[] = []
 
   // Classify current findings
@@ -75,7 +78,6 @@ export function diffScan(
     const previous = previousFingerprints.get(fp)
 
     if (previous) {
-      // Existed before
       const finding: Finding = {
         fingerprint: fp,
         card,
@@ -86,8 +88,20 @@ export function diffScan(
       }
       findings.push(finding)
       existingFindings.push(finding)
+    } else if (isFirstScan) {
+      // First scan: baseline, not "new"
+      const finding: Finding = {
+        fingerprint: fp,
+        card,
+        firstSeen: now,
+        lastSeen: now,
+        status: 'baseline',
+        linkedCardId: null,
+      }
+      findings.push(finding)
+      baselineFindings.push(finding)
     } else {
-      // New finding
+      // Subsequent scan: genuinely new
       const finding: Finding = {
         fingerprint: fp,
         card,
@@ -123,6 +137,7 @@ export function diffScan(
     scannedAt: now,
     findingsCount: findings.length,
     newCount: newFindings.length,
+    baselineCount: baselineFindings.length,
     resolvedCount: resolvedFindings.length,
     findings: [...findings, ...resolvedFindings],
   }
@@ -136,6 +151,7 @@ export function diffScan(
   return {
     findings,
     newFindings,
+    baselineFindings,
     resolvedFindings,
     existingFindings,
     scanHistory,
@@ -150,7 +166,6 @@ export function linkFindingToCard(projectPath: string, fingerprint: string, card
   const history = historyStore.get(projectPath)
   if (!history) return
 
-  // Update the latest scan's finding
   const lastScan = history[history.length - 1]
   if (!lastScan) return
 

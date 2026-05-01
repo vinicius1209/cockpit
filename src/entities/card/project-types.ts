@@ -48,11 +48,12 @@ export interface DiscoveryCard {
   priority: 'critical' | 'high' | 'medium' | 'low'
   source: 'scanner' | 'agent'
   metadata: Record<string, string>
+  subProject?: string
 }
 
 export interface DiffFinding extends DiscoveryCard {
   fingerprint: string
-  status: 'new' | 'existing' | 'resolved'
+  status: 'new' | 'existing' | 'resolved' | 'baseline'
   firstSeen: string
   linkedCardId: string | null
 }
@@ -65,6 +66,7 @@ export interface ResolvedFinding extends DiscoveryCard {
 
 export interface DiscoveryDiff {
   newCount: number
+  baselineCount: number
   existingCount: number
   resolvedCount: number
   findings: DiffFinding[]
