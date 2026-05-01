@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
 import {
   Select,
   SelectContent,
@@ -14,22 +15,50 @@ import { useWorkspaceStore } from '@/entities/workspace/store'
 import { useProjectStore } from '@/entities/card/project-store'
 import { useCardStore } from '@/entities/card/store'
 import { daemonClient } from '@/shared/lib/daemon-client'
-import type { DiscoveryResult, DiscoveryCard } from '@/entities/card/project-types'
+import type { DiscoveryResult, DiscoveryCard, InstalledAgent } from '@/entities/card/project-types'
 import { CARD_TYPE_CONFIG, CARD_PRIORITY_CONFIG } from '@/shared/lib/constants'
 import type { CardType, CardPriority } from '@/entities/card/types'
-import { Search, Loader2, Plus, Sparkles, FolderOpen } from 'lucide-react'
+import { toast } from 'sonner'
+import {
+  Search,
+  Loader2,
+  Plus,
+  Sparkles,
+  FolderOpen,
+  ArrowRight,
+  Bot,
+  CheckCircle2,
+  AlertCircle,
+  Settings,
+  Radar,
+  Import,
+  CircleDot,
+} from 'lucide-react'
 
 export function DiscoveryPage() {
+  const navigate = useNavigate()
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
   const { getWorkspaceProjects } = useProjectStore()
   const { addCard, getWorkspaceColumns, getColumnCards } = useCardStore()
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
-  const [useAgent, setUseAgent] = useState<string>('')
+  const [useAgent, setUseAgent] = useState<string>('none')
   const [isRunning, setIsRunning] = useState(false)
   const [result, setResult] = useState<DiscoveryResult | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [importedCards, setImportedCards] = useState<Set<number>>(new Set())
+  const [daemonOnline, setDaemonOnline] = useState<boolean | null>(null)
+  const [agents, setAgents] = useState<InstalledAgent[]>([])
+
+  useEffect(() => {
+    daemonClient.health()
+      .then(() => {
+        setDaemonOnline(true)
+        return daemonClient.getAvailableAgents()
+      })
+      .then(setAgents)
+      .catch(() => setDaemonOnline(false))
+  }, [])
 
   if (!activeWorkspaceId) {
     return <div className="p-6 text-muted-foreground">Selecione um workspace na sidebar</div>
@@ -46,13 +75,16 @@ export function DiscoveryPage() {
     setImportedCards(new Set())
 
     try {
-      const discoveryResult = await daemonClient.runDiscovery(
-        selectedProject.path,
-        useAgent || undefined,
-      )
+      const agent = useAgent === 'none' ? undefined : useAgent
+      const discoveryResult = await daemonClient.runDiscovery(selectedProject.path, agent)
       setResult(discoveryResult)
+      toast.success(`Discovery concluido: ${discoveryResult.cards.length} descobertas`, {
+        description: discoveryResult.scanResult.stack.join(', ') || selectedProject.name,
+      })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao rodar discovery')
+      const msg = err instanceof Error ? err.message : 'Erro ao rodar discovery'
+      setError(msg)
+      toast.error('Falha no discovery', { description: msg })
     } finally {
       setIsRunning(false)
     }
@@ -86,42 +118,101 @@ export function DiscoveryPage() {
 
   const handleImportAll = () => {
     if (!result) return
+    let count = 0
     result.cards.forEach((card, i) => {
       if (!importedCards.has(i)) {
         handleImportCard(card, i)
+        count++
       }
     })
+    toast.success(`${count} cards importados para o Inbox`)
+  }
+
+  const remainingCards = result ? result.cards.length - importedCards.size : 0
+
+  // ── No projects registered ──
+  if (projects.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full px-6">
+        <div className="max-w-md text-center space-y-4">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-muted">
+            <Radar className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-xl font-semibold">Nenhum projeto registrado</h2>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Para usar o Auto-Discovery, primeiro registre um projeto no workspace.
+            O scanner vai analisar o codigo, encontrar TODOs, FIXMEs, debitos tecnicos e gerar cards automaticamente.
+          </p>
+          <Button onClick={() => navigate(`/workspace/${activeWorkspaceId}/settings`)}>
+            <Settings className="h-4 w-4 mr-2" />
+            Ir para Configuracoes
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
-          <Sparkles className="h-6 w-6" />
-          Auto-Discovery
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Escaneie projetos para descobrir problemas, debitos tecnicos e melhorias automaticamente.
-        </p>
+    <div className="p-4 lg:p-6 space-y-6 max-w-5xl mx-auto">
+
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">Auto-Discovery</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">
+            Escaneie projetos e descubra problemas automaticamente
+          </p>
+        </div>
+
+        {/* Daemon status pill */}
+        <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs ${
+            daemonOnline ? 'bg-green-500/10 text-green-500' : daemonOnline === false ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'
+          }`}>
+            <CircleDot className="h-3 w-3" />
+            {daemonOnline ? 'Daemon online' : daemonOnline === false ? 'Daemon offline' : 'Conectando...'}
+          </div>
+        </div>
       </div>
 
-      {/* Controls */}
+      {/* ── How it works (shown before first scan) ── */}
+      {!result && !isRunning && (
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { step: '1', icon: FolderOpen, title: 'Selecione', desc: 'Escolha o projeto para escanear' },
+            { step: '2', icon: Radar, title: 'Escaneie', desc: 'Scanner analisa codigo, git e deps' },
+            { step: '3', icon: Import, title: 'Importe', desc: 'Envie descobertas direto pro board' },
+          ].map((item) => (
+            <div key={item.step} className="flex items-start gap-3 rounded-lg border border-dashed p-3">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary text-xs font-bold">
+                {item.step}
+              </div>
+              <div>
+                <p className="text-sm font-medium">{item.title}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Controls ── */}
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="pt-5 pb-4">
           <div className="flex items-end gap-3">
-            <div className="flex-1 space-y-2">
-              <label className="text-sm font-medium">Projeto</label>
+            {/* Project select */}
+            <div className="flex-1 space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Projeto</label>
               <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                <SelectTrigger>
+                <SelectTrigger className="h-10">
                   <SelectValue placeholder="Selecionar projeto..." />
                 </SelectTrigger>
                 <SelectContent>
                   {projects.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       <div className="flex items-center gap-2">
-                        <FolderOpen className="h-3.5 w-3.5" />
-                        {p.name}
-                        <span className="text-xs text-muted-foreground">{p.path}</span>
+                        <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="font-medium">{p.name}</span>
                       </div>
                     </SelectItem>
                   ))}
@@ -129,111 +220,187 @@ export function DiscoveryPage() {
               </Select>
             </div>
 
-            <div className="w-48 space-y-2">
-              <label className="text-sm font-medium">Agent (opcional)</label>
+            {/* Agent select */}
+            <div className="w-52 space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Modo</label>
               <Select value={useAgent} onValueChange={setUseAgent}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Scanner basico" />
+                <SelectTrigger className="h-10">
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Scanner basico</SelectItem>
-                  <SelectItem value="claude-code">Claude Code</SelectItem>
-                  <SelectItem value="opencode">OpenCode</SelectItem>
-                  <SelectItem value="gemini-cli">Gemini CLI</SelectItem>
+                  <SelectItem value="none">
+                    <div className="flex items-center gap-2">
+                      <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                      Scanner rapido
+                    </div>
+                  </SelectItem>
+                  {agents.map((a) => (
+                    <SelectItem key={a.name} value={a.name}>
+                      <div className="flex items-center gap-2">
+                        <Bot className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>{a.name}</span>
+                        {a.version && (
+                          <span className="text-[10px] text-muted-foreground">{a.version.split(' ')[0]}</span>
+                        )}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <Button onClick={handleRunDiscovery} disabled={!selectedProject || isRunning}>
-              {isRunning ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Search className="h-4 w-4 mr-1" />}
-              {isRunning ? 'Escaneando...' : 'Rodar Discovery'}
+            {/* Run button */}
+            <Button
+              className="h-10 px-5"
+              onClick={handleRunDiscovery}
+              disabled={!selectedProject || isRunning || !daemonOnline}
+            >
+              {isRunning ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Escaneando...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Rodar Discovery
+                </>
+              )}
             </Button>
           </div>
-
-          {projects.length === 0 && (
-            <p className="text-sm text-muted-foreground mt-3">
-              Nenhum projeto registrado. Adicione projetos nas configuracoes do workspace.
-            </p>
-          )}
         </CardContent>
       </Card>
 
+      {/* ── Error ── */}
       {error && (
-        <Card className="border-destructive/50">
-          <CardContent className="pt-6 text-sm text-destructive">{error}</CardContent>
-        </Card>
+        <div className="flex items-center gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3">
+          <AlertCircle className="h-4 w-4 text-destructive shrink-0" />
+          <p className="text-sm text-destructive">{error}</p>
+        </div>
       )}
 
-      {/* Results */}
-      {result && (
-        <>
-          {/* Scan info */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-base">{result.project}</CardTitle>
-                  <CardDescription>
-                    {result.cards.length} descobertas — {result.scanResult.stack.join(', ')}
-                    {result.scanResult.git && ` — branch: ${result.scanResult.git.branch}`}
-                  </CardDescription>
-                </div>
-                <Button size="sm" onClick={handleImportAll} disabled={importedCards.size === result.cards.length}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Importar todos ({result.cards.length - importedCards.size})
-                </Button>
-              </div>
-            </CardHeader>
-          </Card>
-
-          {/* Discovery cards */}
-          <ScrollArea className="h-[calc(100vh-400px)]">
-            <div className="space-y-3">
-              {result.cards.map((card, i) => {
-                const typeConfig = CARD_TYPE_CONFIG[card.type as CardType]
-                const prioConfig = CARD_PRIORITY_CONFIG[card.priority as CardPriority]
-                const imported = importedCards.has(i)
-
-                return (
-                  <Card key={i} className={imported ? 'opacity-50' : ''}>
-                    <CardContent className="pt-4 pb-3">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-1 min-w-0 space-y-1.5">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${typeConfig?.bgColor} ${typeConfig?.color} border-0`}>
-                              {typeConfig?.label || card.type}
-                            </Badge>
-                            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${prioConfig?.color}`}>
-                              {prioConfig?.label || card.priority}
-                            </Badge>
-                            <Badge variant="outline" className="text-[10px]">
-                              {card.source}
-                            </Badge>
-                          </div>
-                          <p className="text-sm font-medium">{card.title}</p>
-                          <p className="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-3">{card.description}</p>
-                        </div>
-                        <Button
-                          variant={imported ? 'ghost' : 'outline'}
-                          size="sm"
-                          className="shrink-0"
-                          onClick={() => handleImportCard(card, i)}
-                          disabled={imported}
-                        >
-                          {imported ? 'Importado' : (
-                            <>
-                              <Plus className="h-3.5 w-3.5 mr-1" />
-                              Board
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )
-              })}
+      {/* ── Loading state ── */}
+      {isRunning && (
+        <div className="flex flex-col items-center justify-center py-16 space-y-4">
+          <div className="relative">
+            <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <Radar className="h-8 w-8 text-primary animate-pulse" />
             </div>
-          </ScrollArea>
+          </div>
+          <div className="text-center">
+            <p className="text-sm font-medium">Escaneando {selectedProject?.name}...</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {useAgent === 'none' ? 'Analisando codigo, git e dependencias' : `Usando ${useAgent} para analise profunda`}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Empty state after scan ── */}
+      {result && result.cards.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16 space-y-3">
+          <div className="h-16 w-16 rounded-2xl bg-green-500/10 flex items-center justify-center">
+            <CheckCircle2 className="h-8 w-8 text-green-500" />
+          </div>
+          <p className="text-sm font-medium">Nenhum problema encontrado</p>
+          <p className="text-xs text-muted-foreground">O projeto esta limpo. Tente com um agent para analise mais profunda.</p>
+        </div>
+      )}
+
+      {/* ── Results ── */}
+      {result && result.cards.length > 0 && (
+        <>
+          {/* Summary bar */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="text-sm font-semibold">{result.cards.length} descobertas</h2>
+              <Separator orientation="vertical" className="h-4" />
+              <div className="flex items-center gap-1.5">
+                {result.scanResult.stack.map((s) => (
+                  <Badge key={s} variant="secondary" className="text-[10px]">{s}</Badge>
+                ))}
+                {result.scanResult.git && (
+                  <Badge variant="outline" className="text-[10px]">{result.scanResult.git.branch}</Badge>
+                )}
+              </div>
+            </div>
+
+            <Button
+              size="sm"
+              onClick={handleImportAll}
+              disabled={remainingCards === 0}
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              Importar {remainingCards > 0 ? `todos (${remainingCards})` : 'concluido'}
+            </Button>
+          </div>
+
+          {/* Cards grid */}
+          <div className="space-y-2">
+            {result.cards.map((card, i) => {
+              const typeConfig = CARD_TYPE_CONFIG[card.type as CardType]
+              const prioConfig = CARD_PRIORITY_CONFIG[card.priority as CardPriority]
+              const imported = importedCards.has(i)
+
+              return (
+                <div
+                  key={i}
+                  className={`group flex items-start gap-3 rounded-lg border p-3 transition-colors ${
+                    imported ? 'opacity-40 bg-muted/20' : 'hover:bg-muted/30'
+                  }`}
+                >
+                  {/* Type indicator */}
+                  <div
+                    className="mt-1 h-2 w-2 rounded-full shrink-0"
+                    style={{ backgroundColor: typeConfig?.color?.includes('blue') ? '#3b82f6' : typeConfig?.color?.includes('red') ? '#ef4444' : typeConfig?.color?.includes('green') ? '#22c55e' : typeConfig?.color?.includes('purple') ? '#8b5cf6' : '#6b7280' }}
+                  />
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-1.5">
+                      <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${typeConfig?.bgColor} ${typeConfig?.color} border-0`}>
+                        {typeConfig?.label || card.type}
+                      </Badge>
+                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${prioConfig?.color}`}>
+                        {prioConfig?.label || card.priority}
+                      </Badge>
+                      {card.source === 'agent' && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                          <Bot className="h-2.5 w-2.5 mr-0.5" />
+                          agent
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm font-medium leading-snug">{card.title}</p>
+                    {card.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-2">{card.description}</p>
+                    )}
+                  </div>
+
+                  {/* Import action */}
+                  <Button
+                    variant={imported ? 'ghost' : 'outline'}
+                    size="sm"
+                    className={`shrink-0 h-8 ${imported ? '' : 'opacity-0 group-hover:opacity-100 transition-opacity'}`}
+                    onClick={() => handleImportCard(card, i)}
+                    disabled={imported}
+                  >
+                    {imported ? (
+                      <>
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1 text-green-500" />
+                        Importado
+                      </>
+                    ) : (
+                      <>
+                        <ArrowRight className="h-3.5 w-3.5 mr-1" />
+                        Inbox
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )
+            })}
+          </div>
         </>
       )}
     </div>
