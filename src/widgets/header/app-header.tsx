@@ -12,26 +12,28 @@ export function AppHeader() {
   const navigate = useNavigate()
 
   return (
-    <header className="flex h-14 items-center gap-3 border-b bg-background px-4">
-      <SidebarTrigger />
-      <Separator orientation="vertical" className="h-6" />
+    <header className="flex h-12 shrink-0 items-center justify-between px-4 lg:px-6">
+      <div className="flex items-center gap-3">
+        <SidebarTrigger />
+        <Separator orientation="vertical" className="h-6" />
 
-      {activeWorkspace && (
-        <div className="flex items-center gap-2">
-          <div
-            className="h-3 w-3 rounded-full"
-            style={{ backgroundColor: activeWorkspace.color }}
-          />
-          <h1 className="text-sm font-semibold">{activeWorkspace.name}</h1>
-          {activeWorkspace.description && (
-            <span className="text-xs text-muted-foreground hidden sm:inline">
-              — {activeWorkspace.description}
-            </span>
-          )}
-        </div>
-      )}
+        {activeWorkspace && (
+          <div className="flex items-center gap-2">
+            <div
+              className="h-3 w-3 rounded-full"
+              style={{ backgroundColor: activeWorkspace.color }}
+            />
+            <h1 className="text-sm font-semibold">{activeWorkspace.name}</h1>
+            {activeWorkspace.description && (
+              <span className="text-xs text-muted-foreground hidden sm:inline">
+                — {activeWorkspace.description}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="flex items-center gap-2">
         {activeWorkspace && (
           <Button
             variant="ghost"

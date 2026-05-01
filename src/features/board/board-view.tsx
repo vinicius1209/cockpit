@@ -17,7 +17,6 @@ import { BoardCard } from './board-card'
 import { CardDialog } from './card-dialog'
 import { BoardFiltersBar, type BoardFilters } from './board-filters'
 import type { Card } from '@/entities/card/types'
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 
 export function BoardView() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
@@ -123,7 +122,7 @@ export function BoardView() {
   }, [])
 
   return (
-    <>
+    <div className="flex h-full flex-col">
       <BoardFiltersBar
         filters={filters}
         onChange={setFilters}
@@ -138,7 +137,7 @@ export function BoardView() {
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <ScrollArea className="h-full">
+        <div className="flex-1 overflow-x-auto overflow-y-hidden">
           <div className="flex gap-4 p-4 h-full">
             {columns.map((column) => {
               const columnCards = filterCards(getColumnCards(activeWorkspaceId, column.id))
@@ -153,8 +152,7 @@ export function BoardView() {
               )
             })}
           </div>
-          <ScrollBar orientation="horizontal" />
-        </ScrollArea>
+        </div>
 
         <DragOverlay>
           {activeCard && (
@@ -172,6 +170,6 @@ export function BoardView() {
         defaultColumnId={defaultColumnId}
         workspaceId={activeWorkspaceId}
       />
-    </>
+    </div>
   )
 }

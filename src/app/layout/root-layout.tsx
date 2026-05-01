@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router-dom'
-import { SidebarProvider } from '@/components/ui/sidebar'
+import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/widgets/sidebar/app-sidebar'
 import { AppHeader } from '@/widgets/header/app-header'
 import { Toaster } from '@/components/ui/sonner'
@@ -7,15 +7,13 @@ import { Toaster } from '@/components/ui/sonner'
 export function RootLayout() {
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
-        <AppSidebar />
-        <div className="flex flex-1 flex-col">
-          <AppHeader />
-          <main className="flex-1 overflow-hidden">
-            <Outlet />
-          </main>
+      <AppSidebar />
+      <SidebarInset className="flex min-h-0 flex-col overflow-hidden">
+        <AppHeader />
+        <div className="flex-1 overflow-y-auto">
+          <Outlet />
         </div>
-      </div>
+      </SidebarInset>
       <Toaster richColors position="bottom-right" />
     </SidebarProvider>
   )
