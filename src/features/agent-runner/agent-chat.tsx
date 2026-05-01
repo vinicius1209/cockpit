@@ -1,0 +1,265 @@
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { useAgentStore } from '@/entities/agent/store'
+import { runAgent } from './agent-service'
+import type { Card } from '@/entities/card/types'
+import { Send, Square, Bot, User, Loader2, AlertCircle } from 'lucide-react'
+
+interface AgentChatProps {
+  card: Card
+  workspaceId: string
+}
+
+export function AgentChat({ card, workspaceId }: AgentChatProps) {
+  const {
+    getWorkspaceAgents,
+    getApiKey,
+    createRun,
+    addMessage,
+    updateRunStatus,
+    getCardRuns,
+    getRun,
+  } = useAgentStore()
+
+  const agents = getWorkspaceAgents(workspaceId)
+  const cardRuns = getCardRuns(card.id)
+
+  const [selectedAgentId, setSelectedAgentId] = useState(agents[0]?.id || '')
+  const [activeRunId, setActiveRunId] = useState<string | null>(cardRuns[0]?.id || null)
+  const [input, setInput] = useState('')
+  const [streamingText, setStreamingText] = useState('')
+  const [isStreaming, setIsStreaming] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const activeRun = activeRunId ? getRun(activeRunId) : null
+  const selectedAgent = agents.find((a) => a.id === selectedAgentId)
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [activeRun?.messages, streamingText])
+
+  const handleSend = useCallback(async () => {
+    if (!input.trim() || !selectedAgent || isStreaming) return
+
+    const apiKey = getApiKey(selectedAgent.provider)
+    if (!apiKey) {
+      alert(`Configure a API key do provider "${selectedAgent.provider}" nas configuracoes.`)
+      return
+    }
+
+    let runId = activeRunId
+    if (!runId || activeRun?.status !== 'running') {
+      runId = createRun(selectedAgent.id, card.id, workspaceId)
+      setActiveRunId(runId)
+    }
+
+    const userMessage = input.trim()
+    setInput('')
+    addMessage(runId, { role: 'user', content: userMessage })
+
+    setIsStreaming(true)
+    setStreamingText('')
+
+    const currentRun = getRun(runId)
+    const allMessages = [
+      ...(currentRun?.messages || []),
+      { id: 'temp', role: 'user' as const, content: userMessage, timestamp: new Date().toISOString() },
+    ]
+
+    // Add card context as first user message if it's the first message
+    const contextPrefix = allMessages.filter((m) => m.role === 'user').length === 1
+      ? `[Contexto do Card]\nTitulo: ${card.title}\nTipo: ${card.type}\nPrioridade: ${card.priority}\nDescricao: ${card.description || 'Sem descricao'}\n\n[Mensagem]\n`
+      : ''
+
+    const messagesForApi = allMessages.map((m, i) => ({
+      ...m,
+      content: i === allMessages.length - 1 && contextPrefix ? contextPrefix + m.content : m.content,
+    }))
+
+    const abort = new AbortController()
+    abortRef.current = abort
+
+    await runAgent(
+      selectedAgent,
+      messagesForApi,
+      apiKey,
+      {
+        onToken: (token) => {
+          setStreamingText((prev) => prev + token)
+        },
+        onComplete: (fullText) => {
+          addMessage(runId!, { role: 'assistant', content: fullText })
+          setStreamingText('')
+          setIsStreaming(false)
+        },
+        onError: (error) => {
+          updateRunStatus(runId!, 'error', undefined, error)
+          setStreamingText('')
+          setIsStreaming(false)
+        },
+      },
+      abort.signal,
+    )
+  }, [input, selectedAgent, isStreaming, activeRunId, activeRun, card, workspaceId, getApiKey, createRun, addMessage, getRun, updateRunStatus])
+
+  const handleCancel = () => {
+    abortRef.current?.abort()
+    setIsStreaming(false)
+    setStreamingText('')
+    if (activeRunId) {
+      updateRunStatus(activeRunId, 'cancelled')
+    }
+  }
+
+  const handleNewChat = () => {
+    setActiveRunId(null)
+    setStreamingText('')
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend()
+    }
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center gap-2 p-3 border-b">
+        <Bot className="h-4 w-4 text-muted-foreground" />
+        <Select value={selectedAgentId} onValueChange={setSelectedAgentId}>
+          <SelectTrigger className="h-8 flex-1">
+            <SelectValue placeholder="Selecionar agent..." />
+          </SelectTrigger>
+          <SelectContent>
+            {agents.filter((a) => a.enabled).map((agent) => (
+              <SelectItem key={agent.id} value={agent.id}>
+                <div className="flex items-center gap-2">
+                  <span>{agent.name}</span>
+                  <Badge variant="outline" className="text-[10px]">{agent.role}</Badge>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleNewChat}>
+          Novo
+        </Button>
+      </div>
+
+      {/* Run history tabs */}
+      {cardRuns.length > 0 && (
+        <div className="flex items-center gap-1 px-3 py-1.5 border-b overflow-x-auto">
+          {cardRuns.slice(0, 5).map((run) => {
+            const agent = agents.find((a) => a.id === run.agent_id)
+            return (
+              <Badge
+                key={run.id}
+                variant={activeRunId === run.id ? 'default' : 'outline'}
+                className="cursor-pointer text-[10px] shrink-0"
+                onClick={() => setActiveRunId(run.id)}
+              >
+                {agent?.name || 'Agent'} · {run.messages.length}msg
+                {run.status === 'error' && <AlertCircle className="h-3 w-3 ml-0.5 text-destructive" />}
+              </Badge>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Messages */}
+      <ScrollArea className="flex-1 p-3" ref={scrollRef}>
+        <div className="space-y-3">
+          {!activeRun && !isStreaming && (
+            <div className="text-center text-sm text-muted-foreground py-8">
+              <Bot className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>Selecione um agent e envie uma mensagem.</p>
+              <p className="text-xs mt-1">O contexto do card sera enviado automaticamente.</p>
+            </div>
+          )}
+
+          {activeRun?.messages.map((msg) => (
+            <div key={msg.id} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : ''}`}>
+              {msg.role === 'assistant' && (
+                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Bot className="h-3.5 w-3.5 text-primary" />
+                </div>
+              )}
+              <div
+                className={`rounded-lg px-3 py-2 text-sm max-w-[85%] whitespace-pre-wrap ${
+                  msg.role === 'user'
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted'
+                }`}
+              >
+                {msg.content}
+              </div>
+              {msg.role === 'user' && (
+                <div className="h-6 w-6 rounded-full bg-secondary flex items-center justify-center shrink-0 mt-0.5">
+                  <User className="h-3.5 w-3.5" />
+                </div>
+              )}
+            </div>
+          ))}
+
+          {streamingText && (
+            <div className="flex gap-2">
+              <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                <Bot className="h-3.5 w-3.5 text-primary" />
+              </div>
+              <div className="rounded-lg px-3 py-2 text-sm max-w-[85%] bg-muted whitespace-pre-wrap">
+                {streamingText}
+                <span className="inline-block w-1.5 h-4 bg-primary/50 animate-pulse ml-0.5" />
+              </div>
+            </div>
+          )}
+
+          {activeRun?.status === 'error' && activeRun.error && (
+            <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">
+              <AlertCircle className="h-4 w-4 shrink-0" />
+              {activeRun.error}
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+
+      {/* Input */}
+      <div className="p-3 border-t">
+        <div className="flex items-end gap-2">
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Mensagem para o agent..."
+            rows={2}
+            className="resize-none text-sm"
+            disabled={isStreaming}
+          />
+          {isStreaming ? (
+            <Button variant="destructive" size="icon" className="h-9 w-9 shrink-0" onClick={handleCancel}>
+              <Square className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button size="icon" className="h-9 w-9 shrink-0" onClick={handleSend} disabled={!input.trim() || !selectedAgent}>
+              {isStreaming ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -30,6 +30,8 @@ export interface Card {
   assignee: string | null
   due_date: string | null
   spec_status: SpecStatus | null
+  spec_content: string | null
+  interview_notes: string | null
   labels: CardLabel[]
   created_at: string
   updated_at: string

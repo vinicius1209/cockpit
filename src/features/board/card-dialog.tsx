@@ -22,9 +22,14 @@ import type { Card, CardType, CardPriority, Label as LabelType } from '@/entitie
 import { CARD_TYPE_CONFIG, CARD_PRIORITY_CONFIG } from '@/shared/lib/constants'
 import { useCardStore } from '@/entities/card/store'
 import { useState, useEffect } from 'react'
-import { Trash2, Plus, X, Tag } from 'lucide-react'
+import { Trash2, Plus, X, Tag, Bot, FileText, ScrollText, MessageSquare } from 'lucide-react'
+import { AgentChat } from '@/features/agent-runner/agent-chat'
+import { SpecPanel } from '@/features/spec-engine/spec-panel'
+import { InterviewPanel } from '@/features/agent-runner/interview-panel'
 
 const LABEL_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
+
+type TabId = 'details' | 'interview' | 'spec' | 'agent'
 
 interface CardDialogProps {
   card: Card | null
@@ -45,6 +50,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
   const [showNewLabel, setShowNewLabel] = useState(false)
   const [newLabelName, setNewLabelName] = useState('')
   const [newLabelColor, setNewLabelColor] = useState(LABEL_COLORS[0])
+  const [activeTab, setActiveTab] = useState<TabId>('details')
 
   const isEditing = !!card
   const workspaceLabels = getWorkspaceLabels(workspaceId)
@@ -64,6 +70,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
       setPriority('medium')
       setDueDate('')
       setAssignee('')
+      setActiveTab('details')
     }
     setShowNewLabel(false)
     setNewLabelName('')
@@ -99,6 +106,8 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
         assignee: assignee.trim() || null,
         due_date: dueDate || null,
         spec_status: null,
+        spec_content: null,
+        interview_notes: null,
       })
     }
     onClose()
@@ -128,185 +137,248 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className={`max-h-[90vh] ${isEditing ? 'sm:max-w-3xl' : 'sm:max-w-lg'}`}>
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Editar Card' : 'Novo Card'}</DialogTitle>
+          {isEditing && (
+            <div className="flex gap-1 pt-1">
+              <Button
+                variant={activeTab === 'details' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setActiveTab('details')}
+              >
+                <FileText className="h-3.5 w-3.5 mr-1" />
+                Detalhes
+              </Button>
+              <Button
+                variant={activeTab === 'interview' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setActiveTab('interview')}
+              >
+                <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                Entrevista
+              </Button>
+              <Button
+                variant={activeTab === 'spec' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setActiveTab('spec')}
+              >
+                <ScrollText className="h-3.5 w-3.5 mr-1" />
+                Spec
+                {card?.spec_status && (
+                  <Badge variant="outline" className="ml-1 text-[9px] px-1 py-0">{card.spec_status}</Badge>
+                )}
+              </Button>
+              <Button
+                variant={activeTab === 'agent' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setActiveTab('agent')}
+              >
+                <Bot className="h-3.5 w-3.5 mr-1" />
+                AI Agent
+              </Button>
+            </div>
+          )}
         </DialogHeader>
 
-        <div className="space-y-4 pt-2">
-          <div className="space-y-2">
-            <Label htmlFor="title">Titulo</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Titulo do card..."
-              autoFocus
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Descricao</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descreva o problema ou tarefa..."
-              rows={4}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+        {activeTab === 'details' ? (
+          <div className="space-y-4 pt-2 overflow-y-auto max-h-[calc(90vh-120px)]">
             <div className="space-y-2">
-              <Label>Tipo</Label>
-              <Select value={type} onValueChange={(v) => setType(v as CardType)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CARD_TYPES.map((t) => (
-                    <SelectItem key={t} value={t}>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${CARD_TYPE_CONFIG[t].bgColor} ${CARD_TYPE_CONFIG[t].color} border-0`}>
-                          {CARD_TYPE_CONFIG[t].label}
-                        </Badge>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Prioridade</Label>
-              <Select value={priority} onValueChange={(v) => setPriority(v as CardPriority)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CARD_PRIORITIES.map((p) => (
-                    <SelectItem key={p} value={p}>
-                      <span className={CARD_PRIORITY_CONFIG[p].color}>
-                        {CARD_PRIORITY_CONFIG[p].label}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="due_date">Data limite</Label>
+              <Label htmlFor="title">Titulo</Label>
               <Input
-                id="due_date"
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
+                id="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Titulo do card..."
+                autoFocus
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="assignee">Responsavel</Label>
-              <Input
-                id="assignee"
-                value={assignee}
-                onChange={(e) => setAssignee(e.target.value)}
-                placeholder="Nome..."
+              <Label htmlFor="description">Descricao</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Descreva o problema ou tarefa..."
+                rows={4}
               />
             </div>
-          </div>
 
-          {isEditing && (
-            <>
-              <Separator />
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="flex items-center gap-1.5">
-                    <Tag className="h-3.5 w-3.5" />
-                    Labels
-                  </Label>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-6 text-xs"
-                    onClick={() => setShowNewLabel(!showNewLabel)}
-                  >
-                    <Plus className="h-3 w-3 mr-0.5" />
-                    Nova
-                  </Button>
-                </div>
+                <Label>Tipo</Label>
+                <Select value={type} onValueChange={(v) => setType(v as CardType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CARD_TYPES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${CARD_TYPE_CONFIG[t].bgColor} ${CARD_TYPE_CONFIG[t].color} border-0`}>
+                            {CARD_TYPE_CONFIG[t].label}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                {showNewLabel && (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      value={newLabelName}
-                      onChange={(e) => setNewLabelName(e.target.value)}
-                      placeholder="Nome da label..."
-                      className="h-8 text-sm flex-1"
-                      onKeyDown={(e) => e.key === 'Enter' && handleCreateLabel()}
-                    />
-                    <div className="flex gap-1">
-                      {LABEL_COLORS.map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          className={`h-5 w-5 rounded-full shrink-0 transition-transform ${newLabelColor === c ? 'scale-125 ring-2 ring-offset-1 ring-offset-background ring-primary' : ''}`}
-                          style={{ backgroundColor: c }}
-                          onClick={() => setNewLabelColor(c)}
-                        />
-                      ))}
-                    </div>
-                    <Button size="sm" className="h-8" onClick={handleCreateLabel} disabled={!newLabelName.trim()}>
-                      Criar
+              <div className="space-y-2">
+                <Label>Prioridade</Label>
+                <Select value={priority} onValueChange={(v) => setPriority(v as CardPriority)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CARD_PRIORITIES.map((p) => (
+                      <SelectItem key={p} value={p}>
+                        <span className={CARD_PRIORITY_CONFIG[p].color}>
+                          {CARD_PRIORITY_CONFIG[p].label}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="due_date">Data limite</Label>
+                <Input
+                  id="due_date"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assignee">Responsavel</Label>
+                <Input
+                  id="assignee"
+                  value={assignee}
+                  onChange={(e) => setAssignee(e.target.value)}
+                  placeholder="Nome..."
+                />
+              </div>
+            </div>
+
+            {isEditing && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-1.5">
+                      <Tag className="h-3.5 w-3.5" />
+                      Labels
+                    </Label>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 text-xs"
+                      onClick={() => setShowNewLabel(!showNewLabel)}
+                    >
+                      <Plus className="h-3 w-3 mr-0.5" />
+                      Nova
                     </Button>
                   </div>
-                )}
 
-                <div className="flex flex-wrap gap-1.5">
-                  {workspaceLabels.map((label) => {
-                    const active = isLabelActive(label.id)
-                    return (
-                      <Badge
-                        key={label.id}
-                        variant={active ? 'default' : 'outline'}
-                        className={`cursor-pointer text-xs transition-colors ${active ? 'text-white border-0' : 'opacity-60 hover:opacity-100'}`}
-                        style={active ? { backgroundColor: label.color } : undefined}
-                        onClick={() => card && toggleCardLabel(card.id, label)}
-                      >
-                        {!active && (
-                          <span className="h-2 w-2 rounded-full mr-1 inline-block" style={{ backgroundColor: label.color }} />
-                        )}
-                        {label.name}
-                        {active && <X className="h-3 w-3 ml-1" />}
-                      </Badge>
-                    )
-                  })}
-                  {workspaceLabels.length === 0 && !showNewLabel && (
-                    <span className="text-xs text-muted-foreground">Nenhuma label criada</span>
+                  {showNewLabel && (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={newLabelName}
+                        onChange={(e) => setNewLabelName(e.target.value)}
+                        placeholder="Nome da label..."
+                        className="h-8 text-sm flex-1"
+                        onKeyDown={(e) => e.key === 'Enter' && handleCreateLabel()}
+                      />
+                      <div className="flex gap-1">
+                        {LABEL_COLORS.map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            className={`h-5 w-5 rounded-full shrink-0 transition-transform ${newLabelColor === c ? 'scale-125 ring-2 ring-offset-1 ring-offset-background ring-primary' : ''}`}
+                            style={{ backgroundColor: c }}
+                            onClick={() => setNewLabelColor(c)}
+                          />
+                        ))}
+                      </div>
+                      <Button size="sm" className="h-8" onClick={handleCreateLabel} disabled={!newLabelName.trim()}>
+                        Criar
+                      </Button>
+                    </div>
                   )}
-                </div>
-              </div>
-            </>
-          )}
 
-          <div className="flex items-center justify-between pt-2">
-            {isEditing && (
-              <Button variant="destructive" size="sm" onClick={handleDelete}>
-                <Trash2 className="h-4 w-4 mr-1" />
-                Excluir
-              </Button>
+                  <div className="flex flex-wrap gap-1.5">
+                    {workspaceLabels.map((label) => {
+                      const active = isLabelActive(label.id)
+                      return (
+                        <Badge
+                          key={label.id}
+                          variant={active ? 'default' : 'outline'}
+                          className={`cursor-pointer text-xs transition-colors ${active ? 'text-white border-0' : 'opacity-60 hover:opacity-100'}`}
+                          style={active ? { backgroundColor: label.color } : undefined}
+                          onClick={() => card && toggleCardLabel(card.id, label)}
+                        >
+                          {!active && (
+                            <span className="h-2 w-2 rounded-full mr-1 inline-block" style={{ backgroundColor: label.color }} />
+                          )}
+                          {label.name}
+                          {active && <X className="h-3 w-3 ml-1" />}
+                        </Badge>
+                      )
+                    })}
+                    {workspaceLabels.length === 0 && !showNewLabel && (
+                      <span className="text-xs text-muted-foreground">Nenhuma label criada</span>
+                    )}
+                  </div>
+                </div>
+              </>
             )}
-            <div className={`flex gap-2 ${!isEditing ? 'ml-auto' : ''}`}>
-              <Button variant="outline" onClick={onClose}>
-                Cancelar
-              </Button>
-              <Button onClick={handleSave} disabled={!title.trim()}>
-                {isEditing ? 'Salvar' : 'Criar'}
-              </Button>
+
+            <div className="flex items-center justify-between pt-2">
+              {isEditing && (
+                <Button variant="destructive" size="sm" onClick={handleDelete}>
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Excluir
+                </Button>
+              )}
+              <div className={`flex gap-2 ${!isEditing ? 'ml-auto' : ''}`}>
+                <Button variant="outline" onClick={onClose}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleSave} disabled={!title.trim()}>
+                  {isEditing ? 'Salvar' : 'Criar'}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        ) : activeTab === 'interview' ? (
+          card && (
+            <div className="h-[calc(90vh-120px)]">
+              <InterviewPanel card={card} workspaceId={workspaceId} />
+            </div>
+          )
+        ) : activeTab === 'spec' ? (
+          card && (
+            <div className="h-[calc(90vh-120px)]">
+              <SpecPanel card={card} workspaceId={workspaceId} />
+            </div>
+          )
+        ) : (
+          card && (
+            <div className="h-[calc(90vh-120px)]">
+              <AgentChat card={card} workspaceId={workspaceId} />
+            </div>
+          )
+        )}
       </DialogContent>
     </Dialog>
   )

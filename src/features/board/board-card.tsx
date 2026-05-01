@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card as CardUI } from '@/components/ui/card'
 import { CARD_TYPE_CONFIG, CARD_PRIORITY_CONFIG } from '@/shared/lib/constants'
 import type { Card } from '@/entities/card/types'
-import { GripVertical, Calendar } from 'lucide-react'
+import { GripVertical, Calendar, ScrollText } from 'lucide-react'
 import { format } from 'date-fns'
 
 interface BoardCardProps {
@@ -50,6 +50,12 @@ export function BoardCard({ card, onClick }: BoardCardProps) {
             <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${priorityConfig.color}`}>
               {priorityConfig.label}
             </Badge>
+            {card.spec_status && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0 text-blue-500">
+                <ScrollText className="h-2.5 w-2.5 mr-0.5" />
+                {card.spec_status}
+              </Badge>
+            )}
           </div>
 
           <p className="text-sm font-medium leading-tight">{card.title}</p>
