@@ -114,6 +114,61 @@ export async function executeAgent(request: AgentExecRequest): Promise<AgentExec
   }
 }
 
+export async function executeAgentWithCallbacks(
+  request: AgentExecRequest,
+  onChunk: (text: string) => void,
+): Promise<AgentExecResult> {
+  const agentDef = KNOWN_AGENTS.find((a) => a.name === request.agent)
+  if (!agentDef) {
+    return { agent: request.agent, output: `Agent "${request.agent}" not found`, exitCode: 1, duration: 0 }
+  }
+
+  const args: string[] = [agentDef.headlessFlag, request.prompt]
+  if (agentDef.name === 'claude-code') {
+    args.push('--output-format', 'text')
+    if (request.model) args.push('--model', request.model)
+  }
+
+  const startTime = Date.now()
+
+  try {
+    const proc = Bun.spawn([agentDef.command, ...args], {
+      cwd: request.projectPath || undefined,
+      stdout: 'pipe',
+      stderr: 'pipe',
+      env: { ...process.env, NO_COLOR: '1' },
+    })
+
+    const reader = proc.stdout.getReader()
+    const decoder = new TextDecoder()
+    let fullOutput = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      const text = decoder.decode(value, { stream: true })
+      fullOutput += text
+      // Emit each line as a chunk
+      const lines = text.split('\n').filter((l) => l.trim())
+      for (const line of lines) {
+        onChunk(line.trim())
+      }
+    }
+
+    const exitCode = await proc.exited
+    const duration = Date.now() - startTime
+
+    return { agent: request.agent, output: fullOutput, exitCode, duration }
+  } catch (err) {
+    return {
+      agent: request.agent,
+      output: err instanceof Error ? err.message : 'Unknown error',
+      exitCode: 1,
+      duration: Date.now() - startTime,
+    }
+  }
+}
+
 export function executeAgentStreaming(request: AgentExecRequest): {
   stream: ReadableStream
   abort: () => void

@@ -1,5 +1,5 @@
 import { scanProject } from '../scanner/project-scanner'
-import { executeAgent, detectInstalledAgents } from '../executor/agent-executor'
+import { executeAgentWithCallbacks, detectInstalledAgents } from '../executor/agent-executor'
 import { diffScan } from './scan-differ'
 import type { DiscoveryCard, DiscoveryResult } from './discovery-engine'
 
@@ -155,18 +155,16 @@ Formato de resposta (JSON puro, sem markdown):
 [{"title":"descricao curta","description":"descricao detalhada","type":"bugfix|improvement|chore|discovery","priority":"critical|high|medium|low","subProject":"nome-ou-null"}]`
 
         try {
-          // Heartbeat every 5s to keep SSE connection alive during long agent runs
-          const heartbeat = setInterval(() => {
-            emitProgress(jobId, 'running-agent', `${job.agent} executando...`)
-          }, 5000)
+          const result = await executeAgentWithCallbacks(
+            { agent: job.agent, prompt, projectPath: scanResult.path },
+            (chunk) => {
+              // Emit real agent output lines as progress
+              if (chunk.length > 0 && chunk.length < 200) {
+                emitProgress(jobId, 'running-agent', chunk)
+              }
+            },
+          )
 
-          const result = await executeAgent({
-            agent: job.agent,
-            prompt,
-            projectPath: scanResult.path,
-          })
-
-          clearInterval(heartbeat)
           emitProgress(jobId, 'running-agent', `${job.agent} concluido (${Math.round(result.duration / 1000)}s)`)
 
           if (result.exitCode === 0) {
@@ -189,7 +187,6 @@ Formato de resposta (JSON puro, sem markdown):
             }
           }
         } catch (err) {
-          clearInterval(heartbeat)
           emitProgress(jobId, 'running-agent', `Erro no agent: ${err instanceof Error ? err.message : 'unknown'}`)
         }
       }

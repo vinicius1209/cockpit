@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -63,6 +63,21 @@ export function DiscoveryPage() {
   const [activeSubProject, setActiveSubProject] = useState<string | null>(null)
   const [currentPhase, setCurrentPhase] = useState('')
   const [progressEvents, setProgressEvents] = useState<{ phase: string; message: string }[]>([])
+  const [elapsed, setElapsed] = useState(0)
+  const logRef = useRef<HTMLDivElement>(null)
+
+  // Elapsed timer
+  useEffect(() => {
+    if (!isRunning) { setElapsed(0); return }
+    const start = Date.now()
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 1000)
+    return () => clearInterval(timer)
+  }, [isRunning])
+
+  // Auto-scroll log
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight
+  }, [progressEvents])
 
   useEffect(() => {
     daemonClient.health()
@@ -200,12 +215,19 @@ export function DiscoveryPage() {
 
     const cardsInColumn = getColumnCards(activeWorkspaceId, inboxColumn.id)
 
+    // Build enriched description with sub-project context
+    const descParts: string[] = []
+    if (discoveryCard.subProject) descParts.push(`**Projeto:** ${discoveryCard.subProject}`)
+    if (discoveryCard.description) descParts.push(discoveryCard.description)
+    if (discoveryCard.source === 'agent') descParts.push(`\n_Descoberto via ${discoveryCard.metadata.agent || 'agent'}_`)
+    const enrichedDescription = descParts.join('\n\n') || null
+
     const cardId = addCard({
       workspace_id: activeWorkspaceId,
       column_id: inboxColumn.id,
       project_id: selectedProject?.id || null,
-      title: discoveryCard.title,
-      description: discoveryCard.description,
+      title: discoveryCard.subProject ? `[${discoveryCard.subProject}] ${discoveryCard.title}` : discoveryCard.title,
+      description: enrichedDescription,
       type: discoveryCard.type as CardType,
       priority: discoveryCard.priority as CardPriority,
       position: cardsInColumn.length,
@@ -231,13 +253,19 @@ export function DiscoveryPage() {
   const handleImportAll = () => {
     if (!result) return
     let count = 0
+    const types: Record<string, number> = {}
     result.cards.forEach((card, i) => {
       if (!importedCards.has(i)) {
         handleImportCard(card, i)
         count++
+        types[card.type] = (types[card.type] || 0) + 1
       }
     })
-    toast.success(`${count} cards importados para o Inbox`)
+    const summary = Object.entries(types).map(([t, c]) => `${c} ${t}`).join(', ')
+    toast.success(`${count} cards importados para o Inbox`, {
+      description: summary,
+      duration: 4000,
+    })
   }
 
   const remainingCards = result ? result.cards.length - importedCards.size : 0
@@ -466,52 +494,69 @@ export function DiscoveryPage() {
 
       {/* ── Loading state ── */}
       {isRunning && (
-        <div className="flex flex-col items-center justify-center py-16 space-y-5">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <Radar className="h-8 w-8 text-primary animate-pulse" />
-          </div>
-          <p className="text-sm font-medium">{currentPhase || `Escaneando ${selectedProject?.name}...`}</p>
+        <Card>
+          <CardContent className="pt-5 pb-4 space-y-4">
+            {/* Header with timer */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                  <Radar className="h-5 w-5 text-primary animate-pulse" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{currentPhase || `Escaneando ${selectedProject?.name}...`}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, '0')} elapsed
+                  </p>
+                </div>
+              </div>
+            </div>
 
-          {/* Phase stepper */}
-          {useAgent !== 'none' && (
-            <div className="flex items-center gap-4 text-xs">
-              {[
-                { id: 'scanning', label: 'Scanner' },
-                { id: 'running-agent', label: 'Agent' },
-                { id: 'diffing', label: 'Diff' },
-              ].map((step, idx) => {
-                const done = progressEvents.some((p) => p.phase === step.id)
-                const active = progressEvents.length > 0 && progressEvents[progressEvents.length - 1].phase === step.id
-                return (
-                  <div key={step.id} className="flex items-center gap-1.5">
-                    {idx > 0 && <div className={`h-px w-6 ${done ? 'bg-primary' : 'bg-border'}`} />}
-                    <div className={`flex items-center gap-1 ${active ? 'text-primary' : done ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}>
-                      {done && !active ? (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
-                      ) : active ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <CircleDot className="h-3.5 w-3.5" />
-                      )}
-                      {step.label}
+            {/* Phase stepper */}
+            {useAgent !== 'none' && (
+              <div className="flex items-center gap-4 text-xs px-1">
+                {[
+                  { id: 'scanning', label: 'Scanner' },
+                  { id: 'running-agent', label: 'Agent' },
+                  { id: 'diffing', label: 'Diff' },
+                ].map((step, idx) => {
+                  const done = progressEvents.some((p) => p.phase === step.id)
+                  const active = progressEvents.length > 0 && progressEvents[progressEvents.length - 1].phase === step.id
+                  return (
+                    <div key={step.id} className="flex items-center gap-1.5">
+                      {idx > 0 && <div className={`h-px w-8 ${done ? 'bg-primary' : 'bg-border'}`} />}
+                      <div className={`flex items-center gap-1 ${active ? 'text-primary' : done ? 'text-muted-foreground' : 'text-muted-foreground/40'}`}>
+                        {done && !active ? (
+                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                        ) : active ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <CircleDot className="h-3.5 w-3.5" />
+                        )}
+                        {step.label}
+                      </div>
                     </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+                  )
+                })}
+              </div>
+            )}
 
-          {/* Live progress log */}
-          {progressEvents.length > 1 && (
-            <div className="w-full max-w-md rounded-lg border bg-muted/30 p-3 max-h-28 overflow-y-auto">
-              {progressEvents.map((p, i) => (
-                <p key={i} className="text-[11px] text-muted-foreground font-mono">
-                  <span className="text-primary/60">[{p.phase}]</span> {p.message}
-                </p>
-              ))}
-            </div>
-          )}
-        </div>
+            {/* Live agent output */}
+            {progressEvents.length > 0 && (
+              <div
+                ref={logRef}
+                className="rounded-lg border bg-muted/20 p-3 max-h-48 overflow-y-auto font-mono text-[11px] space-y-0.5"
+              >
+                {progressEvents.map((p, i) => (
+                  <p key={i} className={p.phase === 'running-agent' ? 'text-muted-foreground' : 'text-primary/80'}>
+                    {p.phase === 'running-agent' ? p.message : (
+                      <><span className="text-green-500/70">[{p.phase}]</span> {p.message}</>
+                    )}
+                  </p>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* ── Empty state after scan ── */}
