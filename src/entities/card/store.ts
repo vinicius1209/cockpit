@@ -1,0 +1,122 @@
+import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
+import type { Card, CardInsert, BoardColumn, Label } from './types'
+import { DEFAULT_COLUMNS } from '@/shared/lib/constants'
+
+interface CardState {
+  cards: Card[]
+  columns: Record<string, BoardColumn[]>
+  labels: Record<string, Label[]>
+  addCard: (data: CardInsert) => string
+  updateCard: (id: string, data: Partial<Card>) => void
+  deleteCard: (id: string) => void
+  moveCard: (cardId: string, toColumnId: string, newPosition: number) => void
+  reorderCards: (columnId: string, cardIds: string[]) => void
+  getColumnCards: (workspaceId: string, columnId: string) => Card[]
+  getWorkspaceColumns: (workspaceId: string) => BoardColumn[]
+  initWorkspaceColumns: (workspaceId: string) => void
+  addLabel: (workspaceId: string, name: string, color: string) => string
+}
+
+export const useCardStore = create<CardState>()(
+  persist(
+    (set, get) => ({
+      cards: [],
+      columns: {},
+      labels: {},
+
+      addCard: (data) => {
+        const id = `card-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+        const card: Card = {
+          ...data,
+          id,
+          labels: [],
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }
+        set((state) => ({ cards: [...state.cards, card] }))
+        return id
+      },
+
+      updateCard: (id, data) => {
+        set((state) => ({
+          cards: state.cards.map((c) =>
+            c.id === id ? { ...c, ...data, updated_at: new Date().toISOString() } : c,
+          ),
+        }))
+      },
+
+      deleteCard: (id) => {
+        set((state) => ({ cards: state.cards.filter((c) => c.id !== id) }))
+      },
+
+      moveCard: (cardId, toColumnId, newPosition) => {
+        set((state) => ({
+          cards: state.cards.map((c) =>
+            c.id === cardId
+              ? { ...c, column_id: toColumnId, position: newPosition, updated_at: new Date().toISOString() }
+              : c,
+          ),
+        }))
+      },
+
+      reorderCards: (columnId, cardIds) => {
+        set((state) => ({
+          cards: state.cards.map((c) => {
+            if (c.column_id !== columnId) return c
+            const idx = cardIds.indexOf(c.id)
+            if (idx === -1) return c
+            return { ...c, position: idx, updated_at: new Date().toISOString() }
+          }),
+        }))
+      },
+
+      getColumnCards: (workspaceId, columnId) => {
+        return get()
+          .cards.filter((c) => c.workspace_id === workspaceId && c.column_id === columnId)
+          .sort((a, b) => a.position - b.position)
+      },
+
+      getWorkspaceColumns: (workspaceId) => {
+        const cols = get().columns[workspaceId]
+        if (!cols || cols.length === 0) {
+          get().initWorkspaceColumns(workspaceId)
+          return get().columns[workspaceId] || []
+        }
+        return cols.sort((a, b) => a.position - b.position)
+      },
+
+      initWorkspaceColumns: (workspaceId) => {
+        const existing = get().columns[workspaceId]
+        if (existing && existing.length > 0) return
+
+        const cols: BoardColumn[] = DEFAULT_COLUMNS.map((col) => ({
+          id: `col-${workspaceId}-${col.slug}`,
+          workspace_id: workspaceId,
+          name: col.name,
+          slug: col.slug,
+          position: col.position,
+          color: col.color,
+          created_at: new Date().toISOString(),
+        }))
+
+        set((state) => ({
+          columns: { ...state.columns, [workspaceId]: cols },
+        }))
+      },
+
+      addLabel: (workspaceId, name, color) => {
+        const id = `lbl-${Date.now()}`
+        const label: Label = { id, workspace_id: workspaceId, name, color }
+        set((state) => ({
+          labels: {
+            ...state.labels,
+            [workspaceId]: [...(state.labels[workspaceId] || []), label],
+          },
+        }))
+        return id
+      },
+    }),
+    { name: 'cockpit-cards' },
+  ),
+)
