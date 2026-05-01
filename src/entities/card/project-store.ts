@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Project, ProjectInsert } from './project-types'
+import { createStorageAdapter } from '@/shared/lib/persistence'
 
 interface ProjectState {
   projects: Project[]
@@ -41,6 +42,11 @@ export const useProjectStore = create<ProjectState>()(
         return get().projects.filter((p) => p.workspace_id === workspaceId)
       },
     }),
-    { name: 'cockpit-projects' },
+    {
+      name: 'cockpit-projects',
+      version: 1,
+      storage: createStorageAdapter(),
+      migrate: (persisted) => persisted as ProjectState,
+    },
   ),
 )

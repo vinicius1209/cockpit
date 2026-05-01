@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Card, CardInsert, BoardColumn, Label } from './types'
 import { DEFAULT_COLUMNS } from '@/shared/lib/constants'
+import { createStorageAdapter } from '@/shared/lib/persistence'
 
 interface CardState {
   cards: Card[]
@@ -153,6 +154,11 @@ export const useCardStore = create<CardState>()(
         }))
       },
     }),
-    { name: 'cockpit-cards' },
+    {
+      name: 'cockpit-cards',
+      version: 1,
+      storage: createStorageAdapter(),
+      migrate: (persisted) => persisted as CardState,
+    },
   ),
 )

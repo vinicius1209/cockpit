@@ -24,11 +24,21 @@ export interface DiscoveryJob {
   error: string | null
 }
 
-const jobStore = new Map<string, DiscoveryJob>()
+import { DaemonFileStore } from '../persistence/file-store'
+
+const jobFileStore = new DaemonFileStore<Record<string, DiscoveryJob>>('jobs.json', {})
 const jobListeners = new Map<string, Set<(event: JobProgress) => void>>()
 
+export async function initJobStore(): Promise<void> {
+  await jobFileStore.init()
+}
+
+function getJobMap(): Record<string, DiscoveryJob> {
+  return jobFileStore.get()
+}
+
 function emitProgress(jobId: string, phase: JobStatus, message: string, detail?: string) {
-  const job = jobStore.get(jobId)
+  const job = getJobMap()[jobId]
   if (!job) return
 
   const event: JobProgress = {
@@ -64,12 +74,14 @@ export function createJob(projectPath: string, agent?: string): DiscoveryJob {
     error: null,
   }
 
-  jobStore.set(id, job)
+  const map = getJobMap()
+  map[id] = job
+  jobFileStore.set(map)
   return job
 }
 
 export function getJob(id: string): DiscoveryJob | undefined {
-  return jobStore.get(id)
+  return getJobMap()[id]
 }
 
 export function subscribeToJob(jobId: string, listener: (event: JobProgress) => void): () => void {
@@ -89,7 +101,7 @@ export function subscribeToJob(jobId: string, listener: (event: JobProgress) => 
 }
 
 export async function executeJobAsync(jobId: string): Promise<void> {
-  const job = jobStore.get(jobId)
+  const job = getJobMap()[jobId]
   if (!job) return
 
   try {
@@ -227,10 +239,12 @@ Formato de resposta (JSON puro, sem markdown):
     }
 
     job.completedAt = new Date().toISOString()
+    jobFileStore.set(getJobMap()) // persist on completion
     emitProgress(jobId, 'completed', `Discovery concluido: ${cards.length} descobertas`)
   } catch (err) {
     job.error = err instanceof Error ? err.message : 'Erro desconhecido'
     job.completedAt = new Date().toISOString()
+    jobFileStore.set(getJobMap()) // persist on failure too
     emitProgress(jobId, 'failed', job.error)
   }
 }

@@ -1,6 +1,9 @@
 import { handleRequest } from './routes/router'
+import { initPersistence } from './persistence'
 
 const PORT = Number(process.env.COCKPIT_DAEMON_PORT || 4800)
+
+await initPersistence()
 
 const server = Bun.serve({
   port: PORT,

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Doc, DocInsert } from './types'
+import { createStorageAdapter } from '@/shared/lib/persistence'
 
 interface DocState {
   docs: Doc[]
@@ -64,6 +65,11 @@ export const useDocStore = create<DocState>()(
           .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
       },
     }),
-    { name: 'cockpit-docs' },
+    {
+      name: 'cockpit-docs',
+      version: 1,
+      storage: createStorageAdapter(),
+      migrate: (persisted) => persisted as DocState,
+    },
   ),
 )

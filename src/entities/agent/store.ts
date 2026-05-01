@@ -2,11 +2,12 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { AgentConfig, AgentRun, AgentMessage } from './types'
 import { AGENT_PRESETS } from './presets'
+import { createStorageAdapter } from '@/shared/lib/persistence'
+import { getApiKey as getKey, setApiKey as setKey } from '@/shared/lib/persistence/api-key-store'
 
 interface AgentState {
   configs: Record<string, AgentConfig[]>
   runs: AgentRun[]
-  apiKeys: Record<string, string>
 
   // Config management
   getWorkspaceAgents: (workspaceId: string) => AgentConfig[]
@@ -31,8 +32,7 @@ export const useAgentStore = create<AgentState>()(
   persist(
     (set, get) => ({
       configs: {},
-      runs: [],
-      apiKeys: {},
+      runs: [] as AgentRun[],
 
       getWorkspaceAgents: (workspaceId) => {
         const configs = get().configs[workspaceId]
@@ -145,16 +145,31 @@ export const useAgentStore = create<AgentState>()(
         return get().runs.find((r) => r.id === runId)
       },
 
-      setApiKey: (provider, key) => {
-        set((state) => ({
-          apiKeys: { ...state.apiKeys, [provider]: key },
-        }))
+      setApiKey: (_provider, key) => {
+        setKey(_provider, key)
       },
 
       getApiKey: (provider) => {
-        return get().apiKeys[provider]
+        return getKey(provider) || undefined
       },
     }),
-    { name: 'cockpit-agents' },
+    {
+      name: 'cockpit-agents',
+      version: 1,
+      storage: createStorageAdapter(),
+      migrate: (persisted: unknown) => {
+        const state = persisted as Record<string, unknown>
+        // v0 -> v1: extract apiKeys from Zustand state to sessionStorage
+        if (state?.apiKeys && typeof state.apiKeys === 'object') {
+          const keys = state.apiKeys as Record<string, string>
+          for (const [provider, key] of Object.entries(keys)) {
+            if (key) setKey(provider, key)
+          }
+        }
+        // Remove apiKeys from persisted state (no longer stored in Zustand)
+        const { apiKeys: _, ...rest } = state || {}
+        return rest
+      },
+    },
   ),
 )

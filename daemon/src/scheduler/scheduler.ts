@@ -1,4 +1,5 @@
 import { runDiscovery, type DiscoveryResult } from '../discovery/discovery-engine'
+import { DaemonFileStore } from '../persistence/file-store'
 
 export interface ScheduledJob {
   id: string
@@ -13,15 +14,31 @@ export interface ScheduledJob {
   nextRun: string
 }
 
-const jobs = new Map<string, ScheduledJob>()
+const schedFileStore = new DaemonFileStore<Record<string, ScheduledJob>>('scheduled-jobs.json', {})
 const timers = new Map<string, Timer>()
 
+export async function initSchedulerStore(): Promise<void> {
+  await schedFileStore.init()
+  // Restore timers for enabled jobs
+  const jobs = schedFileStore.get()
+  for (const job of Object.values(jobs)) {
+    if (job.enabled) {
+      startJobTimer(job)
+      console.log(`[scheduler] Restored job "${job.projectName}" (every ${Math.round(job.intervalMs / 3600000)}h)`)
+    }
+  }
+}
+
+function getJobMap(): Record<string, ScheduledJob> {
+  return schedFileStore.get()
+}
+
 export function getScheduledJobs(): ScheduledJob[] {
-  return Array.from(jobs.values())
+  return Object.values(getJobMap())
 }
 
 export function getJob(id: string): ScheduledJob | undefined {
-  return jobs.get(id)
+  return getJobMap()[id]
 }
 
 export function addScheduledJob(config: {
@@ -47,7 +64,9 @@ export function addScheduledJob(config: {
     nextRun: new Date(Date.now() + intervalMs).toISOString(),
   }
 
-  jobs.set(id, job)
+  const map = getJobMap()
+  map[id] = job
+  schedFileStore.set(map)
   startJobTimer(job)
 
   console.log(`[scheduler] Job "${job.projectName}" scheduled every ${config.intervalHours}h`)
@@ -60,11 +79,16 @@ export function removeScheduledJob(id: string): boolean {
     clearInterval(timer)
     timers.delete(id)
   }
-  return jobs.delete(id)
+  const map = getJobMap()
+  const existed = !!map[id]
+  delete map[id]
+  schedFileStore.set(map)
+  return existed
 }
 
 export function toggleJob(id: string, enabled: boolean): ScheduledJob | undefined {
-  const job = jobs.get(id)
+  const map = getJobMap()
+  const job = map[id]
   if (!job) return undefined
 
   job.enabled = enabled
@@ -79,13 +103,13 @@ export function toggleJob(id: string, enabled: boolean): ScheduledJob | undefine
     }
   }
 
+  schedFileStore.set(map)
   return job
 }
 
 export async function runJobNow(id: string): Promise<DiscoveryResult | null> {
-  const job = jobs.get(id)
+  const job = getJobMap()[id]
   if (!job) return null
-
   return executeJob(job)
 }
 
@@ -98,13 +122,14 @@ async function executeJob(job: ScheduledJob): Promise<DiscoveryResult> {
   job.lastResult = result
   job.nextRun = new Date(Date.now() + job.intervalMs).toISOString()
 
+  schedFileStore.set(getJobMap())
+
   console.log(`[scheduler] Discovery complete: ${result.cards.length} cards found for "${job.projectName}"`)
 
   return result
 }
 
 function startJobTimer(job: ScheduledJob) {
-  // Clear existing timer
   const existing = timers.get(job.id)
   if (existing) clearInterval(existing)
 

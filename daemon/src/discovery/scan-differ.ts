@@ -41,15 +41,25 @@ function generateFingerprint(card: DiscoveryCard): string {
   return `fp-${Math.abs(hash).toString(36)}`
 }
 
-// In-memory store for scan history (keyed by projectPath)
-const historyStore = new Map<string, ScanHistory[]>()
+import { DaemonFileStore } from '../persistence/file-store'
+
+const historyFileStore = new DaemonFileStore<Record<string, ScanHistory[]>>('scan-history.json', {})
+
+export async function initScanHistory(): Promise<void> {
+  await historyFileStore.init()
+}
+
+function getHistoryMap(): Record<string, ScanHistory[]> {
+  return historyFileStore.get()
+}
 
 export function diffScan(
   projectPath: string,
   currentCards: DiscoveryCard[],
 ): DiffResult {
   const now = new Date().toISOString()
-  const previousScans = historyStore.get(projectPath) || []
+  const historyMap = getHistoryMap()
+  const previousScans = historyMap[projectPath] || []
   const lastScan = previousScans[previousScans.length - 1]
   const isFirstScan = previousScans.length === 0
 
@@ -143,10 +153,12 @@ export function diffScan(
   }
 
   // Store history (keep last 20 scans per project)
-  const history = historyStore.get(projectPath) || []
+  const updatedMap = { ...getHistoryMap() }
+  const history = updatedMap[projectPath] || []
   history.push(scanHistory)
   if (history.length > 20) history.shift()
-  historyStore.set(projectPath, history)
+  updatedMap[projectPath] = history
+  historyFileStore.set(updatedMap)
 
   return {
     findings,
@@ -159,11 +171,12 @@ export function diffScan(
 }
 
 export function getScanHistory(projectPath: string): ScanHistory[] {
-  return historyStore.get(projectPath) || []
+  return getHistoryMap()[projectPath] || []
 }
 
 export function linkFindingToCard(projectPath: string, fingerprint: string, cardId: string) {
-  const history = historyStore.get(projectPath)
+  const historyMap = getHistoryMap()
+  const history = historyMap[projectPath]
   if (!history) return
 
   const lastScan = history[history.length - 1]
@@ -172,5 +185,6 @@ export function linkFindingToCard(projectPath: string, fingerprint: string, card
   const finding = lastScan.findings.find((f) => f.fingerprint === fingerprint)
   if (finding) {
     finding.linkedCardId = cardId
+    historyFileStore.set(historyMap)
   }
 }

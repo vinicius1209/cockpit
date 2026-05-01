@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Workspace } from './types'
+import { createStorageAdapter } from '@/shared/lib/persistence'
 
 interface WorkspaceState {
   workspaces: Workspace[]
@@ -93,6 +94,11 @@ export const useWorkspaceStore = create<WorkspaceState>()(
         return state.workspaces.find((w) => w.id === state.activeWorkspaceId)
       },
     }),
-    { name: 'cockpit-workspaces' },
+    {
+      name: 'cockpit-workspaces',
+      version: 1,
+      storage: createStorageAdapter(),
+      migrate: (persisted) => persisted as WorkspaceState,
+    },
   ),
 )
