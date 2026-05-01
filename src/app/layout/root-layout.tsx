@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/widgets/sidebar/app-sidebar'
 import { AppHeader } from '@/widgets/header/app-header'
+import { Toaster } from '@/components/ui/sonner'
 
 export function RootLayout() {
   return (
@@ -15,6 +16,7 @@ export function RootLayout() {
           </main>
         </div>
       </div>
+      <Toaster richColors position="bottom-right" />
     </SidebarProvider>
   )
 }

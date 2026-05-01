@@ -9,9 +9,10 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Trash2, Plus, GripVertical, X, FolderOpen, Search, Loader2 } from 'lucide-react'
+import { ArrowLeft, Trash2, Plus, GripVertical, X, FolderOpen, Search, Loader2, CheckCircle2, AlertCircle, GitBranch, FileCode, Bot } from 'lucide-react'
 import { daemonClient } from '@/shared/lib/daemon-client'
-import type { InstalledAgent } from '@/entities/card/project-types'
+import type { InstalledAgent, ScanResult } from '@/entities/card/project-types'
+import { toast } from 'sonner'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#06b6d4', '#f97316']
 const LABEL_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
@@ -21,7 +22,7 @@ export function WorkspaceSettingsPage() {
   const navigate = useNavigate()
   const { workspaces, updateWorkspace, deleteWorkspace, setActiveWorkspace } = useWorkspaceStore()
   const { getWorkspaceLabels, addLabel, deleteLabel, getWorkspaceColumns } = useCardStore()
-  const { getWorkspaceProjects, addProject, deleteProject } = useProjectStore()
+  const { getWorkspaceProjects, addProject, updateProject, deleteProject } = useProjectStore()
 
   const workspace = workspaces.find((w) => w.id === workspaceId)
 
@@ -38,6 +39,7 @@ export function WorkspaceSettingsPage() {
   const [availableAgents, setAvailableAgents] = useState<InstalledAgent[]>([])
   const [daemonOnline, setDaemonOnline] = useState<boolean | null>(null)
   const [scanning, setScanning] = useState<string | null>(null)
+  const [scanResults, setScanResults] = useState<Record<string, ScanResult>>({})
 
   useEffect(() => {
     if (workspace) {
@@ -88,7 +90,7 @@ export function WorkspaceSettingsPage() {
     setNewLabelName('')
   }
 
-  const handleAddProject = async () => {
+  const handleAddProject = () => {
     if (!newProjectPath.trim()) return
     const projectName = newProjectName.trim() || newProjectPath.split('/').pop() || 'Projeto'
 
@@ -100,6 +102,10 @@ export function WorkspaceSettingsPage() {
       auto_scan: false,
       scan_interval_hours: 4,
     })
+
+    toast.success(`Projeto "${projectName}" adicionado`, {
+      description: `Path: ${newProjectPath.trim()}`,
+    })
     setNewProjectName('')
     setNewProjectPath('')
   }
@@ -107,9 +113,26 @@ export function WorkspaceSettingsPage() {
   const handleScanProject = async (projectPath: string, projectId: string) => {
     setScanning(projectId)
     try {
-      await daemonClient.scanProject(projectPath)
-    } catch {
-      // scan error
+      const result = await daemonClient.scanProject(projectPath)
+      setScanResults((prev) => ({ ...prev, [projectId]: result }))
+      updateProject(projectId, { last_scan_at: new Date().toISOString() })
+
+      const summaryParts: string[] = []
+      if (result.stack.length > 0) summaryParts.push(result.stack.join(', '))
+      if (result.git) summaryParts.push(`branch: ${result.git.branch}`)
+      if (result.todos.length > 0) summaryParts.push(`${result.todos.length} TODOs`)
+      if (result.agentConfigs.hasAgentsMd) summaryParts.push('AGENTS.md')
+      if (result.agentConfigs.hasClaudeDir) summaryParts.push('.claude/')
+
+      toast.success(`Scan concluido: ${result.name}`, {
+        description: summaryParts.join(' · ') || 'Nenhuma informacao adicional encontrada',
+        duration: 5000,
+      })
+    } catch (err) {
+      toast.error('Erro no scan', {
+        description: err instanceof Error ? err.message : 'Verifique se o daemon esta rodando',
+        duration: 5000,
+      })
     } finally {
       setScanning(null)
     }
@@ -210,36 +233,105 @@ export function WorkspaceSettingsPage() {
           </div>
 
           {projects.length > 0 ? (
-            <div className="space-y-2">
-              {projects.map((proj) => (
-                <div key={proj.id} className="flex items-center gap-2 py-2 px-3 rounded-md bg-muted/30">
-                  <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium">{proj.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{proj.path}</p>
+            <div className="space-y-3">
+              {projects.map((proj) => {
+                const scan = scanResults[proj.id]
+                return (
+                  <div key={proj.id} className="rounded-md border bg-muted/20 overflow-hidden">
+                    <div className="flex items-center gap-2 py-2 px-3">
+                      <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium">{proj.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">{proj.path}</p>
+                      </div>
+                      {proj.last_scan_at && (
+                        <Badge variant="outline" className="text-[10px] shrink-0">
+                          <CheckCircle2 className="h-2.5 w-2.5 mr-0.5 text-green-500" />
+                          scanned
+                        </Badge>
+                      )}
+                      {daemonOnline && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 text-xs shrink-0"
+                          onClick={() => handleScanProject(proj.path, proj.id)}
+                          disabled={scanning === proj.id}
+                        >
+                          {scanning === proj.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5 mr-1" />}
+                          Scan
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
+                        onClick={() => deleteProject(proj.id)}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+
+                    {scan && (
+                      <div className="border-t px-3 py-2.5 space-y-2 bg-muted/30">
+                        {/* Stack & Git */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {scan.stack.map((s) => (
+                            <Badge key={s} variant="secondary" className="text-[10px]">
+                              <FileCode className="h-2.5 w-2.5 mr-0.5" />
+                              {s}
+                            </Badge>
+                          ))}
+                          {scan.git && (
+                            <Badge variant="outline" className="text-[10px]">
+                              <GitBranch className="h-2.5 w-2.5 mr-0.5" />
+                              {scan.git.branch} · {scan.git.status}
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* Agent configs */}
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {scan.agentConfigs.hasAgentsMd && (
+                            <Badge variant="outline" className="text-[10px] text-green-600">
+                              <Bot className="h-2.5 w-2.5 mr-0.5" />
+                              AGENTS.md
+                            </Badge>
+                          )}
+                          {scan.agentConfigs.hasClaudeDir && (
+                            <Badge variant="outline" className="text-[10px] text-purple-600">
+                              .claude/
+                            </Badge>
+                          )}
+                          {scan.agentConfigs.hasOpenCodeDir && (
+                            <Badge variant="outline" className="text-[10px] text-blue-600">
+                              .opencode/
+                            </Badge>
+                          )}
+                        </div>
+
+                        {/* TODOs summary */}
+                        {scan.todos.length > 0 && (
+                          <div className="text-xs text-muted-foreground">
+                            <AlertCircle className="h-3 w-3 inline mr-1" />
+                            {scan.todos.length} TODO{scan.todos.length > 1 ? 's' : ''} encontrado{scan.todos.length > 1 ? 's' : ''}
+                            {scan.todos.slice(0, 3).map((t, i) => (
+                              <span key={i} className="block ml-4 truncate text-[11px] mt-0.5">
+                                {t.type}: {t.file}:{t.line}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Structure summary */}
+                        <p className="text-[11px] text-muted-foreground">
+                          {scan.structure.filter((s) => s.startsWith('📁')).length} diretorios, {scan.structure.filter((s) => s.includes('📄')).length} arquivos na raiz
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  {daemonOnline && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-7 text-xs shrink-0"
-                      onClick={() => handleScanProject(proj.path, proj.id)}
-                      disabled={scanning === proj.id}
-                    >
-                      {scanning === proj.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5 mr-1" />}
-                      Scan
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
-                    onClick={() => deleteProject(proj.id)}
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">Nenhum projeto registrado</p>
