@@ -16,12 +16,15 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
 import { CARD_TYPES, CARD_PRIORITIES } from '@/entities/card/types'
-import type { Card, CardType, CardPriority } from '@/entities/card/types'
+import type { Card, CardType, CardPriority, Label as LabelType } from '@/entities/card/types'
 import { CARD_TYPE_CONFIG, CARD_PRIORITY_CONFIG } from '@/shared/lib/constants'
 import { useCardStore } from '@/entities/card/store'
 import { useState, useEffect } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Plus, X, Tag } from 'lucide-react'
+
+const LABEL_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
 
 interface CardDialogProps {
   card: Card | null
@@ -32,14 +35,19 @@ interface CardDialogProps {
 }
 
 export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }: CardDialogProps) {
-  const { addCard, updateCard, deleteCard } = useCardStore()
+  const { addCard, updateCard, deleteCard, getWorkspaceLabels, addLabel, toggleCardLabel } = useCardStore()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [type, setType] = useState<CardType>('feature')
   const [priority, setPriority] = useState<CardPriority>('medium')
   const [dueDate, setDueDate] = useState('')
+  const [assignee, setAssignee] = useState('')
+  const [showNewLabel, setShowNewLabel] = useState(false)
+  const [newLabelName, setNewLabelName] = useState('')
+  const [newLabelColor, setNewLabelColor] = useState(LABEL_COLORS[0])
 
   const isEditing = !!card
+  const workspaceLabels = getWorkspaceLabels(workspaceId)
 
   useEffect(() => {
     if (card) {
@@ -48,13 +56,17 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
       setType(card.type)
       setPriority(card.priority)
       setDueDate(card.due_date || '')
+      setAssignee(card.assignee || '')
     } else {
       setTitle('')
       setDescription('')
       setType('feature')
       setPriority('medium')
       setDueDate('')
+      setAssignee('')
     }
+    setShowNewLabel(false)
+    setNewLabelName('')
   }, [card, open])
 
   const handleSave = () => {
@@ -67,6 +79,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
         type,
         priority,
         due_date: dueDate || null,
+        assignee: assignee.trim() || null,
       })
     } else {
       const columns = useCardStore.getState().getWorkspaceColumns(workspaceId)
@@ -83,7 +96,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
         type,
         priority,
         position: cardsInColumn.length,
-        assignee: null,
+        assignee: assignee.trim() || null,
         due_date: dueDate || null,
         spec_status: null,
       })
@@ -98,9 +111,24 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
     }
   }
 
+  const handleCreateLabel = () => {
+    if (!newLabelName.trim()) return
+    const labelId = addLabel(workspaceId, newLabelName.trim(), newLabelColor)
+    if (card) {
+      const newLabel: LabelType = { id: labelId, workspace_id: workspaceId, name: newLabelName.trim(), color: newLabelColor }
+      toggleCardLabel(card.id, newLabel)
+    }
+    setNewLabelName('')
+    setShowNewLabel(false)
+  }
+
+  const isLabelActive = (labelId: string) => {
+    return card?.labels.some((cl) => cl.label_id === labelId) ?? false
+  }
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Editar Card' : 'Novo Card'}</DialogTitle>
         </DialogHeader>
@@ -168,15 +196,99 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="due_date">Data limite</Label>
-            <Input
-              id="due_date"
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="due_date">Data limite</Label>
+              <Input
+                id="due_date"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="assignee">Responsavel</Label>
+              <Input
+                id="assignee"
+                value={assignee}
+                onChange={(e) => setAssignee(e.target.value)}
+                placeholder="Nome..."
+              />
+            </div>
           </div>
+
+          {isEditing && (
+            <>
+              <Separator />
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-1.5">
+                    <Tag className="h-3.5 w-3.5" />
+                    Labels
+                  </Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 text-xs"
+                    onClick={() => setShowNewLabel(!showNewLabel)}
+                  >
+                    <Plus className="h-3 w-3 mr-0.5" />
+                    Nova
+                  </Button>
+                </div>
+
+                {showNewLabel && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={newLabelName}
+                      onChange={(e) => setNewLabelName(e.target.value)}
+                      placeholder="Nome da label..."
+                      className="h-8 text-sm flex-1"
+                      onKeyDown={(e) => e.key === 'Enter' && handleCreateLabel()}
+                    />
+                    <div className="flex gap-1">
+                      {LABEL_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          className={`h-5 w-5 rounded-full shrink-0 transition-transform ${newLabelColor === c ? 'scale-125 ring-2 ring-offset-1 ring-offset-background ring-primary' : ''}`}
+                          style={{ backgroundColor: c }}
+                          onClick={() => setNewLabelColor(c)}
+                        />
+                      ))}
+                    </div>
+                    <Button size="sm" className="h-8" onClick={handleCreateLabel} disabled={!newLabelName.trim()}>
+                      Criar
+                    </Button>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap gap-1.5">
+                  {workspaceLabels.map((label) => {
+                    const active = isLabelActive(label.id)
+                    return (
+                      <Badge
+                        key={label.id}
+                        variant={active ? 'default' : 'outline'}
+                        className={`cursor-pointer text-xs transition-colors ${active ? 'text-white border-0' : 'opacity-60 hover:opacity-100'}`}
+                        style={active ? { backgroundColor: label.color } : undefined}
+                        onClick={() => card && toggleCardLabel(card.id, label)}
+                      >
+                        {!active && (
+                          <span className="h-2 w-2 rounded-full mr-1 inline-block" style={{ backgroundColor: label.color }} />
+                        )}
+                        {label.name}
+                        {active && <X className="h-3 w-3 ml-1" />}
+                      </Badge>
+                    )
+                  })}
+                  {workspaceLabels.length === 0 && !showNewLabel && (
+                    <span className="text-xs text-muted-foreground">Nenhuma label criada</span>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="flex items-center justify-between pt-2">
             {isEditing && (

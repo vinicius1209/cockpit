@@ -16,6 +16,9 @@ interface CardState {
   getWorkspaceColumns: (workspaceId: string) => BoardColumn[]
   initWorkspaceColumns: (workspaceId: string) => void
   addLabel: (workspaceId: string, name: string, color: string) => string
+  deleteLabel: (workspaceId: string, labelId: string) => void
+  getWorkspaceLabels: (workspaceId: string) => Label[]
+  toggleCardLabel: (cardId: string, label: Label) => void
 }
 
 export const useCardStore = create<CardState>()(
@@ -115,6 +118,39 @@ export const useCardStore = create<CardState>()(
           },
         }))
         return id
+      },
+
+      deleteLabel: (workspaceId, labelId) => {
+        set((state) => ({
+          labels: {
+            ...state.labels,
+            [workspaceId]: (state.labels[workspaceId] || []).filter((l) => l.id !== labelId),
+          },
+          cards: state.cards.map((c) => ({
+            ...c,
+            labels: c.labels.filter((cl) => cl.label_id !== labelId),
+          })),
+        }))
+      },
+
+      getWorkspaceLabels: (workspaceId) => {
+        return get().labels[workspaceId] || []
+      },
+
+      toggleCardLabel: (cardId, label) => {
+        set((state) => ({
+          cards: state.cards.map((c) => {
+            if (c.id !== cardId) return c
+            const exists = c.labels.some((cl) => cl.label_id === label.id)
+            return {
+              ...c,
+              labels: exists
+                ? c.labels.filter((cl) => cl.label_id !== label.id)
+                : [...c.labels, { card_id: cardId, label_id: label.id, label }],
+              updated_at: new Date().toISOString(),
+            }
+          }),
+        }))
       },
     }),
     { name: 'cockpit-cards' },

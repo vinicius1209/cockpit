@@ -54,10 +54,34 @@ export function BoardCard({ card, onClick }: BoardCardProps) {
 
           <p className="text-sm font-medium leading-tight">{card.title}</p>
 
-          {card.due_date && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Calendar className="h-3 w-3" />
-              <span>{format(new Date(card.due_date), 'dd/MM')}</span>
+          {card.labels.length > 0 && (
+            <div className="flex items-center gap-1 flex-wrap">
+              {card.labels.map((cl) => (
+                <span
+                  key={cl.label_id}
+                  className="h-1.5 w-6 rounded-full inline-block"
+                  style={{ backgroundColor: cl.label?.color ?? '#6b7280' }}
+                  title={cl.label?.name}
+                />
+              ))}
+            </div>
+          )}
+
+          {(card.due_date || card.assignee) && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {card.due_date && (
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  <span>{format(new Date(card.due_date), 'dd/MM')}</span>
+                </div>
+              )}
+              {card.assignee && (
+                <div className="flex items-center gap-1 ml-auto">
+                  <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-medium text-primary">
+                    {card.assignee.charAt(0).toUpperCase()}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

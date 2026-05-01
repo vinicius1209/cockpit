@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -15,17 +15,19 @@ import { useWorkspaceStore } from '@/entities/workspace/store'
 import { BoardColumn } from './board-column'
 import { BoardCard } from './board-card'
 import { CardDialog } from './card-dialog'
+import { BoardFiltersBar, type BoardFilters } from './board-filters'
 import type { Card } from '@/entities/card/types'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 
 export function BoardView() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
-  const { getWorkspaceColumns, getColumnCards, moveCard } = useCardStore()
+  const { getWorkspaceColumns, getColumnCards, moveCard, cards, getWorkspaceLabels } = useCardStore()
 
   const [activeCard, setActiveCard] = useState<Card | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
   const [defaultColumnId, setDefaultColumnId] = useState<string | undefined>()
+  const [filters, setFilters] = useState<BoardFilters>({ types: [], priorities: [], labelIds: [] })
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -40,6 +42,32 @@ export function BoardView() {
   }
 
   const columns = getWorkspaceColumns(activeWorkspaceId)
+
+  const hasFilters = filters.types.length > 0 || filters.priorities.length > 0 || filters.labelIds.length > 0
+  const workspaceLabels = getWorkspaceLabels(activeWorkspaceId)
+
+  const workspaceCards = useMemo(
+    () => cards.filter((c) => c.workspace_id === activeWorkspaceId),
+    [cards, activeWorkspaceId],
+  )
+
+  const filterCards = useCallback(
+    (columnCards: Card[]) => {
+      if (!hasFilters) return columnCards
+      return columnCards.filter((c) => {
+        if (filters.types.length > 0 && !filters.types.includes(c.type)) return false
+        if (filters.priorities.length > 0 && !filters.priorities.includes(c.priority)) return false
+        if (filters.labelIds.length > 0 && !c.labels.some((cl) => filters.labelIds.includes(cl.label_id))) return false
+        return true
+      })
+    },
+    [filters, hasFilters],
+  )
+
+  const filteredTotal = useMemo(() => {
+    if (!hasFilters) return workspaceCards.length
+    return filterCards(workspaceCards).length
+  }, [workspaceCards, filterCards, hasFilters])
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event
@@ -96,6 +124,13 @@ export function BoardView() {
 
   return (
     <>
+      <BoardFiltersBar
+        filters={filters}
+        onChange={setFilters}
+        totalCards={workspaceCards.length}
+        filteredCards={filteredTotal}
+        labels={workspaceLabels}
+      />
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -106,12 +141,12 @@ export function BoardView() {
         <ScrollArea className="h-full">
           <div className="flex gap-4 p-4 h-full">
             {columns.map((column) => {
-              const cards = getColumnCards(activeWorkspaceId, column.id)
+              const columnCards = filterCards(getColumnCards(activeWorkspaceId, column.id))
               return (
                 <BoardColumn
                   key={column.id}
                   column={column}
-                  cards={cards}
+                  cards={columnCards}
                   onCardClick={handleCardClick}
                   onAddCard={handleAddCard}
                 />
