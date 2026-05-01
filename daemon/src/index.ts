@@ -4,6 +4,7 @@ const PORT = Number(process.env.COCKPIT_DAEMON_PORT || 4800)
 
 const server = Bun.serve({
   port: PORT,
+  idleTimeout: 255, // max allowed by Bun (seconds) — needed for long SSE streams during agent execution
   async fetch(req) {
     // CORS for local frontend
     if (req.method === 'OPTIONS') {

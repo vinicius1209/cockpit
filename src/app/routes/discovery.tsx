@@ -143,18 +143,47 @@ export function DiscoveryPage() {
 
       es.onerror = () => {
         es.close()
-        // Try to recover result
+        // Try to recover: check job status, reconnect if still running
         daemonClient.getDiscoveryJob(jobId)
           .then((job) => {
             const j = job as { status: string; result: DiscoveryResult | null; error: string | null }
             if (j.status === 'completed' && j.result) {
               setResult(j.result)
+              setIsRunning(false)
+              toast.success(`Discovery concluido: ${j.result.cards.length} descobertas`)
             } else if (j.status === 'failed') {
               setError(j.error || 'Erro desconhecido')
+              setIsRunning(false)
+            } else {
+              // Job still running — poll every 5s until done
+              setCurrentPhase('Reconectando... agent ainda em execucao')
+              const poll = setInterval(() => {
+                daemonClient.getDiscoveryJob(jobId)
+                  .then((j2) => {
+                    const job2 = j2 as { status: string; result: DiscoveryResult | null; error: string | null }
+                    if (job2.status === 'completed' && job2.result) {
+                      clearInterval(poll)
+                      setResult(job2.result)
+                      setIsRunning(false)
+                      toast.success(`Discovery concluido: ${job2.result.cards.length} descobertas`)
+                    } else if (job2.status === 'failed') {
+                      clearInterval(poll)
+                      setError(job2.error || 'Erro desconhecido')
+                      setIsRunning(false)
+                    }
+                  })
+                  .catch(() => {
+                    clearInterval(poll)
+                    setError('Conexao com daemon perdida')
+                    setIsRunning(false)
+                  })
+              }, 5000)
             }
           })
-          .catch(() => setError('Conexao com daemon perdida'))
-          .finally(() => setIsRunning(false))
+          .catch(() => {
+            setError('Conexao com daemon perdida')
+            setIsRunning(false)
+          })
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao iniciar discovery'
