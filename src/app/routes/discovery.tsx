@@ -5,12 +5,18 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { useWorkspaceStore } from '@/entities/workspace/store'
 import { useProjectStore } from '@/entities/card/project-store'
 import { useCardStore } from '@/entities/card/store'
@@ -19,6 +25,7 @@ import type { DiscoveryResult, DiscoveryCard, InstalledAgent } from '@/entities/
 import { CARD_TYPE_CONFIG, CARD_PRIORITY_CONFIG } from '@/shared/lib/constants'
 import type { CardType, CardPriority } from '@/entities/card/types'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import {
   Search,
   Loader2,
@@ -33,6 +40,8 @@ import {
   Radar,
   Import,
   CircleDot,
+  ChevronsUpDown,
+  Check,
 } from 'lucide-react'
 
 export function DiscoveryPage() {
@@ -43,6 +52,8 @@ export function DiscoveryPage() {
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
   const [useAgent, setUseAgent] = useState<string>('none')
+  const [projectOpen, setProjectOpen] = useState(false)
+  const [modeOpen, setModeOpen] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
   const [result, setResult] = useState<DiscoveryResult | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -200,53 +211,126 @@ export function DiscoveryPage() {
       <Card>
         <CardContent className="pt-5 pb-4">
           <div className="flex items-end gap-3">
-            {/* Project select */}
+            {/* Project combobox */}
             <div className="flex-1 space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Projeto</label>
-              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Selecionar projeto..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      <div className="flex items-center gap-2">
-                        <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="font-medium">{p.name}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={projectOpen} onOpenChange={setProjectOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={projectOpen}
+                    className="h-10 w-full justify-between font-normal"
+                  >
+                    {selectedProject ? (
+                      <span className="flex items-center gap-2 truncate">
+                        <FolderOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="font-medium">{selectedProject.name}</span>
+                        <span className="text-xs text-muted-foreground truncate hidden sm:inline">
+                          {selectedProject.path.replace(/^\/Users\/[^/]+\//, '~/')}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">Buscar projeto...</span>
+                    )}
+                    <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar projeto..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhum projeto encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {projects.map((p) => (
+                          <CommandItem
+                            key={p.id}
+                            value={p.name}
+                            onSelect={() => {
+                              setSelectedProjectId(p.id)
+                              setProjectOpen(false)
+                            }}
+                          >
+                            <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                            <div className="flex flex-col ml-1">
+                              <span className="font-medium">{p.name}</span>
+                              <span className="text-[11px] text-muted-foreground">{p.path.replace(/^\/Users\/[^/]+\//, '~/')}</span>
+                            </div>
+                            <Check className={cn('ml-auto h-4 w-4', selectedProjectId === p.id ? 'opacity-100' : 'opacity-0')} />
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
-            {/* Agent select */}
-            <div className="w-52 space-y-1.5">
+            {/* Mode combobox */}
+            <div className="w-56 space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Modo</label>
-              <Select value={useAgent} onValueChange={setUseAgent}>
-                <SelectTrigger className="h-10">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">
-                    <div className="flex items-center gap-2">
-                      <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                      Scanner rapido
-                    </div>
-                  </SelectItem>
-                  {agents.map((a) => (
-                    <SelectItem key={a.name} value={a.name}>
-                      <div className="flex items-center gap-2">
+              <Popover open={modeOpen} onOpenChange={setModeOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={modeOpen}
+                    className="h-10 w-full justify-between font-normal"
+                  >
+                    {useAgent === 'none' ? (
+                      <span className="flex items-center gap-2">
+                        <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                        Scanner rapido
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
                         <Bot className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span>{a.name}</span>
-                        {a.version && (
-                          <span className="text-[10px] text-muted-foreground">{a.version.split(' ')[0]}</span>
-                        )}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                        {agents.find((a) => a.name === useAgent)?.name || useAgent}
+                      </span>
+                    )}
+                    <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Buscar modo..." />
+                    <CommandList>
+                      <CommandEmpty>Nenhum agent encontrado.</CommandEmpty>
+                      <CommandGroup heading="Scanner">
+                        <CommandItem
+                          value="scanner-rapido"
+                          onSelect={() => { setUseAgent('none'); setModeOpen(false) }}
+                        >
+                          <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                          <div className="flex flex-col ml-1">
+                            <span>Scanner rapido</span>
+                            <span className="text-[11px] text-muted-foreground">TODOs, git status, dependencias</span>
+                          </div>
+                          <Check className={cn('ml-auto h-4 w-4', useAgent === 'none' ? 'opacity-100' : 'opacity-0')} />
+                        </CommandItem>
+                      </CommandGroup>
+                      {agents.length > 0 && (
+                        <CommandGroup heading="AI Agents">
+                          {agents.map((a) => (
+                            <CommandItem
+                              key={a.name}
+                              value={a.name}
+                              onSelect={() => { setUseAgent(a.name); setModeOpen(false) }}
+                            >
+                              <Bot className="h-3.5 w-3.5 text-muted-foreground" />
+                              <div className="flex flex-col ml-1">
+                                <span>{a.name}</span>
+                                <span className="text-[11px] text-muted-foreground">{a.version?.split(' ')[0] || 'installed'}</span>
+                              </div>
+                              <Check className={cn('ml-auto h-4 w-4', useAgent === a.name ? 'opacity-100' : 'opacity-0')} />
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             {/* Run button */}
