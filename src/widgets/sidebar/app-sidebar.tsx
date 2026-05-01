@@ -11,7 +11,7 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar'
 import { useWorkspaceStore } from '@/entities/workspace/store'
-import { LayoutDashboard, Settings, Plus, Briefcase, Sparkles } from 'lucide-react'
+import { LayoutDashboard, Settings, Plus, Briefcase, Sparkles, BarChart3, BookOpen } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 
 export function AppSidebar() {
@@ -59,6 +59,24 @@ export function AppSidebar() {
                 >
                   <Sparkles className="h-4 w-4" />
                   <span>Discovery</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={location.pathname === '/metrics'}
+                  onClick={() => navigate('/metrics')}
+                >
+                  <BarChart3 className="h-4 w-4" />
+                  <span>Metricas</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={location.pathname === '/docs'}
+                  onClick={() => navigate('/docs')}
+                >
+                  <BookOpen className="h-4 w-4" />
+                  <span>Docs Vault</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
