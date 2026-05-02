@@ -54,11 +54,7 @@ export function AgentChat({ card, workspaceId }: AgentChatProps) {
   const handleSend = useCallback(async () => {
     if (!input.trim() || !selectedAgent || isStreaming) return
 
-    const apiKey = getApiKey(selectedAgent.provider)
-    if (!apiKey) {
-      alert(`Configure a API key do provider "${selectedAgent.provider}" nas configuracoes.`)
-      return
-    }
+    const apiKey = getApiKey(selectedAgent.provider) || ''
 
     let runId = activeRunId
     if (!runId || activeRun?.status !== 'running') {

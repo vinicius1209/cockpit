@@ -37,11 +37,7 @@ export function InterviewPanel({ card, workspaceId }: InterviewPanelProps) {
 
   const startInterview = useCallback(async () => {
     if (!interviewer) return
-    const apiKey = getApiKey(interviewer.provider)
-    if (!apiKey) {
-      alert(`Configure a API key do provider "${interviewer.provider}" nas configuracoes.`)
-      return
-    }
+    const apiKey = getApiKey(interviewer.provider) || ''
 
     const initialMessage: AgentMessage = {
       id: `msg-${Date.now()}`,
@@ -97,8 +93,7 @@ Faca a primeira pergunta para entender melhor esse card.`,
   const handleSend = useCallback(async () => {
     if (!input.trim() || !interviewer || isStreaming) return
 
-    const apiKey = getApiKey(interviewer.provider)
-    if (!apiKey) return
+    const apiKey = getApiKey(interviewer.provider) || ''
 
     const userMsg: AgentMessage = {
       id: `msg-${Date.now()}`,

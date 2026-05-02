@@ -79,11 +79,7 @@ export function SpecPanel({ card, workspaceId }: SpecPanelProps) {
 
   const handleGenerateSpec = useCallback(async () => {
     if (!specWriter) return
-    const apiKey = getApiKey(specWriter.provider)
-    if (!apiKey) {
-      alert(`Configure a API key do provider "${specWriter.provider}" nas configuracoes.`)
-      return
-    }
+    const apiKey = getApiKey(specWriter.provider) || ''
 
     setIsGenerating(true)
     setContent('')

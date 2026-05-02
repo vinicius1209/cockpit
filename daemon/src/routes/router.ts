@@ -4,6 +4,7 @@ import { handleAgentRoutes } from './agents'
 import { handleDiscoveryRoutes } from './discovery'
 import { handleSchedulerRoutes } from './scheduler'
 import { handleSecretsRoutes } from './secrets'
+import { handleChatRoutes } from './chat'
 
 export async function handleRequest(req: Request): Promise<Response> {
   const url = new URL(req.url)
@@ -37,6 +38,11 @@ export async function handleRequest(req: Request): Promise<Response> {
   // Secrets routes
   if (path.startsWith('/secrets')) {
     return handleSecretsRoutes(req, url)
+  }
+
+  // Chat routes
+  if (path.startsWith('/chat')) {
+    return handleChatRoutes(req, url)
   }
 
   return jsonResponse({ error: 'Not found' }, 404)

@@ -38,7 +38,8 @@ export function SettingsPage() {
             API Keys
           </CardTitle>
           <CardDescription>
-            Chaves de API para os providers de AI. Armazenadas localmente no navegador.
+            Opcional — O Cockpit usa automaticamente os CLI agents instalados (Claude Code, OpenCode, Gemini CLI).
+            Configure uma key apenas se preferir usar a API direta.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

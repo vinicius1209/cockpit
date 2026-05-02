@@ -6,6 +6,8 @@ interface StreamCallbacks {
   onError: (error: string) => void
 }
 
+const DAEMON_URL = import.meta.env.VITE_DAEMON_URL || 'http://localhost:4800'
+
 export async function runAgent(
   config: AgentConfig,
   messages: AgentMessage[],
@@ -13,6 +15,12 @@ export async function runAgent(
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
 ) {
+  // If no API key → route through daemon (uses CLI agent, no key needed)
+  if (!apiKey) {
+    return runViaDaemon(config, messages, callbacks, signal)
+  }
+
+  // If API key provided → use direct API (opt-in advanced)
   const provider = config.provider
 
   if (provider === 'claude') {
@@ -23,6 +31,83 @@ export async function runAgent(
     return runGemini(config, messages, apiKey, callbacks, signal)
   } else {
     callbacks.onError(`Provider "${provider}" nao suportado ainda`)
+  }
+}
+
+async function runViaDaemon(
+  config: AgentConfig,
+  messages: AgentMessage[],
+  callbacks: StreamCallbacks,
+  signal?: AbortSignal,
+) {
+  const chatMessages = messages
+    .filter((m) => m.role !== 'system')
+    .map((m) => ({ role: m.role, content: m.content }))
+
+  try {
+    const response = await fetch(`${DAEMON_URL}/chat/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        systemPrompt: config.system_prompt,
+        messages: chatMessages,
+        model: config.model,
+      }),
+      signal,
+    })
+
+    if (!response.ok) {
+      const err = await response.text()
+      callbacks.onError(`Daemon error: ${err}`)
+      return
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) {
+      callbacks.onError('No response body')
+      return
+    }
+
+    const decoder = new TextDecoder()
+    let fullText = ''
+    let buffer = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        const data = line.slice(6).trim()
+
+        try {
+          const event = JSON.parse(data)
+          if (event.type === 'chunk' && event.text) {
+            fullText += event.text + '\n'
+            callbacks.onToken(event.text + '\n')
+          } else if (event.type === 'done') {
+            if (event.fullText) fullText = event.fullText
+          } else if (event.type === 'error') {
+            callbacks.onError(event.message || 'Erro do daemon')
+            return
+          }
+        } catch {
+          // skip malformed
+        }
+      }
+    }
+
+    callbacks.onComplete(fullText.trim())
+  } catch (err) {
+    if (signal?.aborted) {
+      callbacks.onError('Cancelado')
+      return
+    }
+    callbacks.onError(err instanceof Error ? err.message : 'Erro de conexao com daemon')
   }
 }
 
