@@ -349,13 +349,13 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
         {/* Keep panels mounted but hidden to preserve state across tab switches */}
         {isEditing && card && (
           <>
-            <div className={`flex-1 min-h-0 ${activeTab === 'interview' ? '' : 'hidden'}`}>
+            <div className={`flex-1 min-h-0 overflow-hidden ${activeTab === 'interview' ? 'flex flex-col' : 'hidden'}`}>
               <InterviewPanel card={card} workspaceId={workspaceId} />
             </div>
-            <div className={`flex-1 min-h-0 ${activeTab === 'spec' ? '' : 'hidden'}`}>
+            <div className={`flex-1 min-h-0 overflow-hidden ${activeTab === 'spec' ? 'flex flex-col' : 'hidden'}`}>
               <SpecPanel card={card} workspaceId={workspaceId} />
             </div>
-            <div className={`flex-1 min-h-0 ${activeTab === 'agent' ? '' : 'hidden'}`}>
+            <div className={`flex-1 min-h-0 overflow-hidden ${activeTab === 'agent' ? 'flex flex-col' : 'hidden'}`}>
               <AgentChat card={card} workspaceId={workspaceId} />
             </div>
           </>
