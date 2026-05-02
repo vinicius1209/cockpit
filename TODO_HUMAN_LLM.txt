@@ -1,38 +1,12 @@
 PROJECT TODO LIST (HUMAN + LLM)
 Created for collaborative planning and execution.
 
-How to use:
-- Add new items under the right section.
-- Keep each task with: [ ] Task | Owner: Human/LLM/Both | Status: Todo/Doing/Done
-- Move completed tasks to Done.
+[X] Adicionar histórico de discovery. Ao realizar um novo discovery ele recebe um id/hash e 
+vai salvar os itens/sub itens encontrados naquele discovery. O usuario pode na UI depois acessar
+esses discovery e rever os itens gerados naquele momento. Hoje ao recarregar a tela o usuario
+perde tudo o que foi feito no  discovery anterior.
 
-----------------------------------------
-HUMAN TASKS
-----------------------------------------
-[ ] Define the next project milestone | Owner: Human | Status: Todo
-[ ] Prioritize top 3 features for this cycle | Owner: Human | Status: Todo
-[ ] Review and approve implementation proposals | Owner: Human | Status: Todo
-
-----------------------------------------
-LLM TASKS
-----------------------------------------
-[ ] Propose implementation plan for top priority feature | Owner: LLM | Status: Todo
-[ ] Suggest code refactors for maintainability | Owner: LLM | Status: Todo
-[ ] Draft tests for new/changed behavior | Owner: LLM | Status: Todo
-
-----------------------------------------
-HUMAN + LLM INTERACTION LOOP
-----------------------------------------
-[ ] Human describes a new task in one sentence | Owner: Both | Status: Todo
-[ ] LLM breaks task into actionable steps | Owner: Both | Status: Todo
-[ ] Human validates scope and priorities | Owner: Both | Status: Todo
-[ ] LLM implements or drafts changes | Owner: Both | Status: Todo
-[ ] Human reviews results and requests adjustments | Owner: Both | Status: Todo
-
-----------------------------------------
-NEW THINGS TO DO IN PROJECT
-----------------------------------------
-[ ] Audit current project structure and identify cleanup opportunities | Owner: Both | Status: Todo
-[ ] Improve developer onboarding instructions | Owner: Both | Status: Todo
-[ ] Add/verify lint and test automation in CI | Owner: Both | Status: Todo
-[ ] Define a short roadmap for the next 2 iterations | Owner: Human | Status: Todo
+[ ] Ao trocar informação no mobo entrevista no card e ir para outra aba a informacão é perdida. Por exemplo:
+estava na aba de entrevista e quis olhar a aba de Spec, e ao voltar para a aba de entrevista tudo foi perdido.
+Isso precisa ser persistido, precisa ter uma experiencia fluida do usuário. Pense que ele está trabalhando focado
+no card para deixar tudo documentado/pronto para a LLM trabalhar depois.

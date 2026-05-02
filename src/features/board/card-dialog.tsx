@@ -360,25 +360,23 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
               </div>
             </div>
           </div>
-        ) : activeTab === 'interview' ? (
-          card && (
-            <div className="h-[calc(90vh-120px)]">
+        ) : null}
+
+        {/* Keep panels mounted but hidden to preserve state across tab switches */}
+        {isEditing && card && (
+          <>
+            <div className={`h-[calc(90vh-120px)] ${activeTab === 'interview' ? '' : 'hidden'}`}>
               <InterviewPanel card={card} workspaceId={workspaceId} />
             </div>
-          )
-        ) : activeTab === 'spec' ? (
-          card && (
-            <div className="h-[calc(90vh-120px)]">
+            <div className={`h-[calc(90vh-120px)] ${activeTab === 'spec' ? '' : 'hidden'}`}>
               <SpecPanel card={card} workspaceId={workspaceId} />
             </div>
-          )
-        ) : (
-          card && (
-            <div className="h-[calc(90vh-120px)]">
+            <div className={`h-[calc(90vh-120px)] ${activeTab === 'agent' ? '' : 'hidden'}`}>
               <AgentChat card={card} workspaceId={workspaceId} />
             </div>
-          )
+          </>
         )}
+
       </DialogContent>
     </Dialog>
   )
