@@ -8,8 +8,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Trash2, Plus, GripVertical, X, FolderOpen, Search, Loader2, CheckCircle2, AlertCircle, GitBranch, FileCode, Bot, Wand2 } from 'lucide-react'
+import { ArrowLeft, Trash2, Plus, X, FolderOpen, Search, Loader2, CheckCircle2, AlertCircle, GitBranch, FileCode, Bot, Wand2, Settings, Tag, Columns3 } from 'lucide-react'
 import { daemonClient } from '@/shared/lib/daemon-client'
 import type { InstalledAgent, ScanResult } from '@/entities/card/project-types'
 import { toast } from 'sonner'
@@ -32,8 +34,6 @@ export function WorkspaceSettingsPage() {
   const [newLabelName, setNewLabelName] = useState('')
   const [newLabelColor, setNewLabelColor] = useState(LABEL_COLORS[0])
   const [saved, setSaved] = useState(false)
-
-  // Project form
   const [newProjectName, setNewProjectName] = useState('')
   const [newProjectPath, setNewProjectPath] = useState('')
   const [availableAgents, setAvailableAgents] = useState<InstalledAgent[]>([])
@@ -53,10 +53,7 @@ export function WorkspaceSettingsPage() {
 
   useEffect(() => {
     daemonClient.health()
-      .then(() => {
-        setDaemonOnline(true)
-        return daemonClient.getAvailableAgents()
-      })
+      .then(() => { setDaemonOnline(true); return daemonClient.getAvailableAgents() })
       .then(setAvailableAgents)
       .catch(() => setDaemonOnline(false))
   }, [])
@@ -77,6 +74,7 @@ export function WorkspaceSettingsPage() {
       color,
     })
     setSaved(true)
+    toast.success('Workspace salvo')
     setTimeout(() => setSaved(false), 2000)
   }
 
@@ -88,25 +86,18 @@ export function WorkspaceSettingsPage() {
   const handleAddLabel = () => {
     if (!newLabelName.trim()) return
     addLabel(workspaceId, newLabelName.trim(), newLabelColor)
+    toast.success(`Label "${newLabelName.trim()}" criada`)
     setNewLabelName('')
   }
 
   const handleAddProject = () => {
     if (!newProjectPath.trim()) return
     const projectName = newProjectName.trim() || newProjectPath.split('/').pop() || 'Projeto'
-
     addProject({
-      workspace_id: workspaceId,
-      name: projectName,
-      path: newProjectPath.trim(),
-      agent_preference: null,
-      auto_scan: false,
-      scan_interval_hours: 4,
+      workspace_id: workspaceId, name: projectName, path: newProjectPath.trim(),
+      agent_preference: null, auto_scan: false, scan_interval_hours: 4,
     })
-
-    toast.success(`Projeto "${projectName}" adicionado`, {
-      description: `Path: ${newProjectPath.trim()}`,
-    })
+    toast.success(`Projeto "${projectName}" adicionado`)
     setNewProjectName('')
     setNewProjectPath('')
   }
@@ -117,26 +108,14 @@ export function WorkspaceSettingsPage() {
       const result = await daemonClient.scanProject(projectPath)
       setScanResults((prev) => ({ ...prev, [projectId]: result }))
       updateProject(projectId, { last_scan_at: new Date().toISOString() })
-
-      const summaryParts: string[] = []
-      if (result.stack.length > 0) summaryParts.push(result.stack.join(', '))
-      if (result.git) summaryParts.push(`branch: ${result.git.branch}`)
-      if (result.todos.length > 0) summaryParts.push(`${result.todos.length} TODOs`)
-      if (result.agentConfigs.hasAgentsMd) summaryParts.push('AGENTS.md')
-      if (result.agentConfigs.hasClaudeDir) summaryParts.push('.claude/')
-
-      toast.success(`Scan concluido: ${result.name}`, {
-        description: summaryParts.join(' · ') || 'Nenhuma informacao adicional encontrada',
-        duration: 5000,
-      })
+      const parts: string[] = []
+      if (result.stack.length > 0) parts.push(result.stack.join(', '))
+      if (result.git) parts.push(`branch: ${result.git.branch}`)
+      if (result.todos.length > 0) parts.push(`${result.todos.length} TODOs`)
+      toast.success(`Scan concluido: ${result.name}`, { description: parts.join(' · ') || undefined })
     } catch (err) {
-      toast.error('Erro no scan', {
-        description: err instanceof Error ? err.message : 'Verifique se o daemon esta rodando',
-        duration: 5000,
-      })
-    } finally {
-      setScanning(null)
-    }
+      toast.error('Erro no scan', { description: err instanceof Error ? err.message : 'Daemon offline' })
+    } finally { setScanning(null) }
   }
 
   const handleBootstrapProject = async (projectPath: string, projectId: string) => {
@@ -144,324 +123,299 @@ export function WorkspaceSettingsPage() {
     try {
       const result = await daemonClient.bootstrapProject(projectPath)
       if (result.filesCreated.length > 0) {
-        toast.success(`Bootstrap concluido: ${result.project}`, {
-          description: `Criados: ${result.filesCreated.join(', ')}`,
-          duration: 5000,
-        })
+        toast.success(`Bootstrap concluido`, { description: `Criados: ${result.filesCreated.join(', ')}` })
       } else {
-        toast.info('Nenhum arquivo criado', {
-          description: `Todos os arquivos ja existem: ${result.filesSkipped.join(', ')}`,
-        })
+        toast.info('Arquivos ja existem', { description: result.filesSkipped.join(', ') })
       }
-      // Re-scan to refresh badges
       handleScanProject(projectPath, projectId)
     } catch (err) {
-      toast.error('Erro no bootstrap', {
-        description: err instanceof Error ? err.message : 'Verifique se o daemon esta rodando',
-      })
-    } finally {
-      setBootstrapping(null)
-    }
+      toast.error('Erro no bootstrap', { description: err instanceof Error ? err.message : 'Daemon offline' })
+    } finally { setBootstrapping(null) }
   }
 
+  const abbreviatePath = (p: string) => p.replace(/^\/Users\/[^/]+\//, '~/')
+
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => navigate(`/workspace/${workspaceId}`)}>
+    <div className="p-4 lg:p-6 max-w-3xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-3 mb-6">
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/workspace/${workspaceId}`)}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
-          <h1 className="text-xl font-bold">Configuracoes</h1>
-          <p className="text-sm text-muted-foreground">{workspace.name}</p>
+        <div className="flex items-center gap-2 flex-1">
+          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: workspace.color }} />
+          <h1 className="text-lg font-semibold">{workspace.name}</h1>
+          <span className="text-muted-foreground text-sm">/ Configuracoes</span>
+        </div>
+        {/* Daemon status */}
+        <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] ${
+          daemonOnline ? 'bg-green-500/10 text-green-500' : daemonOnline === false ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'
+        }`}>
+          <span className="h-1.5 w-1.5 rounded-full bg-current" />
+          {daemonOnline ? 'Online' : daemonOnline === false ? 'Offline' : '...'}
         </div>
       </div>
 
-      {/* Daemon status */}
-      <div className="flex items-center gap-2 text-sm">
-        <span className={`h-2 w-2 rounded-full ${daemonOnline ? 'bg-green-500' : daemonOnline === false ? 'bg-red-500' : 'bg-yellow-500'}`} />
-        <span className="text-muted-foreground">
-          {daemonOnline ? 'Daemon conectado' : daemonOnline === false ? 'Daemon offline — rode: cd cockpit/daemon && bun dev' : 'Verificando daemon...'}
-        </span>
-        {daemonOnline && availableAgents.length > 0 && (
-          <div className="flex gap-1 ml-2">
-            {availableAgents.map((a) => (
-              <Badge key={a.name} variant="outline" className="text-[10px]">
-                {a.name} {a.version?.split(' ')[0]}
-              </Badge>
-            ))}
-          </div>
-        )}
-      </div>
+      <Tabs defaultValue="geral" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="geral">
+            <Settings className="h-3.5 w-3.5 mr-1.5" />
+            Geral
+          </TabsTrigger>
+          <TabsTrigger value="projetos">
+            <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
+            Projetos
+            {projects.length > 0 && <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0">{projects.length}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="board">
+            <Columns3 className="h-3.5 w-3.5 mr-1.5" />
+            Board
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Info basica */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Informacoes</CardTitle>
-          <CardDescription>Dados basicos do workspace</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="ws-name">Nome</Label>
-            <Input id="ws-name" value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="ws-desc">Descricao</Label>
-            <Textarea id="ws-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
-          </div>
-          <div className="space-y-2">
-            <Label>Cor</Label>
-            <div className="flex gap-2">
-              {COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className={`h-8 w-8 rounded-full transition-transform ${color === c ? 'scale-125 ring-2 ring-offset-2 ring-offset-background ring-primary' : ''}`}
-                  style={{ backgroundColor: c }}
-                  onClick={() => setColor(c)}
+        {/* ── TAB: Geral ── */}
+        <TabsContent value="geral" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Informacoes</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-[1fr_auto] gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="ws-name">Nome</Label>
+                  <Input id="ws-name" value={name} onChange={(e) => setName(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cor</Label>
+                  <div className="flex gap-1.5 pt-1">
+                    {COLORS.map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        className={`h-7 w-7 rounded-full transition-all ${color === c ? 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-110' : 'opacity-70 hover:opacity-100'}`}
+                        style={{ backgroundColor: c }}
+                        onClick={() => setColor(c)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="ws-desc">Descricao</Label>
+                <Textarea
+                  id="ws-desc"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  placeholder="Ex: CRM React + Supabase, PJ Fixo 6-8h/dia"
                 />
+              </div>
+              <div className="flex items-center justify-between">
+                <Button onClick={handleSave} disabled={!name.trim()}>
+                  {saved ? <><CheckCircle2 className="h-4 w-4 mr-1" /> Salvo</> : 'Salvar alteracoes'}
+                </Button>
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleDelete}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                  Excluir workspace
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Labels */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Tag className="h-4 w-4" />
+                Labels
+              </CardTitle>
+              <CardDescription>Tags para organizar cards neste workspace</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Input
+                  value={newLabelName}
+                  onChange={(e) => setNewLabelName(e.target.value)}
+                  placeholder="Nome da label..."
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddLabel()}
+                />
+                <div className="flex gap-1">
+                  {LABEL_COLORS.slice(0, 6).map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={`h-5 w-5 rounded-full shrink-0 transition-all ${newLabelColor === c ? 'ring-2 ring-primary ring-offset-1 ring-offset-background scale-110' : 'opacity-60 hover:opacity-100'}`}
+                      style={{ backgroundColor: c }}
+                      onClick={() => setNewLabelColor(c)}
+                    />
+                  ))}
+                </div>
+                <Button size="sm" onClick={handleAddLabel} disabled={!newLabelName.trim()}>
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {labels.length > 0 ? (
+                <div className="space-y-1">
+                  {labels.map((label) => (
+                    <div key={label.id} className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted/50 group">
+                      <div className="flex items-center gap-2">
+                        <span className="h-3 w-3 rounded-full" style={{ backgroundColor: label.color }} />
+                        <span className="text-sm">{label.name}</span>
+                      </div>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive" onClick={() => deleteLabel(workspaceId, label.id)}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground py-2">Nenhuma label criada ainda</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── TAB: Projetos ── */}
+        <TabsContent value="projetos" className="space-y-4">
+          {/* Agents detectados */}
+          {daemonOnline && availableAgents.length > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-xs text-muted-foreground">Agents detectados:</span>
+              {availableAgents.map((a) => (
+                <Badge key={a.name} variant="outline" className="text-[10px]">
+                  <Bot className="h-2.5 w-2.5 mr-0.5" />
+                  {a.name} {a.version?.split(' ')[0]}
+                </Badge>
               ))}
             </div>
-          </div>
-          <Button onClick={handleSave} disabled={!name.trim()}>
-            {saved ? 'Salvo!' : 'Salvar'}
-          </Button>
-        </CardContent>
-      </Card>
+          )}
 
-      {/* Projects */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <FolderOpen className="h-4 w-4" />
-            Projetos
-          </CardTitle>
-          <CardDescription>Projetos vinculados a este workspace. Usado para discovery e scan.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Input
-              value={newProjectName}
-              onChange={(e) => setNewProjectName(e.target.value)}
-              placeholder="Nome (opcional)"
-              className="w-36"
-            />
-            <Input
-              value={newProjectPath}
-              onChange={(e) => setNewProjectPath(e.target.value)}
-              placeholder="~/projetos/meu-projeto"
-              className="flex-1"
-              onKeyDown={(e) => e.key === 'Enter' && handleAddProject()}
-            />
-            <Button size="sm" onClick={handleAddProject} disabled={!newProjectPath.trim()}>
-              <Plus className="h-4 w-4 mr-1" />
-              Adicionar
-            </Button>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Adicionar projeto</CardTitle>
+              <CardDescription>Vincule projetos para usar no Discovery e auto-scan</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-2">
+                <Input
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  placeholder="Nome (opcional)"
+                  className="w-32"
+                />
+                <Input
+                  value={newProjectPath}
+                  onChange={(e) => setNewProjectPath(e.target.value)}
+                  placeholder="~/projetos/meu-projeto"
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddProject()}
+                />
+                <Button onClick={handleAddProject} disabled={!newProjectPath.trim()}>
+                  <Plus className="h-4 w-4 mr-1" />
+                  Adicionar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
           {projects.length > 0 ? (
             <div className="space-y-3">
               {projects.map((proj) => {
                 const scan = scanResults[proj.id]
                 return (
-                  <div key={proj.id} className="rounded-md border bg-muted/20 overflow-hidden">
-                    <div className="flex items-center gap-2 py-2 px-3">
-                      <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium">{proj.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{proj.path}</p>
+                  <Card key={proj.id}>
+                    <CardContent className="pt-4 pb-3">
+                      <div className="flex items-start gap-3">
+                        <FolderOpen className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">{proj.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{abbreviatePath(proj.path)}</p>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          {proj.last_scan_at && (
+                            <Badge variant="outline" className="text-[10px]">
+                              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5 text-green-500" />
+                              scanned
+                            </Badge>
+                          )}
+                          {daemonOnline && (
+                            <>
+                              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleBootstrapProject(proj.path, proj.id)} disabled={bootstrapping === proj.id} title="Gerar AGENTS.md, CLAUDE.md e commands">
+                                {bootstrapping === proj.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Wand2 className="h-3.5 w-3.5 mr-1" />Setup</>}
+                              </Button>
+                              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleScanProject(proj.path, proj.id)} disabled={scanning === proj.id}>
+                                {scanning === proj.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Search className="h-3.5 w-3.5 mr-1" />Scan</>}
+                              </Button>
+                            </>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteProject(proj.id)}>
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </div>
-                      {proj.last_scan_at && (
-                        <Badge variant="outline" className="text-[10px] shrink-0">
-                          <CheckCircle2 className="h-2.5 w-2.5 mr-0.5 text-green-500" />
-                          scanned
-                        </Badge>
-                      )}
-                      {daemonOnline && (
+
+                      {scan && (
                         <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs shrink-0"
-                            onClick={() => handleBootstrapProject(proj.path, proj.id)}
-                            disabled={bootstrapping === proj.id}
-                            title="Gerar AGENTS.md, CLAUDE.md e commands automaticamente"
-                          >
-                            {bootstrapping === proj.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5 mr-1" />}
-                            Setup
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-7 text-xs shrink-0"
-                            onClick={() => handleScanProject(proj.path, proj.id)}
-                            disabled={scanning === proj.id}
-                          >
-                            {scanning === proj.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5 mr-1" />}
-                            Scan
-                          </Button>
+                          <Separator className="my-2.5" />
+                          <div className="space-y-1.5 pl-7">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {scan.stack.map((s) => (
+                                <Badge key={s} variant="secondary" className="text-[10px]"><FileCode className="h-2.5 w-2.5 mr-0.5" />{s}</Badge>
+                              ))}
+                              {scan.git && (
+                                <Badge variant="outline" className="text-[10px]"><GitBranch className="h-2.5 w-2.5 mr-0.5" />{scan.git.branch}</Badge>
+                              )}
+                              {scan.agentConfigs.hasAgentsMd && <Badge variant="outline" className="text-[10px] text-green-600">AGENTS.md</Badge>}
+                              {scan.agentConfigs.hasClaudeDir && <Badge variant="outline" className="text-[10px] text-purple-600">.claude/</Badge>}
+                            </div>
+                            {scan.todos.length > 0 && (
+                              <p className="text-[11px] text-muted-foreground">
+                                <AlertCircle className="h-3 w-3 inline mr-1" />
+                                {scan.todos.length} TODO{scan.todos.length > 1 ? 's' : ''}
+                              </p>
+                            )}
+                          </div>
                         </>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
-                        onClick={() => deleteProject(proj.id)}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-
-                    {scan && (
-                      <div className="border-t px-3 py-2.5 space-y-2 bg-muted/30">
-                        {/* Stack & Git */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {scan.stack.map((s) => (
-                            <Badge key={s} variant="secondary" className="text-[10px]">
-                              <FileCode className="h-2.5 w-2.5 mr-0.5" />
-                              {s}
-                            </Badge>
-                          ))}
-                          {scan.git && (
-                            <Badge variant="outline" className="text-[10px]">
-                              <GitBranch className="h-2.5 w-2.5 mr-0.5" />
-                              {scan.git.branch} · {scan.git.status}
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* Agent configs */}
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {scan.agentConfigs.hasAgentsMd && (
-                            <Badge variant="outline" className="text-[10px] text-green-600">
-                              <Bot className="h-2.5 w-2.5 mr-0.5" />
-                              AGENTS.md
-                            </Badge>
-                          )}
-                          {scan.agentConfigs.hasClaudeDir && (
-                            <Badge variant="outline" className="text-[10px] text-purple-600">
-                              .claude/
-                            </Badge>
-                          )}
-                          {scan.agentConfigs.hasOpenCodeDir && (
-                            <Badge variant="outline" className="text-[10px] text-blue-600">
-                              .opencode/
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* TODOs summary */}
-                        {scan.todos.length > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            <AlertCircle className="h-3 w-3 inline mr-1" />
-                            {scan.todos.length} TODO{scan.todos.length > 1 ? 's' : ''} encontrado{scan.todos.length > 1 ? 's' : ''}
-                            {scan.todos.slice(0, 3).map((t, i) => (
-                              <span key={i} className="block ml-4 truncate text-[11px] mt-0.5">
-                                {t.type}: {t.file}:{t.line}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Structure summary */}
-                        <p className="text-[11px] text-muted-foreground">
-                          {scan.structure.filter((s) => s.startsWith('📁')).length} diretorios, {scan.structure.filter((s) => s.includes('📄')).length} arquivos na raiz
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                    </CardContent>
+                  </Card>
                 )
               })}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Nenhum projeto registrado</p>
+            <Card>
+              <CardContent className="pt-6 pb-6 text-center">
+                <FolderOpen className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+                <p className="text-sm text-muted-foreground">Nenhum projeto registrado</p>
+                <p className="text-xs text-muted-foreground mt-1">Adicione um projeto acima para usar o Discovery</p>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
+        </TabsContent>
 
-      {/* Labels */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Labels</CardTitle>
-          <CardDescription>Labels disponiveis neste workspace</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Input
-              value={newLabelName}
-              onChange={(e) => setNewLabelName(e.target.value)}
-              placeholder="Nome da label..."
-              className="flex-1"
-              onKeyDown={(e) => e.key === 'Enter' && handleAddLabel()}
-            />
-            <div className="flex gap-1">
-              {LABEL_COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  className={`h-5 w-5 rounded-full shrink-0 transition-transform ${newLabelColor === c ? 'scale-125 ring-2 ring-offset-1 ring-offset-background ring-primary' : ''}`}
-                  style={{ backgroundColor: c }}
-                  onClick={() => setNewLabelColor(c)}
-                />
-              ))}
-            </div>
-            <Button size="sm" onClick={handleAddLabel} disabled={!newLabelName.trim()}>
-              <Plus className="h-4 w-4 mr-1" />
-              Criar
-            </Button>
-          </div>
-          {labels.length > 0 ? (
-            <div className="space-y-2">
-              {labels.map((label) => (
-                <div key={label.id} className="flex items-center justify-between py-1.5 px-2 rounded-md hover:bg-muted/50">
-                  <div className="flex items-center gap-2">
-                    <span className="h-3 w-3 rounded-full" style={{ backgroundColor: label.color }} />
-                    <span className="text-sm">{label.name}</span>
+        {/* ── TAB: Board ── */}
+        <TabsContent value="board" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Colunas do Kanban</CardTitle>
+              <CardDescription>{columns.length} colunas configuradas para este workspace</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-1">
+                {columns.map((col, i) => (
+                  <div key={col.id} className="flex items-center gap-3 py-2 px-3 rounded-md bg-muted/20">
+                    <span className="text-xs text-muted-foreground w-4 text-right">{i + 1}</span>
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: col.color ?? '#6b7280' }} />
+                    <span className="text-sm flex-1">{col.name}</span>
+                    <Badge variant="outline" className="text-[10px] font-mono">{col.slug}</Badge>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteLabel(workspaceId, label.id)}>
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">Nenhuma label criada</p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Colunas */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Colunas do Board</CardTitle>
-          <CardDescription>Colunas kanban deste workspace</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {columns.map((col) => (
-              <div key={col.id} className="flex items-center gap-2 py-1.5 px-2 rounded-md bg-muted/30">
-                <GripVertical className="h-4 w-4 text-muted-foreground" />
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: col.color ?? '#6b7280' }} />
-                <span className="text-sm flex-1">{col.name}</span>
-                <Badge variant="outline" className="text-[10px]">{col.slug}</Badge>
+                ))}
               </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Zona de perigo */}
-      <Card className="border-destructive/50">
-        <CardHeader>
-          <CardTitle className="text-base text-destructive">Zona de Perigo</CardTitle>
-          <CardDescription>Acoes irreversiveis</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button variant="destructive" onClick={handleDelete}>
-            <Trash2 className="h-4 w-4 mr-1" />
-            Excluir Workspace
-          </Button>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
