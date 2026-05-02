@@ -23,7 +23,7 @@ import { useAgentStore } from '@/entities/agent/store'
 import { useProjectStore } from '@/entities/card/project-store'
 import { runAgent } from './agent-service'
 import type { Card } from '@/entities/card/types'
-import { Send, Square, Bot, Loader2, AlertCircle } from 'lucide-react'
+import { Send, Square, Bot, Loader2, AlertCircle, Plus, MessageSquare } from 'lucide-react'
 
 interface AgentChatProps {
   card: Card
@@ -156,26 +156,32 @@ export function AgentChat({ card, workspaceId }: AgentChatProps) {
             ))}
           </SelectContent>
         </Select>
-        <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleNewChat}>
-          Novo
+        <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={handleNewChat} title="Iniciar nova conversa com o agent selecionado">
+          <Plus className="h-3.5 w-3.5" />
+          Nova conversa
         </Button>
       </div>
 
       {/* Run history tabs */}
       {cardRuns.length > 0 && (
-        <div className="flex items-center gap-1 px-4 py-1.5 border-b overflow-x-auto">
-          {cardRuns.slice(0, 5).map((run) => {
+        <div className="flex items-center gap-1.5 px-4 py-1.5 border-b overflow-x-auto">
+          <span className="text-[10px] text-muted-foreground shrink-0 mr-0.5">Conversas:</span>
+          {cardRuns.slice(0, 5).map((run, i) => {
             const agent = agents.find((a) => a.id === run.agent_id)
+            const isActive = activeRunId === run.id
             return (
-              <Badge
+              <button
                 key={run.id}
-                variant={activeRunId === run.id ? 'default' : 'outline'}
-                className="cursor-pointer text-[10px] shrink-0"
+                className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] shrink-0 transition-colors ${
+                  isActive ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                }`}
                 onClick={() => setActiveRunId(run.id)}
               >
-                {agent?.name || 'Agent'} · {run.messages.length}msg
-                {run.status === 'error' && <AlertCircle className="h-3 w-3 ml-0.5 text-destructive" />}
-              </Badge>
+                <MessageSquare className="h-3 w-3" />
+                {agent?.name || 'Agent'} #{cardRuns.length - i}
+                <span className="opacity-60">· {run.messages.length}msg</span>
+                {run.status === 'error' && <AlertCircle className="h-3 w-3 text-destructive" />}
+              </button>
             )
           })}
         </div>
