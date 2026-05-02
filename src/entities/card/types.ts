@@ -7,6 +7,38 @@ export type CardPriority = typeof CARD_PRIORITIES[number]
 export const SPEC_STATUSES = ['draft', 'ready', 'in_progress', 'review', 'done'] as const
 export type SpecStatus = typeof SPEC_STATUSES[number]
 
+export type AutomationTrigger = 'on_card_enter'
+
+export const AUTOMATION_ACTIONS = [
+  'run_card_discovery',
+  'generate_spec',
+  'run_implementation',
+  'run_review',
+  'save_to_vault',
+  'notify',
+] as const
+export type AutomationAction = typeof AUTOMATION_ACTIONS[number]
+
+export const AUTOMATION_ACTION_LABELS: Record<AutomationAction, string> = {
+  run_card_discovery: 'Card Discovery (agent investiga o card)',
+  generate_spec: 'Gerar spec automaticamente',
+  run_implementation: 'Executar implementacao',
+  run_review: 'Executar reviewer',
+  save_to_vault: 'Salvar spec no Docs Vault',
+  notify: 'Notificar (card movido)',
+}
+
+export interface ColumnAutomation {
+  id: string
+  trigger: AutomationTrigger
+  action: AutomationAction
+  enabled: boolean
+  config?: {
+    agent?: string
+    model?: string
+  }
+}
+
 export interface BoardColumn {
   id: string
   workspace_id: string
@@ -14,6 +46,7 @@ export interface BoardColumn {
   slug: string
   position: number
   color: string | null
+  automations: ColumnAutomation[]
   created_at: string
 }
 

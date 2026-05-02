@@ -10,8 +10,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Trash2, Plus, X, FolderOpen, Search, Loader2, CheckCircle2, AlertCircle, GitBranch, FileCode, Bot, Wand2, Settings, Tag, Columns3 } from 'lucide-react'
+import { AUTOMATION_ACTION_LABELS } from '@/entities/card/types'
 import { daemonClient } from '@/shared/lib/daemon-client'
 import type { InstalledAgent, ScanResult } from '@/entities/card/project-types'
 import { toast } from 'sonner'
@@ -23,7 +25,7 @@ export function WorkspaceSettingsPage() {
   const { workspaceId } = useParams<{ workspaceId: string }>()
   const navigate = useNavigate()
   const { workspaces, updateWorkspace, deleteWorkspace, setActiveWorkspace } = useWorkspaceStore()
-  const { getWorkspaceLabels, addLabel, deleteLabel, getWorkspaceColumns } = useCardStore()
+  const { getWorkspaceLabels, addLabel, deleteLabel, getWorkspaceColumns, toggleColumnAutomation } = useCardStore()
   const { getWorkspaceProjects, addProject, updateProject, deleteProject } = useProjectStore()
 
   const workspace = workspaces.find((w) => w.id === workspaceId)
@@ -398,17 +400,43 @@ export function WorkspaceSettingsPage() {
         <TabsContent value="board" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Colunas do Kanban</CardTitle>
-              <CardDescription>{columns.length} colunas configuradas para este workspace</CardDescription>
+              <CardTitle className="text-base">Colunas e Automacoes</CardTitle>
+              <CardDescription>Configure automacoes que disparam quando um card entra em cada coluna</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-1">
+              <div className="space-y-3">
                 {columns.map((col, i) => (
-                  <div key={col.id} className="flex items-center gap-3 py-2 px-3 rounded-md bg-muted/20">
-                    <span className="text-xs text-muted-foreground w-4 text-right">{i + 1}</span>
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: col.color ?? '#6b7280' }} />
-                    <span className="text-sm flex-1">{col.name}</span>
-                    <Badge variant="outline" className="text-[10px] font-mono">{col.slug}</Badge>
+                  <div key={col.id} className="rounded-lg border overflow-hidden">
+                    {/* Column header */}
+                    <div className="flex items-center gap-3 py-2 px-3 bg-muted/20">
+                      <span className="text-xs text-muted-foreground w-4 text-right">{i + 1}</span>
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: col.color ?? '#6b7280' }} />
+                      <span className="text-sm font-medium flex-1">{col.name}</span>
+                      <Badge variant="outline" className="text-[10px] font-mono">{col.slug}</Badge>
+                    </div>
+
+                    {/* Automations */}
+                    {col.automations && col.automations.length > 0 && (
+                      <div className="px-3 py-2 space-y-1.5">
+                        {col.automations.map((auto) => (
+                          <div key={auto.id} className="flex items-center justify-between py-1">
+                            <span className={`text-xs ${auto.enabled ? 'text-foreground' : 'text-muted-foreground'}`}>
+                              {AUTOMATION_ACTION_LABELS[auto.action] || auto.action}
+                            </span>
+                            <Switch
+                              checked={auto.enabled}
+                              onCheckedChange={() => toggleColumnAutomation(workspaceId, col.id, auto.id)}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {(!col.automations || col.automations.length === 0) && (
+                      <div className="px-3 py-2">
+                        <span className="text-[11px] text-muted-foreground">Sem automacoes</span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

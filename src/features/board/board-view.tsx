@@ -106,6 +106,14 @@ export function BoardView() {
 
     if (activeCard.column_id !== targetColumnId || activeCard.position !== targetPosition) {
       moveCard(activeCard.id, targetColumnId, targetPosition)
+
+      // Trigger column automations
+      const targetCol = columns.find((c) => c.id === targetColumnId)
+      if (targetCol && activeCard.column_id !== targetColumnId) {
+        import('@/entities/card/automation-engine').then(({ executeColumnAutomations }) => {
+          executeColumnAutomations(activeCard, targetCol, activeWorkspaceId)
+        })
+      }
     }
   }
 

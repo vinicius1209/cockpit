@@ -19,6 +19,7 @@ interface CardState {
   addLabel: (workspaceId: string, name: string, color: string) => string
   deleteLabel: (workspaceId: string, labelId: string) => void
   getWorkspaceLabels: (workspaceId: string) => Label[]
+  toggleColumnAutomation: (workspaceId: string, columnId: string, automationId: string) => void
   toggleCardLabel: (cardId: string, label: Label) => void
 }
 
@@ -101,6 +102,7 @@ export const useCardStore = create<CardState>()(
           slug: col.slug,
           position: col.position,
           color: col.color,
+          automations: col.automations || [],
           created_at: new Date().toISOString(),
         }))
 
@@ -153,12 +155,42 @@ export const useCardStore = create<CardState>()(
           }),
         }))
       },
+
+      toggleColumnAutomation: (workspaceId, columnId, automationId) => {
+        set((state) => ({
+          columns: {
+            ...state.columns,
+            [workspaceId]: (state.columns[workspaceId] || []).map((col) => {
+              if (col.id !== columnId) return col
+              return {
+                ...col,
+                automations: (col.automations || []).map((a) =>
+                  a.id === automationId ? { ...a, enabled: !a.enabled } : a,
+                ),
+              }
+            }),
+          },
+        }))
+      },
     }),
     {
       name: 'cockpit-cards',
-      version: 1,
+      version: 2,
       storage: createStorageAdapter(),
-      migrate: (persisted) => persisted as CardState,
+      migrate: (persisted: unknown) => {
+        const state = persisted as Record<string, unknown>
+        // v1 → v2: add automations to existing columns
+        if (state?.columns && typeof state.columns === 'object') {
+          const cols = state.columns as Record<string, Array<Record<string, unknown>>>
+          for (const wsId of Object.keys(cols)) {
+            cols[wsId] = cols[wsId].map((col) => ({
+              ...col,
+              automations: col.automations ?? [],
+            }))
+          }
+        }
+        return state as unknown as CardState
+      },
     },
   ),
 )

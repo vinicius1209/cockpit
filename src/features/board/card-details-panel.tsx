@@ -15,7 +15,7 @@ import { CARD_TYPE_CONFIG, CARD_PRIORITY_CONFIG } from '@/shared/lib/constants'
 import { useCardStore } from '@/entities/card/store'
 import { useDocStore } from '@/entities/docs/store'
 import { useState } from 'react'
-import { Plus, X, FileText, BookOpen } from 'lucide-react'
+import { Plus, X, FileText, BookOpen, User, Bot } from 'lucide-react'
 
 const LABEL_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
 
@@ -144,7 +144,20 @@ export function CardDetailsPanel({
         {/* Assignee */}
         <div className="space-y-1">
           <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Responsavel</span>
-          <Input value={assignee} onChange={(e) => setAssignee(e.target.value)} placeholder="Nome..." className="h-8 text-xs" />
+          <Select value={assignee || 'unassigned'} onValueChange={(v) => setAssignee(v === 'unassigned' ? '' : v)}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unassigned">
+                <span className="text-muted-foreground">Nao atribuido</span>
+              </SelectItem>
+              <SelectItem value="eu">
+                <span className="flex items-center gap-1.5"><User className="h-3 w-3" /> Eu</span>
+              </SelectItem>
+              <SelectItem value="ai-agent">
+                <span className="flex items-center gap-1.5"><Bot className="h-3 w-3" /> AI Agent</span>
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Spec status */}
