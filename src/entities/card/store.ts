@@ -175,18 +175,28 @@ export const useCardStore = create<CardState>()(
     }),
     {
       name: 'cockpit-cards',
-      version: 2,
+      version: 3,
       storage: createStorageAdapter(),
       migrate: (persisted: unknown) => {
         const state = persisted as Record<string, unknown>
-        // v1 → v2: add automations to existing columns
+        // v1 → v2: add automation presets to existing columns
         if (state?.columns && typeof state.columns === 'object') {
+          const presetMap: Record<string, typeof DEFAULT_COLUMNS[0]['automations']> = {}
+          for (const dc of DEFAULT_COLUMNS) {
+            presetMap[dc.slug] = dc.automations
+          }
+
           const cols = state.columns as Record<string, Array<Record<string, unknown>>>
           for (const wsId of Object.keys(cols)) {
-            cols[wsId] = cols[wsId].map((col) => ({
-              ...col,
-              automations: col.automations ?? [],
-            }))
+            cols[wsId] = cols[wsId].map((col) => {
+              const slug = col.slug as string
+              const existing = col.automations as unknown[] | undefined
+              // Only backfill if empty or missing
+              if (!existing || existing.length === 0) {
+                return { ...col, automations: presetMap[slug] || [] }
+              }
+              return col
+            })
           }
         }
         return state as unknown as CardState
