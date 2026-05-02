@@ -2,7 +2,6 @@ import { useState, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { useCardStore } from '@/entities/card/store'
 import { useAgentStore } from '@/entities/agent/store'
 import { useProjectStore } from '@/entities/card/project-store'
@@ -262,7 +261,7 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
       </div>
 
       {/* Content: Preview or Editor */}
-      <ScrollArea className="flex-1">
+      <div className="flex-1 overflow-y-auto min-h-0">
         <div className="p-4">
           {viewMode === 'preview' && content.trim() ? (
             <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -278,7 +277,7 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
             />
           )}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   )
 }
