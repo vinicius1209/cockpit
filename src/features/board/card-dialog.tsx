@@ -22,10 +22,11 @@ import type { Card, CardType, CardPriority, Label as LabelType } from '@/entitie
 import { CARD_TYPE_CONFIG, CARD_PRIORITY_CONFIG } from '@/shared/lib/constants'
 import { useCardStore } from '@/entities/card/store'
 import { useState, useEffect } from 'react'
-import { Trash2, Plus, X, Tag, Bot, FileText, ScrollText, MessageSquare } from 'lucide-react'
+import { Trash2, Plus, X, Tag, Bot, FileText, ScrollText, MessageSquare, BookOpen } from 'lucide-react'
 import { AgentChat } from '@/features/agent-runner/agent-chat'
 import { SpecPanel } from '@/features/spec-engine/spec-panel'
 import { InterviewPanel } from '@/features/agent-runner/interview-panel'
+import { useDocStore } from '@/entities/docs/store'
 
 const LABEL_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
 
@@ -41,6 +42,7 @@ interface CardDialogProps {
 
 export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }: CardDialogProps) {
   const { addCard, updateCard, deleteCard, getWorkspaceLabels, addLabel, toggleCardLabel } = useCardStore()
+  const { getCardDocs } = useDocStore()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [type, setType] = useState<CardType>('feature')
@@ -270,8 +272,34 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
               </div>
             </div>
 
-            {isEditing && (
+            {isEditing && card && (
               <>
+                {/* Linked docs */}
+                {(() => {
+                  const linkedDocs = getCardDocs(card.id)
+                  if (linkedDocs.length === 0) return null
+                  return (
+                    <>
+                      <Separator />
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-1.5">
+                          <BookOpen className="h-3.5 w-3.5" />
+                          Documentos vinculados
+                        </Label>
+                        <div className="space-y-1">
+                          {linkedDocs.map((doc) => (
+                            <div key={doc.id} className="flex items-center gap-2 py-1 px-2 rounded-md bg-muted/30 text-xs">
+                              <FileText className="h-3 w-3 text-muted-foreground" />
+                              <span className="truncate flex-1">{doc.title}</span>
+                              <Badge variant="outline" className="text-[9px]">{doc.source}</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )
+                })()}
+
                 <Separator />
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">

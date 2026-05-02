@@ -9,7 +9,9 @@ import { useWorkspaceStore } from '@/entities/workspace/store'
 import { runAgent } from '@/features/agent-runner/agent-service'
 import type { Card, SpecStatus } from '@/entities/card/types'
 import { MessageResponse } from '@/components/ai-elements/message'
-import { Sparkles, Save, Loader2, ChevronRight, Eye, Pencil } from 'lucide-react'
+import { createDocFromSpec } from '@/features/docs-vault/auto-doc'
+import { toast } from 'sonner'
+import { Sparkles, Save, Loader2, ChevronRight, Eye, Pencil, BookOpen } from 'lucide-react'
 
 const SPEC_STEPS: { status: SpecStatus; label: string; color: string }[] = [
   { status: 'draft', label: 'Rascunho', color: '#f59e0b' },
@@ -234,6 +236,22 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
             <Badge variant="outline" className="text-[10px]">
               {projects.find((p) => p.path === getProjectPath())?.name || 'projeto'}
             </Badge>
+          )}
+          {content.trim() && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => {
+                const docId = createDocFromSpec(card, workspaceId)
+                if (docId) toast.success('Spec salva no Docs Vault')
+                else toast.error('Sem conteudo para salvar')
+              }}
+              title="Salvar spec como documento no Vault"
+            >
+              <BookOpen className="h-3.5 w-3.5 mr-1" />
+              Vault
+            </Button>
           )}
           {content.trim() && (
             <div className="flex rounded-md border overflow-hidden">
