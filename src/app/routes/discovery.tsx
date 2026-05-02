@@ -21,7 +21,7 @@ import { useWorkspaceStore } from '@/entities/workspace/store'
 import { useProjectStore } from '@/entities/card/project-store'
 import { useCardStore } from '@/entities/card/store'
 import { daemonClient } from '@/shared/lib/daemon-client'
-import type { DiscoveryResult, DiscoveryCard, InstalledAgent } from '@/entities/card/project-types'
+import type { DiscoveryResult, DiscoveryCard, InstalledAgent, JobSummary } from '@/entities/card/project-types'
 import { CARD_TYPE_CONFIG, CARD_PRIORITY_CONFIG } from '@/shared/lib/constants'
 import type { CardType, CardPriority } from '@/entities/card/types'
 import { toast } from 'sonner'
@@ -42,6 +42,8 @@ import {
   CircleDot,
   ChevronsUpDown,
   Check,
+  History,
+  Clock,
 } from 'lucide-react'
 
 export function DiscoveryPage() {
@@ -65,6 +67,8 @@ export function DiscoveryPage() {
   const [currentPhase, setCurrentPhase] = useState('')
   const [progressEvents, setProgressEvents] = useState<{ phase: string; message: string }[]>([])
   const [elapsed, setElapsed] = useState(0)
+  const [jobHistory, setJobHistory] = useState<JobSummary[]>([])
+  const [activeJobId, setActiveJobId] = useState<string | null>(null)
   const logRef = useRef<HTMLDivElement>(null)
 
   // Elapsed timer
@@ -90,12 +94,43 @@ export function DiscoveryPage() {
       .catch(() => setDaemonOnline(false))
   }, [])
 
+  // Load history when project changes
+  useEffect(() => {
+    if (!selectedProjectId || !daemonOnline) return
+    const proj = getWorkspaceProjects(activeWorkspaceId || '').find((p) => p.id === selectedProjectId)
+    if (!proj) return
+
+    daemonClient.listDiscoveryJobs(proj.path, 10)
+      .then((jobs) => {
+        setJobHistory(jobs)
+        // Auto-load last completed scan
+        const lastCompleted = jobs.find((j) => j.status === 'completed')
+        if (lastCompleted && !result && !isRunning) {
+          setActiveJobId(lastCompleted.id)
+          daemonClient.getDiscoveryJob(lastCompleted.id)
+            .then((job) => {
+              const j = job as { result: DiscoveryResult | null }
+              if (j.result) setResult(j.result)
+            })
+            .catch(() => {})
+        }
+      })
+      .catch(() => {})
+  }, [selectedProjectId, daemonOnline])
+
   if (!activeWorkspaceId) {
     return <div className="p-6 text-muted-foreground">Selecione um workspace na sidebar</div>
   }
 
   const projects = getWorkspaceProjects(activeWorkspaceId)
   const selectedProject = projects.find((p) => p.id === selectedProjectId)
+
+  const refreshHistory = () => {
+    if (!selectedProject) return
+    daemonClient.listDiscoveryJobs(selectedProject.path, 10)
+      .then(setJobHistory)
+      .catch(() => {})
+  }
 
   const handleRunDiscovery = async () => {
     if (!selectedProject) return
@@ -117,6 +152,7 @@ export function DiscoveryPage() {
         toast.success(`Discovery concluido: ${discoveryResult.cards.length} descobertas`, {
           description: discoveryResult.scanResult.stack.join(', ') || selectedProject.name,
         })
+        refreshHistory()
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Erro ao rodar discovery'
         setError(msg)
@@ -144,6 +180,7 @@ export function DiscoveryPage() {
             setResult(data.result as DiscoveryResult)
             setIsRunning(false)
             toast.success(`Discovery concluido: ${(data.result as DiscoveryResult).cards.length} descobertas`)
+            refreshHistory()
             es.close()
           }
           if (data.phase === 'failed') {
@@ -500,6 +537,67 @@ export function DiscoveryPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ── History timeline ── */}
+      {jobHistory.length > 0 && !isRunning && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <History className="h-4 w-4 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Historico</span>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {jobHistory.map((job) => {
+              const isActive = activeJobId === job.id
+              const date = new Date(job.createdAt)
+              const timeAgo = (() => {
+                const mins = Math.floor((Date.now() - date.getTime()) / 60000)
+                if (mins < 1) return 'Agora'
+                if (mins < 60) return `${mins}min`
+                const hrs = Math.floor(mins / 60)
+                if (hrs < 24) return `${hrs}h`
+                return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+              })()
+
+              return (
+                <button
+                  key={job.id}
+                  onClick={() => {
+                    setActiveJobId(job.id)
+                    daemonClient.getDiscoveryJob(job.id)
+                      .then((j) => {
+                        const data = j as { result: DiscoveryResult | null }
+                        if (data.result) {
+                          setResult(data.result)
+                          setImportedCards(new Set())
+                        }
+                      })
+                      .catch(() => toast.error('Erro ao carregar scan'))
+                  }}
+                  className={cn(
+                    'flex flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors min-w-[140px] shrink-0',
+                    isActive ? 'border-primary bg-primary/5' : 'hover:bg-muted/30',
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 w-full">
+                    <Clock className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-xs font-medium">{timeAgo}</span>
+                    {job.status === 'completed' && <CheckCircle2 className="h-3 w-3 text-green-500 ml-auto" />}
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    {job.agent || 'scanner'}{job.model ? ` · ${job.model.split('/').pop()}` : ''}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Badge variant="outline" className="text-[9px] px-1 py-0">{job.cardsCount} cards</Badge>
+                    {job.newCount > 0 && (
+                      <Badge className="text-[9px] px-1 py-0 bg-green-500/15 text-green-500 border-0">{job.newCount} novas</Badge>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Error ── */}
       {error && (

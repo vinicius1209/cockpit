@@ -88,3 +88,17 @@ export interface DiscoveryResult {
   scanResult: ScanResult
   diff?: DiscoveryDiff
 }
+
+export interface JobSummary {
+  id: string
+  projectPath: string
+  agent?: string
+  model?: string
+  status: string
+  createdAt: string
+  completedAt: string | null
+  cardsCount: number
+  newCount: number
+  baselineCount: number
+  resolvedCount: number
+}

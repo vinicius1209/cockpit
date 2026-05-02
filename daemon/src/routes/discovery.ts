@@ -1,7 +1,7 @@
 import { jsonResponse } from '../index'
 import { runDiscovery } from '../discovery/discovery-engine'
 import { diffScan, getScanHistory, linkFindingToCard } from '../discovery/scan-differ'
-import { createJob, executeJobAsync, getJob, subscribeToJob } from '../discovery/job-queue'
+import { createJob, executeJobAsync, getJob, subscribeToJob, listJobs } from '../discovery/job-queue'
 
 function corsHeaders(): Record<string, string> {
   return {
@@ -127,6 +127,13 @@ export async function handleDiscoveryRoutes(req: Request, url: URL): Promise<Res
         ...corsHeaders(),
       },
     })
+  }
+
+  // GET /discovery/jobs — list recent jobs (summary)
+  if (path === '/discovery/jobs' && req.method === 'GET') {
+    const projectPath = url.searchParams.get('projectPath') || undefined
+    const limit = Number(url.searchParams.get('limit') || 10)
+    return jsonResponse(listJobs(projectPath, limit))
   }
 
   // GET /discovery/jobs/:jobId — fetch job result

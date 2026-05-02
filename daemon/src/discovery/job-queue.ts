@@ -86,6 +86,44 @@ export function getJob(id: string): DiscoveryJob | undefined {
   return getJobMap()[id]
 }
 
+export interface JobSummary {
+  id: string
+  projectPath: string
+  agent?: string
+  model?: string
+  status: JobStatus
+  createdAt: string
+  completedAt: string | null
+  cardsCount: number
+  newCount: number
+  baselineCount: number
+  resolvedCount: number
+}
+
+export function listJobs(projectPath?: string, limit = 10): JobSummary[] {
+  const all = Object.values(getJobMap())
+  const filtered = projectPath
+    ? all.filter((j) => j.projectPath === projectPath || j.projectPath.endsWith(projectPath.replace(/^~/, '')))
+    : all
+
+  return filtered
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, limit)
+    .map((j) => ({
+      id: j.id,
+      projectPath: j.projectPath,
+      agent: j.agent,
+      model: j.model,
+      status: j.status,
+      createdAt: j.createdAt,
+      completedAt: j.completedAt,
+      cardsCount: j.result?.cards?.length ?? 0,
+      newCount: (j.result?.diff as Record<string, number> | undefined)?.newCount ?? 0,
+      baselineCount: (j.result?.diff as Record<string, number> | undefined)?.baselineCount ?? 0,
+      resolvedCount: (j.result?.diff as Record<string, number> | undefined)?.resolvedCount ?? 0,
+    }))
+}
+
 export function subscribeToJob(jobId: string, listener: (event: JobProgress) => void): () => void {
   let listeners = jobListeners.get(jobId)
   if (!listeners) {

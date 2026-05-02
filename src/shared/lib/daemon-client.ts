@@ -1,4 +1,4 @@
-import type { ScanResult, InstalledAgent, DiscoveryResult } from '@/entities/card/project-types'
+import type { ScanResult, InstalledAgent, DiscoveryResult, JobSummary } from '@/entities/card/project-types'
 
 const DAEMON_URL = import.meta.env.VITE_DAEMON_URL || 'http://localhost:4800'
 
@@ -58,4 +58,11 @@ export const daemonClient = {
 
   getDiscoveryJob: (jobId: string) =>
     daemonFetch<Record<string, unknown>>(`/discovery/jobs/${jobId}`),
+
+  listDiscoveryJobs: (projectPath?: string, limit = 10) => {
+    const params = new URLSearchParams()
+    if (projectPath) params.set('projectPath', projectPath)
+    params.set('limit', String(limit))
+    return daemonFetch<JobSummary[]>(`/discovery/jobs?${params}`)
+  },
 }
