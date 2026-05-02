@@ -261,8 +261,8 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
       </div>
 
       {/* Content: Preview or Editor */}
-      <div className="flex-1 overflow-y-auto min-h-0">
-        <div className="p-4">
+      <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
+        <div className="p-4 flex-1 flex flex-col">
           {viewMode === 'preview' && content.trim() ? (
             <div className="prose prose-sm dark:prose-invert max-w-none">
               <MessageResponse>{content}</MessageResponse>
@@ -272,7 +272,7 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Escreva a spec aqui ou use o botao 'Gerar com AI'..."
-              className="min-h-[400px] resize-none font-mono text-sm"
+              className="flex-1 resize-none font-mono text-sm"
               disabled={isGenerating}
             />
           )}
