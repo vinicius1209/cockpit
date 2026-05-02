@@ -137,7 +137,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className={`max-h-[90vh] ${isEditing ? 'sm:max-w-3xl' : 'sm:max-w-lg'}`}>
+      <DialogContent className={`${isEditing ? 'sm:max-w-3xl h-[85vh]' : 'sm:max-w-lg'} flex flex-col`}>
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Editar Card' : 'Novo Card'}</DialogTitle>
           {isEditing && (
@@ -186,7 +186,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
         </DialogHeader>
 
         {activeTab === 'details' ? (
-          <div className="space-y-4 pt-2 overflow-y-auto max-h-[calc(90vh-120px)]">
+          <div className="space-y-4 pt-2 overflow-y-auto flex-1 min-h-0">
             <div className="space-y-2">
               <Label htmlFor="title">Titulo</Label>
               <Input
@@ -365,13 +365,13 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
         {/* Keep panels mounted but hidden to preserve state across tab switches */}
         {isEditing && card && (
           <>
-            <div className={`h-[calc(90vh-120px)] ${activeTab === 'interview' ? '' : 'hidden'}`}>
+            <div className={`flex-1 min-h-0 ${activeTab === 'interview' ? '' : 'hidden'}`}>
               <InterviewPanel card={card} workspaceId={workspaceId} />
             </div>
-            <div className={`h-[calc(90vh-120px)] ${activeTab === 'spec' ? '' : 'hidden'}`}>
+            <div className={`flex-1 min-h-0 ${activeTab === 'spec' ? '' : 'hidden'}`}>
               <SpecPanel card={card} workspaceId={workspaceId} />
             </div>
-            <div className={`h-[calc(90vh-120px)] ${activeTab === 'agent' ? '' : 'hidden'}`}>
+            <div className={`flex-1 min-h-0 ${activeTab === 'agent' ? '' : 'hidden'}`}>
               <AgentChat card={card} workspaceId={workspaceId} />
             </div>
           </>
