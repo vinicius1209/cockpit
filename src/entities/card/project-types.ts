@@ -89,6 +89,17 @@ export interface DiscoveryResult {
   diff?: DiscoveryDiff
 }
 
+export interface ImplementEvent {
+  phase: 'analyzing' | 'branching' | 'implementing' | 'output' | 'file' | 'done' | 'error'
+  message?: string
+  text?: string
+  branch?: string
+  action?: 'modified' | 'created' | 'deleted' | 'changed'
+  path?: string
+  summary?: { filesModified: number; filesCreated: number; filesDeleted: number; branch: string | null }
+  exitCode?: number
+}
+
 export interface JobSummary {
   id: string
   projectPath: string

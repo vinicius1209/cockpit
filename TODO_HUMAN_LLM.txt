@@ -10,3 +10,5 @@ perde tudo o que foi feito no  discovery anterior.
 estava na aba de entrevista e quis olhar a aba de Spec, e ao voltar para a aba de entrevista tudo foi perdido.
 Isso precisa ser persistido, precisa ter uma experiencia fluida do usuário. Pense que ele está trabalhando focado
 no card para deixar tudo documentado/pronto para a LLM trabalhar depois.
+
+[ ] live preview dos agents trabalhando no dashboard

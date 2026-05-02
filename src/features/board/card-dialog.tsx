@@ -22,15 +22,16 @@ import type { Card, CardType, CardPriority, Label as LabelType } from '@/entitie
 import { CARD_TYPE_CONFIG, CARD_PRIORITY_CONFIG } from '@/shared/lib/constants'
 import { useCardStore } from '@/entities/card/store'
 import { useState, useEffect } from 'react'
-import { Trash2, Plus, X, Tag, Bot, FileText, ScrollText, MessageSquare, BookOpen } from 'lucide-react'
+import { Trash2, Plus, X, Tag, Bot, FileText, ScrollText, MessageSquare, BookOpen, Rocket } from 'lucide-react'
 import { AgentChat } from '@/features/agent-runner/agent-chat'
 import { SpecPanel } from '@/features/spec-engine/spec-panel'
 import { InterviewPanel } from '@/features/agent-runner/interview-panel'
+import { ImplementPanel } from '@/features/implement/implement-panel'
 import { useDocStore } from '@/entities/docs/store'
 
 const LABEL_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
 
-type TabId = 'details' | 'interview' | 'spec' | 'agent'
+type TabId = 'details' | 'interview' | 'spec' | 'implement' | 'agent'
 
 interface CardDialogProps {
   card: Card | null
@@ -174,6 +175,17 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
                   <Badge variant="outline" className="ml-1 text-[9px] px-1 py-0">{card.spec_status}</Badge>
                 )}
               </Button>
+              {card?.spec_content && (card?.spec_status === 'ready' || card?.spec_status === 'in_progress' || card?.spec_status === 'review') && (
+                <Button
+                  variant={activeTab === 'implement' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setActiveTab('implement')}
+                >
+                  <Rocket className="h-3.5 w-3.5 mr-1" />
+                  Implementar
+                </Button>
+              )}
               <Button
                 variant={activeTab === 'agent' ? 'secondary' : 'ghost'}
                 size="sm"
@@ -382,6 +394,9 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
             </div>
             <div className={`flex-1 min-h-0 overflow-hidden ${activeTab === 'spec' ? 'flex flex-col' : 'hidden'}`}>
               <SpecPanel card={card} workspaceId={workspaceId} />
+            </div>
+            <div className={`flex-1 min-h-0 overflow-hidden ${activeTab === 'implement' ? 'flex flex-col' : 'hidden'}`}>
+              <ImplementPanel card={card} workspaceId={workspaceId} />
             </div>
             <div className={`flex-1 min-h-0 overflow-hidden ${activeTab === 'agent' ? 'flex flex-col' : 'hidden'}`}>
               <AgentChat card={card} workspaceId={workspaceId} />

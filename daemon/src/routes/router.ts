@@ -5,6 +5,7 @@ import { handleDiscoveryRoutes } from './discovery'
 import { handleSchedulerRoutes } from './scheduler'
 import { handleSecretsRoutes } from './secrets'
 import { handleChatRoutes } from './chat'
+import { handleImplementRoutes } from './implement'
 
 export async function handleRequest(req: Request): Promise<Response> {
   const url = new URL(req.url)
@@ -18,6 +19,11 @@ export async function handleRequest(req: Request): Promise<Response> {
   // Project routes
   if (path.startsWith('/projects')) {
     return handleProjectRoutes(req, url)
+  }
+
+  // Implement route (before /agents to avoid prefix conflict)
+  if (path === '/agents/implement' && req.method === 'POST') {
+    return handleImplementRoutes(req, url)
   }
 
   // Agent routes
