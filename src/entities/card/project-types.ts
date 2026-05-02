@@ -34,11 +34,19 @@ export interface ScanResult {
   todos: { file: string; line: number; text: string; type: string }[]
 }
 
+export interface AgentModel {
+  id: string
+  label: string
+  cost: 'low' | 'medium' | 'high'
+}
+
 export interface InstalledAgent {
   name: string
   command: string
   path: string
   version: string | null
+  models: AgentModel[]
+  defaultModel: string | null
 }
 
 export interface DiscoveryCard {

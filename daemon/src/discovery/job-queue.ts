@@ -16,6 +16,7 @@ export interface DiscoveryJob {
   id: string
   projectPath: string
   agent?: string
+  model?: string
   status: JobStatus
   createdAt: string
   completedAt: string | null
@@ -59,13 +60,14 @@ function emitProgress(jobId: string, phase: JobStatus, message: string, detail?:
   }
 }
 
-export function createJob(projectPath: string, agent?: string): DiscoveryJob {
+export function createJob(projectPath: string, agent?: string, model?: string): DiscoveryJob {
   const id = `job-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
 
   const job: DiscoveryJob = {
     id,
     projectPath,
     agent,
+    model,
     status: 'queued',
     createdAt: new Date().toISOString(),
     completedAt: null,
@@ -168,7 +170,7 @@ Formato de resposta (JSON puro, sem markdown):
 
         try {
           const result = await executeAgentWithCallbacks(
-            { agent: job.agent, prompt, projectPath: scanResult.path },
+            { agent: job.agent, prompt, projectPath: scanResult.path, model: job.model },
             (chunk) => {
               // Emit real agent output lines as progress
               if (chunk.length > 0 && chunk.length < 200) {

@@ -18,7 +18,7 @@ export interface DiscoveryResult {
   scanResult: ProjectScanResult
 }
 
-export async function runDiscovery(projectPath: string, agentName?: string): Promise<DiscoveryResult> {
+export async function runDiscovery(projectPath: string, agentName?: string, model?: string): Promise<DiscoveryResult> {
   const scanResult = await scanProject(projectPath)
   const cards: DiscoveryCard[] = []
   const subProjectNames = scanResult.subProjects.map((sp) => sp.name)
@@ -52,7 +52,7 @@ export async function runDiscovery(projectPath: string, agentName?: string): Pro
 
   // 4. Optional: deep analysis with CLI agent
   if (agentName) {
-    const agentCards = await runAgentDiscovery(scanResult, agentName)
+    const agentCards = await runAgentDiscovery(scanResult, agentName, model)
     cards.push(...agentCards)
   }
 
@@ -113,7 +113,7 @@ function todosToCards(todos: TodoItem[], subProjectNames: string[]): DiscoveryCa
   return cards
 }
 
-async function runAgentDiscovery(scanResult: ProjectScanResult, agentName: string): Promise<DiscoveryCard[]> {
+async function runAgentDiscovery(scanResult: ProjectScanResult, agentName: string, model?: string): Promise<DiscoveryCard[]> {
   const agents = await detectInstalledAgents()
   const agent = agents.find((a) => a.name === agentName)
   if (!agent) return []
@@ -147,6 +147,7 @@ Formato de resposta (JSON puro, sem markdown):
       agent: agentName,
       prompt,
       projectPath: scanResult.path,
+      model,
     })
 
     if (result.exitCode !== 0) return []

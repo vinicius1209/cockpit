@@ -16,13 +16,13 @@ export async function handleDiscoveryRoutes(req: Request, url: URL): Promise<Res
 
   // POST /discovery/run — synchronous (fast-path, scanner only)
   if (path === '/discovery/run' && req.method === 'POST') {
-    const body = await req.json() as { projectPath: string; agent?: string }
+    const body = await req.json() as { projectPath: string; agent?: string; model?: string }
     if (!body.projectPath) {
       return jsonResponse({ error: 'Missing "projectPath"' }, 400)
     }
 
     try {
-      const result = await runDiscovery(body.projectPath, body.agent)
+      const result = await runDiscovery(body.projectPath, body.agent, body.model)
       const diff = diffScan(body.projectPath, result.cards)
 
       return jsonResponse({
@@ -54,12 +54,12 @@ export async function handleDiscoveryRoutes(req: Request, url: URL): Promise<Res
 
   // POST /discovery/start — async job (returns immediately)
   if (path === '/discovery/start' && req.method === 'POST') {
-    const body = await req.json() as { projectPath: string; agent?: string }
+    const body = await req.json() as { projectPath: string; agent?: string; model?: string }
     if (!body.projectPath) {
       return jsonResponse({ error: 'Missing "projectPath"' }, 400)
     }
 
-    const job = createJob(body.projectPath, body.agent)
+    const job = createJob(body.projectPath, body.agent, body.model)
 
     // Fire and forget
     executeJobAsync(job.id).catch((err) => {

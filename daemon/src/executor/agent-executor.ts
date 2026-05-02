@@ -1,9 +1,17 @@
+export interface AgentModel {
+  id: string
+  label: string
+  cost: 'low' | 'medium' | 'high'
+}
+
 export interface InstalledAgent {
   name: string
   command: string
   path: string
   version: string | null
   headlessFlag: string
+  models: AgentModel[]
+  defaultModel: string | null
 }
 
 export interface AgentExecRequest {
@@ -20,11 +28,89 @@ export interface AgentExecResult {
   duration: number
 }
 
-const KNOWN_AGENTS: { name: string; command: string; headlessFlag: string; versionFlag: string }[] = [
-  { name: 'claude-code', command: 'claude', headlessFlag: '-p', versionFlag: '--version' },
-  { name: 'opencode', command: 'opencode', headlessFlag: '--prompt', versionFlag: '--version' },
-  { name: 'gemini-cli', command: 'gemini', headlessFlag: '-p', versionFlag: '--version' },
-  { name: 'aider', command: 'aider', headlessFlag: '--message', versionFlag: '--version' },
+interface KnownAgent {
+  name: string
+  command: string
+  headlessFlag: string
+  versionFlag: string
+  modelFlag: string
+  models: AgentModel[]
+  defaultModel: string | null
+  buildArgs: (headlessFlag: string, prompt: string, model?: string) => string[]
+}
+
+const KNOWN_AGENTS: KnownAgent[] = [
+  {
+    name: 'claude-code',
+    command: 'claude',
+    headlessFlag: '-p',
+    versionFlag: '--version',
+    modelFlag: '--model',
+    models: [
+      { id: 'haiku', label: 'Haiku (rapido, barato)', cost: 'low' },
+      { id: 'sonnet', label: 'Sonnet (equilibrado)', cost: 'medium' },
+      { id: 'opus', label: 'Opus (profundo, caro)', cost: 'high' },
+    ],
+    defaultModel: 'sonnet',
+    buildArgs: (flag, prompt, model) => {
+      const args = [flag, prompt, '--output-format', 'text']
+      if (model) args.push('--model', model)
+      return args
+    },
+  },
+  {
+    name: 'opencode',
+    command: 'opencode',
+    headlessFlag: 'run',
+    versionFlag: '--version',
+    modelFlag: '--model',
+    models: [
+      { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash (rapido)', cost: 'low' },
+      { id: 'openai/gpt-5-nano', label: 'GPT-5 Nano (leve)', cost: 'low' },
+      { id: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro (equilibrado)', cost: 'medium' },
+      { id: 'openai/gpt-5.5', label: 'GPT-5.5 (profundo)', cost: 'high' },
+      { id: 'google/gemini-3.1-pro-preview', label: 'Gemini 3.1 Pro (mais recente)', cost: 'high' },
+    ],
+    defaultModel: 'google/gemini-2.5-flash',
+    buildArgs: (flag, prompt, model) => {
+      const args = [flag, prompt]
+      if (model) args.push('--model', model)
+      args.push('--format', 'default')
+      return args
+    },
+  },
+  {
+    name: 'gemini-cli',
+    command: 'gemini',
+    headlessFlag: '-p',
+    versionFlag: '--version',
+    modelFlag: '--model',
+    models: [
+      { id: 'gemini-2.5-flash', label: 'Flash 2.5 (rapido)', cost: 'low' },
+      { id: 'gemini-2.5-pro', label: 'Pro 2.5 (equilibrado)', cost: 'medium' },
+      { id: 'gemini-3.1-pro-preview', label: 'Pro 3.1 (mais recente)', cost: 'high' },
+    ],
+    defaultModel: 'gemini-2.5-flash',
+    buildArgs: (flag, prompt, model) => {
+      const args = [flag, prompt, '--output-format', 'text']
+      if (model) args.push('--model', model)
+      return args
+    },
+  },
+  {
+    name: 'aider',
+    command: 'aider',
+    headlessFlag: '--message',
+    versionFlag: '--version',
+    modelFlag: '--model',
+    models: [],
+    defaultModel: null,
+    buildArgs: (flag, prompt, model) => {
+      const args = [flag, prompt]
+      if (model) args.push('--model', model)
+      return args
+    },
+  },
 ]
 
 export async function detectInstalledAgents(): Promise<InstalledAgent[]> {
@@ -55,6 +141,8 @@ export async function detectInstalledAgents(): Promise<InstalledAgent[]> {
         path: agentPath,
         version,
         headlessFlag: agent.headlessFlag,
+        models: agent.models,
+        defaultModel: agent.defaultModel,
       })
     } catch {
       // agent not found
@@ -70,16 +158,7 @@ export async function executeAgent(request: AgentExecRequest): Promise<AgentExec
     return { agent: request.agent, output: `Agent "${request.agent}" not found`, exitCode: 1, duration: 0 }
   }
 
-  const args: string[] = [agentDef.headlessFlag, request.prompt]
-
-  // Claude Code specific flags
-  if (agentDef.name === 'claude-code') {
-    args.push('--output-format', 'text')
-    if (request.model) {
-      args.push('--model', request.model)
-    }
-  }
-
+  const args = agentDef.buildArgs(agentDef.headlessFlag, request.prompt, request.model)
   const startTime = Date.now()
 
   try {
@@ -98,12 +177,7 @@ export async function executeAgent(request: AgentExecRequest): Promise<AgentExec
     const exitCode = await proc.exited
     const duration = Date.now() - startTime
 
-    return {
-      agent: request.agent,
-      output: stdout || stderr,
-      exitCode,
-      duration,
-    }
+    return { agent: request.agent, output: stdout || stderr, exitCode, duration }
   } catch (err) {
     return {
       agent: request.agent,
@@ -123,12 +197,7 @@ export async function executeAgentWithCallbacks(
     return { agent: request.agent, output: `Agent "${request.agent}" not found`, exitCode: 1, duration: 0 }
   }
 
-  const args: string[] = [agentDef.headlessFlag, request.prompt]
-  if (agentDef.name === 'claude-code') {
-    args.push('--output-format', 'text')
-    if (request.model) args.push('--model', request.model)
-  }
-
+  const args = agentDef.buildArgs(agentDef.headlessFlag, request.prompt, request.model)
   const startTime = Date.now()
 
   try {
@@ -148,7 +217,6 @@ export async function executeAgentWithCallbacks(
       if (done) break
       const text = decoder.decode(value, { stream: true })
       fullOutput += text
-      // Emit each line as a chunk
       const lines = text.split('\n').filter((l) => l.trim())
       for (const line of lines) {
         onChunk(line.trim())
@@ -186,11 +254,7 @@ export function executeAgentStreaming(request: AgentExecRequest): {
     }
   }
 
-  const args: string[] = [agentDef.headlessFlag, request.prompt]
-  if (agentDef.name === 'claude-code') {
-    args.push('--output-format', 'text')
-    if (request.model) args.push('--model', request.model)
-  }
+  const args = agentDef.buildArgs(agentDef.headlessFlag, request.prompt, request.model)
 
   let proc: ReturnType<typeof Bun.spawn> | null = null
 

@@ -26,10 +26,10 @@ export const daemonClient = {
   getAvailableAgents: () =>
     daemonFetch<InstalledAgent[]>('/agents/available'),
 
-  runDiscovery: (projectPath: string, agent?: string) =>
+  runDiscovery: (projectPath: string, agent?: string, model?: string) =>
     daemonFetch<DiscoveryResult>('/discovery/run', {
       method: 'POST',
-      body: JSON.stringify({ projectPath, agent }),
+      body: JSON.stringify({ projectPath, agent, model }),
     }),
 
   executeAgent: (agent: string, prompt: string, projectPath?: string) =>
@@ -50,10 +50,10 @@ export const daemonClient = {
       body: JSON.stringify({ projectPath, fingerprint, cardId }),
     }),
 
-  startDiscovery: (projectPath: string, agent?: string) =>
+  startDiscovery: (projectPath: string, agent?: string, model?: string) =>
     daemonFetch<{ jobId: string; status: string }>('/discovery/start', {
       method: 'POST',
-      body: JSON.stringify({ projectPath, agent }),
+      body: JSON.stringify({ projectPath, agent, model }),
     }),
 
   getDiscoveryJob: (jobId: string) =>

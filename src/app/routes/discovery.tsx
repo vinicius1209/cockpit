@@ -52,6 +52,7 @@ export function DiscoveryPage() {
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>('')
   const [useAgent, setUseAgent] = useState<string>('none')
+  const [selectedModel, setSelectedModel] = useState<string | null>(null)
   const [projectOpen, setProjectOpen] = useState(false)
   const [modeOpen, setModeOpen] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
@@ -111,7 +112,7 @@ export function DiscoveryPage() {
     // Fast-path: scanner only (synchronous, ~1s)
     if (!agent) {
       try {
-        const discoveryResult = await daemonClient.runDiscovery(selectedProject.path)
+        const discoveryResult = await daemonClient.runDiscovery(selectedProject.path, undefined, undefined)
         setResult(discoveryResult)
         toast.success(`Discovery concluido: ${discoveryResult.cards.length} descobertas`, {
           description: discoveryResult.scanResult.stack.join(', ') || selectedProject.name,
@@ -128,7 +129,7 @@ export function DiscoveryPage() {
 
     // Slow-path: with agent → job queue + SSE
     try {
-      const { jobId } = await daemonClient.startDiscovery(selectedProject.path, agent)
+      const { jobId } = await daemonClient.startDiscovery(selectedProject.path, agent, selectedModel || undefined)
       const DAEMON_URL = import.meta.env.VITE_DAEMON_URL || 'http://localhost:4800'
       const es = new EventSource(`${DAEMON_URL}/discovery/stream/${jobId}`)
 
@@ -395,8 +396,8 @@ export function DiscoveryPage() {
               </Popover>
             </div>
 
-            {/* Mode combobox */}
-            <div className="w-56 space-y-1.5">
+            {/* Mode combobox (agent + model unified) */}
+            <div className="w-72 space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Modo</label>
               <Popover open={modeOpen} onOpenChange={setModeOpen}>
                 <PopoverTrigger asChild>
@@ -412,23 +413,31 @@ export function DiscoveryPage() {
                         Scanner rapido
                       </span>
                     ) : (
-                      <span className="flex items-center gap-2">
-                        <Bot className="h-3.5 w-3.5 text-muted-foreground" />
-                        {agents.find((a) => a.name === useAgent)?.name || useAgent}
+                      <span className="flex items-center gap-2 truncate">
+                        <Bot className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span>{useAgent}</span>
+                        {selectedModel && (
+                          <>
+                            <span className="text-muted-foreground">·</span>
+                            <span className="text-xs text-muted-foreground truncate">
+                              {agents.find((a) => a.name === useAgent)?.models.find((m) => m.id === selectedModel)?.label.split(' (')[0] || selectedModel}
+                            </span>
+                          </>
+                        )}
                       </span>
                     )}
                     <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                <PopoverContent className="w-80 p-0" align="start">
                   <Command>
-                    <CommandInput placeholder="Buscar modo..." />
+                    <CommandInput placeholder="Buscar agent ou modelo..." />
                     <CommandList>
-                      <CommandEmpty>Nenhum agent encontrado.</CommandEmpty>
+                      <CommandEmpty>Nenhum encontrado.</CommandEmpty>
                       <CommandGroup heading="Scanner">
                         <CommandItem
                           value="scanner-rapido"
-                          onSelect={() => { setUseAgent('none'); setModeOpen(false) }}
+                          onSelect={() => { setUseAgent('none'); setSelectedModel(null); setModeOpen(false) }}
                         >
                           <Search className="h-3.5 w-3.5 text-muted-foreground" />
                           <div className="flex flex-col ml-1">
@@ -438,24 +447,32 @@ export function DiscoveryPage() {
                           <Check className={cn('ml-auto h-4 w-4', useAgent === 'none' ? 'opacity-100' : 'opacity-0')} />
                         </CommandItem>
                       </CommandGroup>
-                      {agents.length > 0 && (
-                        <CommandGroup heading="AI Agents">
-                          {agents.map((a) => (
-                            <CommandItem
-                              key={a.name}
-                              value={a.name}
-                              onSelect={() => { setUseAgent(a.name); setModeOpen(false) }}
-                            >
-                              <Bot className="h-3.5 w-3.5 text-muted-foreground" />
-                              <div className="flex flex-col ml-1">
-                                <span>{a.name}</span>
-                                <span className="text-[11px] text-muted-foreground">{a.version?.split(' ')[0] || 'installed'}</span>
-                              </div>
-                              <Check className={cn('ml-auto h-4 w-4', useAgent === a.name ? 'opacity-100' : 'opacity-0')} />
-                            </CommandItem>
-                          ))}
+                      {agents.filter((a) => a.models.length > 0).map((a) => (
+                        <CommandGroup key={a.name} heading={`${a.name} ${a.version?.split(' ')[0] || ''}`}>
+                          {a.models.map((m) => {
+                            const isSelected = useAgent === a.name && selectedModel === m.id
+                            const costDot = m.cost === 'low' ? 'bg-green-500' : m.cost === 'medium' ? 'bg-yellow-500' : 'bg-red-500'
+                            return (
+                              <CommandItem
+                                key={`${a.name}-${m.id}`}
+                                value={`${a.name} ${m.label} ${m.id}`}
+                                onSelect={() => {
+                                  setUseAgent(a.name)
+                                  setSelectedModel(m.id)
+                                  setModeOpen(false)
+                                }}
+                              >
+                                <span className={`h-2 w-2 rounded-full ${costDot} shrink-0`} />
+                                <div className="flex flex-col ml-1">
+                                  <span>{m.label}</span>
+                                  <span className="text-[11px] text-muted-foreground">{m.id}</span>
+                                </div>
+                                <Check className={cn('ml-auto h-4 w-4', isSelected ? 'opacity-100' : 'opacity-0')} />
+                              </CommandItem>
+                            )
+                          })}
                         </CommandGroup>
-                      )}
+                      ))}
                     </CommandList>
                   </Command>
                 </PopoverContent>
