@@ -14,10 +14,11 @@ export async function runAgent(
   apiKey: string,
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
+  projectPath?: string,
 ) {
   // If no API key → route through daemon (uses CLI agent, no key needed)
   if (!apiKey) {
-    return runViaDaemon(config, messages, callbacks, signal)
+    return runViaDaemon(config, messages, callbacks, signal, projectPath)
   }
 
   // If API key provided → use direct API (opt-in advanced)
@@ -39,6 +40,7 @@ async function runViaDaemon(
   messages: AgentMessage[],
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
+  projectPath?: string,
 ) {
   const chatMessages = messages
     .filter((m) => m.role !== 'system')
@@ -52,6 +54,7 @@ async function runViaDaemon(
         systemPrompt: config.system_prompt,
         messages: chatMessages,
         model: config.model,
+        projectPath,
       }),
       signal,
     })

@@ -5,9 +5,12 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useCardStore } from '@/entities/card/store'
 import { useAgentStore } from '@/entities/agent/store'
+import { useProjectStore } from '@/entities/card/project-store'
+import { useWorkspaceStore } from '@/entities/workspace/store'
 import { runAgent } from '@/features/agent-runner/agent-service'
 import type { Card, SpecStatus } from '@/entities/card/types'
-import { Sparkles, Save, Loader2, ChevronRight } from 'lucide-react'
+import { MessageResponse } from '@/components/ai-elements/message'
+import { Sparkles, Save, Loader2, ChevronRight, Eye, Pencil } from 'lucide-react'
 
 const SPEC_STEPS: { status: SpecStatus; label: string; color: string }[] = [
   { status: 'draft', label: 'Rascunho', color: '#f59e0b' },
@@ -55,14 +58,54 @@ interface SpecPanelProps {
 export function SpecPanel({ card, workspaceId }: SpecPanelProps) {
   const { updateCard } = useCardStore()
   const { getWorkspaceAgents, getApiKey } = useAgentStore()
+  const { getWorkspaceProjects } = useProjectStore()
+  const activeWorkspace = useWorkspaceStore((s) => s.getActiveWorkspace())
 
   const [content, setContent] = useState(card.spec_content || '')
   const [isGenerating, setIsGenerating] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [viewMode, setViewMode] = useState<'preview' | 'edit'>(card.spec_content ? 'preview' : 'edit')
   const abortRef = useRef<AbortController | null>(null)
 
   const currentStatus = card.spec_status
   const specWriter = getWorkspaceAgents(workspaceId).find((a) => a.role === 'spec-writer')
+  const projects = getWorkspaceProjects(workspaceId)
+
+  // Find the best projectPath for this card
+  const getProjectPath = (): string | undefined => {
+    // If card has a project_id, use that project's path
+    if (card.project_id) {
+      const proj = projects.find((p) => p.id === card.project_id)
+      if (proj) return proj.path
+    }
+    // Otherwise use first project in workspace
+    return projects[0]?.path
+  }
+
+  // Build enriched system prompt with workspace context
+  const buildSystemPrompt = (): string => {
+    const base = specWriter?.system_prompt || ''
+    const contextParts: string[] = []
+
+    if (activeWorkspace) {
+      contextParts.push(`Workspace: ${activeWorkspace.name}`)
+      if (activeWorkspace.description) contextParts.push(`Descricao: ${activeWorkspace.description}`)
+    }
+
+    if (projects.length > 0) {
+      contextParts.push(`Projetos vinculados: ${projects.map((p) => p.name).join(', ')}`)
+    }
+
+    const projectPath = getProjectPath()
+    if (projectPath) {
+      contextParts.push(`Diretorio do projeto: ${projectPath}`)
+      contextParts.push('Voce tem acesso ao codigo-fonte do projeto. Leia os arquivos relevantes para gerar uma spec mais precisa.')
+    }
+
+    if (contextParts.length === 0) return base
+
+    return `${base}\n\n## Contexto do Workspace\n${contextParts.join('\n')}`
+  }
 
   const handleSave = () => {
     updateCard(card.id, {
@@ -83,6 +126,7 @@ export function SpecPanel({ card, workspaceId }: SpecPanelProps) {
 
     setIsGenerating(true)
     setContent('')
+    setViewMode('preview')
 
     const userMessage = `Gere uma spec tecnica completa para o seguinte card:
 
@@ -90,14 +134,21 @@ Titulo: ${card.title}
 Tipo: ${card.type}
 Prioridade: ${card.priority}
 Descricao: ${card.description || 'Sem descricao detalhada'}
+${card.interview_notes ? `\nNotas da entrevista:\n${card.interview_notes}` : ''}
+${card.project_id ? `\nProjeto: ${projects.find((p) => p.id === card.project_id)?.name || 'N/A'}` : ''}
 
-${card.interview_notes ? `Notas da entrevista:\n${card.interview_notes}` : ''}`
+Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o contexto real antes de gerar a spec.`
+
+    const enrichedConfig = {
+      ...specWriter,
+      system_prompt: buildSystemPrompt(),
+    }
 
     const abort = new AbortController()
     abortRef.current = abort
 
     await runAgent(
-      specWriter,
+      enrichedConfig,
       [{ id: 'user-msg', role: 'user', content: userMessage, timestamp: new Date().toISOString() }],
       apiKey,
       {
@@ -113,8 +164,9 @@ ${card.interview_notes ? `Notas da entrevista:\n${card.interview_notes}` : ''}`
         },
       },
       abort.signal,
+      getProjectPath(),
     )
-  }, [specWriter, card, getApiKey, updateCard])
+  }, [specWriter, card, getApiKey, updateCard, projects, activeWorkspace])
 
   const handleUseTemplate = () => {
     const filled = SPEC_TEMPLATE.replace('{title}', card.title)
@@ -178,7 +230,30 @@ ${card.interview_notes ? `Notas da entrevista:\n${card.interview_notes}` : ''}`
             </Button>
           </>
         )}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-2">
+          {getProjectPath() && (
+            <Badge variant="outline" className="text-[10px]">
+              {projects.find((p) => p.path === getProjectPath())?.name || 'projeto'}
+            </Badge>
+          )}
+          {content.trim() && (
+            <div className="flex rounded-md border overflow-hidden">
+              <button
+                className={`px-2 py-1 text-[11px] flex items-center gap-1 transition-colors ${viewMode === 'preview' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => setViewMode('preview')}
+              >
+                <Eye className="h-3 w-3" />
+                Preview
+              </button>
+              <button
+                className={`px-2 py-1 text-[11px] flex items-center gap-1 transition-colors ${viewMode === 'edit' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                onClick={() => setViewMode('edit')}
+              >
+                <Pencil className="h-3 w-3" />
+                Editar
+              </button>
+            </div>
+          )}
           <Button size="sm" className="h-7 text-xs" onClick={handleSave}>
             <Save className="h-3.5 w-3.5 mr-1" />
             {saved ? 'Salvo!' : 'Salvar'}
@@ -186,16 +261,22 @@ ${card.interview_notes ? `Notas da entrevista:\n${card.interview_notes}` : ''}`
         </div>
       </div>
 
-      {/* Editor */}
+      {/* Content: Preview or Editor */}
       <ScrollArea className="flex-1">
-        <div className="p-3">
-          <Textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            placeholder="Escreva a spec aqui ou use o botao 'Gerar com AI'..."
-            className="min-h-[400px] resize-none font-mono text-sm"
-            disabled={isGenerating}
-          />
+        <div className="p-4">
+          {viewMode === 'preview' && content.trim() ? (
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <MessageResponse>{content}</MessageResponse>
+            </div>
+          ) : (
+            <Textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              placeholder="Escreva a spec aqui ou use o botao 'Gerar com AI'..."
+              className="min-h-[400px] resize-none font-mono text-sm"
+              disabled={isGenerating}
+            />
+          )}
         </div>
       </ScrollArea>
     </div>

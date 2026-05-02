@@ -15,6 +15,7 @@ import {
 import { useAgentStore } from '@/entities/agent/store'
 import { useCardStore } from '@/entities/card/store'
 import { runAgent } from './agent-service'
+import { useProjectStore } from '@/entities/card/project-store'
 import type { Card } from '@/entities/card/types'
 import type { AgentMessage } from '@/entities/agent/types'
 import { Send, Square, Bot, Loader2, Save, MessageSquare } from 'lucide-react'
@@ -27,8 +28,11 @@ interface InterviewPanelProps {
 export function InterviewPanel({ card, workspaceId }: InterviewPanelProps) {
   const { getWorkspaceAgents, getApiKey } = useAgentStore()
   const { updateCard } = useCardStore()
+  const { getWorkspaceProjects } = useProjectStore()
 
   const interviewer = getWorkspaceAgents(workspaceId).find((a) => a.role === 'interviewer')
+  const projects = getWorkspaceProjects(workspaceId)
+  const projectPath = card.project_id ? projects.find((p) => p.id === card.project_id)?.path : projects[0]?.path
 
   const [messages, setMessages] = useState<AgentMessage[]>([])
   const [input, setInput] = useState('')
@@ -89,6 +93,7 @@ Faca a primeira pergunta para entender melhor esse card.`,
         },
       },
       abort.signal,
+      projectPath,
     )
   }, [interviewer, card, getApiKey])
 
@@ -139,6 +144,7 @@ Faca a primeira pergunta para entender melhor esse card.`,
         },
       },
       abort.signal,
+      projectPath,
     )
   }, [input, interviewer, isStreaming, messages, getApiKey])
 

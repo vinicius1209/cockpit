@@ -20,6 +20,7 @@ import {
   MessageResponse,
 } from '@/components/ai-elements/message'
 import { useAgentStore } from '@/entities/agent/store'
+import { useProjectStore } from '@/entities/card/project-store'
 import { runAgent } from './agent-service'
 import type { Card } from '@/entities/card/types'
 import { Send, Square, Bot, Loader2, AlertCircle } from 'lucide-react'
@@ -40,8 +41,11 @@ export function AgentChat({ card, workspaceId }: AgentChatProps) {
     getRun,
   } = useAgentStore()
 
+  const { getWorkspaceProjects } = useProjectStore()
   const agents = getWorkspaceAgents(workspaceId)
   const cardRuns = getCardRuns(card.id)
+  const projects = getWorkspaceProjects(workspaceId)
+  const projectPath = card.project_id ? projects.find((p) => p.id === card.project_id)?.path : projects[0]?.path
 
   const [selectedAgentId, setSelectedAgentId] = useState(agents[0]?.id || '')
   const [activeRunId, setActiveRunId] = useState<string | null>(cardRuns[0]?.id || null)
@@ -107,8 +111,9 @@ export function AgentChat({ card, workspaceId }: AgentChatProps) {
         },
       },
       abort.signal,
+      projectPath,
     )
-  }, [input, selectedAgent, isStreaming, activeRunId, activeRun, card, workspaceId, getApiKey, createRun, addMessage, getRun, updateRunStatus])
+  }, [input, selectedAgent, isStreaming, activeRunId, activeRun, card, workspaceId, getApiKey, createRun, addMessage, getRun, updateRunStatus, projectPath])
 
   const handleCancel = () => {
     abortRef.current?.abort()

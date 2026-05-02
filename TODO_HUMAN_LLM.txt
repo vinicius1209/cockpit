@@ -6,7 +6,7 @@ vai salvar os itens/sub itens encontrados naquele discovery. O usuario pode na U
 esses discovery e rever os itens gerados naquele momento. Hoje ao recarregar a tela o usuario
 perde tudo o que foi feito no  discovery anterior.
 
-[ ] Ao trocar informação no mobo entrevista no card e ir para outra aba a informacão é perdida. Por exemplo:
+[X] Ao trocar informação no mobo entrevista no card e ir para outra aba a informacão é perdida. Por exemplo:
 estava na aba de entrevista e quis olhar a aba de Spec, e ao voltar para a aba de entrevista tudo foi perdido.
 Isso precisa ser persistido, precisa ter uma experiencia fluida do usuário. Pense que ele está trabalhando focado
 no card para deixar tudo documentado/pronto para a LLM trabalhar depois.
