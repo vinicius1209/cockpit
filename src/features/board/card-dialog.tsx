@@ -343,22 +343,6 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
               </>
             )}
 
-            <div className="flex items-center justify-between pt-2">
-              {isEditing && (
-                <Button variant="destructive" size="sm" onClick={handleDelete}>
-                  <Trash2 className="h-4 w-4 mr-1" />
-                  Excluir
-                </Button>
-              )}
-              <div className={`flex gap-2 ${!isEditing ? 'ml-auto' : ''}`}>
-                <Button variant="outline" onClick={onClose}>
-                  Cancelar
-                </Button>
-                <Button onClick={handleSave} disabled={!title.trim()}>
-                  {isEditing ? 'Salvar' : 'Criar'}
-                </Button>
-              </div>
-            </div>
           </div>
         ) : null}
 
@@ -377,6 +361,23 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
           </>
         )}
 
+        {/* Footer — fixed at bottom */}
+        <div className="flex items-center justify-between border-t pt-3 shrink-0">
+          {isEditing ? (
+            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleDelete}>
+              <Trash2 className="h-3.5 w-3.5 mr-1" />
+              Excluir
+            </Button>
+          ) : <div />}
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={!title.trim()}>
+              {isEditing ? 'Salvar' : 'Criar'}
+            </Button>
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   )
