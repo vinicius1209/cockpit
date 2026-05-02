@@ -103,7 +103,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className={`${isEditing ? 'sm:max-w-3xl h-[85vh]' : 'sm:max-w-lg'} flex flex-col`}>
+      <DialogContent className={`sm:max-w-3xl ${isEditing ? 'h-[85vh]' : 'h-auto'} flex flex-col`}>
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Editar Card' : 'Novo Card'}</DialogTitle>
           {isEditing && (
