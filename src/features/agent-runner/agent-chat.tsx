@@ -156,10 +156,12 @@ export function AgentChat({ card, workspaceId }: AgentChatProps) {
             ))}
           </SelectContent>
         </Select>
-        <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={handleNewChat} title="Iniciar nova conversa com o agent selecionado">
-          <Plus className="h-3.5 w-3.5" />
-          Nova conversa
-        </Button>
+        {activeRunId && (
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={handleNewChat} title="Iniciar nova conversa com o agent selecionado">
+            <Plus className="h-3.5 w-3.5" />
+            Nova conversa
+          </Button>
+        )}
       </div>
 
       {/* Run history tabs */}
