@@ -158,16 +158,26 @@ export async function executeAgent(request: AgentExecRequest): Promise<AgentExec
     return { agent: request.agent, output: `Agent "${request.agent}" not found`, exitCode: 1, duration: 0 }
   }
 
-  const args = agentDef.buildArgs(agentDef.headlessFlag, request.prompt, request.model)
+  const usePipe = request.prompt.length > 4000
+  const args = usePipe
+    ? agentDef.buildArgs(agentDef.headlessFlag, '-', request.model)
+    : agentDef.buildArgs(agentDef.headlessFlag, request.prompt, request.model)
   const startTime = Date.now()
 
   try {
     const proc = Bun.spawn([agentDef.command, ...args], {
       cwd: request.projectPath || undefined,
+      stdin: usePipe ? 'pipe' : undefined,
       stdout: 'pipe',
       stderr: 'pipe',
       env: { ...process.env, NO_COLOR: '1' },
     })
+
+    if (usePipe && proc.stdin) {
+      const writer = proc.stdin.getWriter()
+      await writer.write(new TextEncoder().encode(request.prompt))
+      await writer.close()
+    }
 
     const [stdout, stderr] = await Promise.all([
       new Response(proc.stdout).text(),
@@ -197,16 +207,28 @@ export async function executeAgentWithCallbacks(
     return { agent: request.agent, output: `Agent "${request.agent}" not found`, exitCode: 1, duration: 0 }
   }
 
-  const args = agentDef.buildArgs(agentDef.headlessFlag, request.prompt, request.model)
+  // For large prompts, use stdin instead of CLI argument to avoid OS limits
+  const usePipe = request.prompt.length > 4000
+  const args = usePipe
+    ? agentDef.buildArgs(agentDef.headlessFlag, '-', request.model)
+    : agentDef.buildArgs(agentDef.headlessFlag, request.prompt, request.model)
   const startTime = Date.now()
 
   try {
     const proc = Bun.spawn([agentDef.command, ...args], {
       cwd: request.projectPath || undefined,
+      stdin: usePipe ? 'pipe' : undefined,
       stdout: 'pipe',
       stderr: 'pipe',
       env: { ...process.env, NO_COLOR: '1' },
     })
+
+    // Write prompt to stdin if piping
+    if (usePipe && proc.stdin) {
+      const writer = proc.stdin.getWriter()
+      await writer.write(new TextEncoder().encode(request.prompt))
+      await writer.close()
+    }
 
     const reader = proc.stdout.getReader()
     const decoder = new TextDecoder()

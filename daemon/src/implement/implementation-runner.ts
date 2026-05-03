@@ -112,10 +112,17 @@ export async function runImplementation(
     emit({ phase: 'branching', message: `Criando branch ${branchName}...`, branch: branchName })
 
     try {
-      await runCmd('git', ['checkout', '-b', branchName], projectPath)
-      emit({ phase: 'branching', message: `Branch ${branchName} criada`, branch: branchName })
+      // Try to create new branch, if exists checkout existing
+      try {
+        await runCmd('git', ['checkout', '-b', branchName], projectPath)
+        emit({ phase: 'branching', message: `Branch ${branchName} criada`, branch: branchName })
+      } catch {
+        // Branch already exists, checkout it
+        await runCmd('git', ['checkout', branchName], projectPath)
+        emit({ phase: 'branching', message: `Branch ${branchName} (existente)`, branch: branchName })
+      }
     } catch (err) {
-      emit({ phase: 'error', message: `Erro ao criar branch: ${err instanceof Error ? err.message : 'unknown'}` })
+      emit({ phase: 'error', message: `Erro ao criar/trocar branch: ${err instanceof Error ? err.message : 'unknown'}` })
       return
     }
   }
