@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { AgentConfig, AgentRun, AgentMessage } from './types'
 import { AGENT_PRESETS } from './presets'
-import { createStorageAdapter } from '@/shared/lib/persistence'
+import { createStorageAdapter, createDaemonStorageAdapter } from '@/shared/lib/persistence'
 import { getApiKey as getKey, setApiKey as setKey } from '@/shared/lib/persistence/api-key-store'
 
 interface AgentState {
@@ -156,7 +156,7 @@ export const useAgentStore = create<AgentState>()(
     {
       name: 'cockpit-agents',
       version: 1,
-      storage: createStorageAdapter(),
+      storage: createStorageAdapter(createDaemonStorageAdapter('agents')),
       migrate: (persisted: unknown) => {
         const state = persisted as Record<string, unknown>
         // v0 -> v1: extract apiKeys from Zustand state to sessionStorage

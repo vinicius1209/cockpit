@@ -34,11 +34,21 @@ export function InterviewPanel({ card, workspaceId }: InterviewPanelProps) {
   const projects = getWorkspaceProjects(workspaceId)
   const projectPath = card.project_id ? projects.find((p) => p.id === card.project_id)?.path : projects[0]?.path
 
-  const [messages, setMessages] = useState<AgentMessage[]>([])
+  // Restore messages from card if available
+  const [messages, setMessages] = useState<AgentMessage[]>(() => {
+    if (card.interview_messages && card.interview_messages.length > 0) {
+      return card.interview_messages as AgentMessage[]
+    }
+    return []
+  })
   const [input, setInput] = useState('')
   const [streamingText, setStreamingText] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
-  const [isComplete, setIsComplete] = useState(false)
+  const [isComplete, setIsComplete] = useState(() => {
+    // Check if last message contains completion marker
+    const lastAssistant = card.interview_messages?.filter((m) => m.role === 'assistant').pop()
+    return lastAssistant?.content.includes('ENTREVISTA COMPLETA') ?? false
+  })
   const abortRef = useRef<AbortController | null>(null)
 
   const startInterview = useCallback(async () => {
@@ -80,12 +90,14 @@ Faca a primeira pergunta para entender melhor esse card.`,
             content: fullText,
             timestamp: new Date().toISOString(),
           }
-          setMessages((prev) => [...prev, assistantMsg])
+          const allMsgs = [...messages, initialMessage, assistantMsg]
+          setMessages(allMsgs.slice(1).length > 0 ? allMsgs : [initialMessage, assistantMsg])
           setStreamingText('')
           setIsStreaming(false)
+          persistMessages([initialMessage, assistantMsg])
           if (fullText.includes('ENTREVISTA COMPLETA')) {
             setIsComplete(true)
-            handleSaveNotesAuto([...messages, initialMessage, assistantMsg])
+            handleSaveNotesAuto([initialMessage, assistantMsg])
           }
         },
         onError: () => {
@@ -132,12 +144,14 @@ Faca a primeira pergunta para entender melhor esse card.`,
             content: fullText,
             timestamp: new Date().toISOString(),
           }
-          setMessages((prev) => [...prev, assistantMsg])
+          const allMsgs = [...newMessages, assistantMsg]
+          setMessages(allMsgs)
           setStreamingText('')
           setIsStreaming(false)
+          persistMessages(allMsgs)
           if (fullText.includes('ENTREVISTA COMPLETA')) {
             setIsComplete(true)
-            handleSaveNotesAuto([...newMessages, assistantMsg])
+            handleSaveNotesAuto(allMsgs)
           }
         },
         onError: () => {
@@ -156,6 +170,12 @@ Faca a primeira pergunta para entender melhor esse card.`,
     setStreamingText('')
   }
 
+  const persistMessages = (msgs: AgentMessage[]) => {
+    updateCard(card.id, {
+      interview_messages: msgs.map((m) => ({ id: m.id, role: m.role, content: m.content, timestamp: m.timestamp })),
+    })
+  }
+
   const handleSaveNotesAuto = (msgs: AgentMessage[]) => {
     const notes = msgs
       .filter((m) => m.role === 'assistant')
@@ -163,6 +183,7 @@ Faca a primeira pergunta para entender melhor esse card.`,
       .join('\n\n---\n\n')
     if (notes.trim()) {
       updateCard(card.id, { interview_notes: notes })
+      persistMessages(msgs)
       toast.success('Notas da entrevista salvas automaticamente')
     }
   }

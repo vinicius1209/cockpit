@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Doc, DocInsert } from './types'
-import { createStorageAdapter } from '@/shared/lib/persistence'
+import { createStorageAdapter, createDaemonStorageAdapter } from '@/shared/lib/persistence'
 
 interface DocState {
   docs: Doc[]
@@ -68,7 +68,7 @@ export const useDocStore = create<DocState>()(
     {
       name: 'cockpit-docs',
       version: 1,
-      storage: createStorageAdapter(),
+      storage: createStorageAdapter(createDaemonStorageAdapter('docs')),
       migrate: (persisted) => persisted as DocState,
     },
   ),

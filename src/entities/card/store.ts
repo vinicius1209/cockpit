@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Card, CardInsert, BoardColumn, Label } from './types'
 import { DEFAULT_COLUMNS } from '@/shared/lib/constants'
-import { createStorageAdapter } from '@/shared/lib/persistence'
+import { createStorageAdapter, createDaemonStorageAdapter } from '@/shared/lib/persistence'
 
 export interface ProcessingState {
   cardId: string
@@ -223,7 +223,7 @@ export const useCardStore = create<CardState>()(
     {
       name: 'cockpit-cards',
       version: 3,
-      storage: createStorageAdapter(),
+      storage: createStorageAdapter(createDaemonStorageAdapter('cards')),
       migrate: (persisted: unknown) => {
         const state = persisted as Record<string, unknown>
         // v1 → v2: add automation presets to existing columns

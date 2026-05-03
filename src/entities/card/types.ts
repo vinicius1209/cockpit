@@ -65,6 +65,7 @@ export interface Card {
   spec_status: SpecStatus | null
   spec_content: string | null
   interview_notes: string | null
+  interview_messages: { id: string; role: string; content: string; timestamp: string }[] | null
   labels: CardLabel[]
   created_at: string
   updated_at: string
