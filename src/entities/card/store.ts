@@ -4,10 +4,19 @@ import type { Card, CardInsert, BoardColumn, Label } from './types'
 import { DEFAULT_COLUMNS } from '@/shared/lib/constants'
 import { createStorageAdapter } from '@/shared/lib/persistence'
 
+export interface ProcessingState {
+  cardId: string
+  action: string
+  status: 'running' | 'done' | 'error'
+  chunks: string[]
+  startedAt: string
+}
+
 interface CardState {
   cards: Card[]
   columns: Record<string, BoardColumn[]>
   labels: Record<string, Label[]>
+  processingCards: Record<string, ProcessingState>
   addCard: (data: CardInsert) => string
   updateCard: (id: string, data: Partial<Card>) => void
   deleteCard: (id: string) => void
@@ -21,6 +30,10 @@ interface CardState {
   getWorkspaceLabels: (workspaceId: string) => Label[]
   toggleColumnAutomation: (workspaceId: string, columnId: string, automationId: string) => void
   toggleCardLabel: (cardId: string, label: Label) => void
+  startProcessing: (cardId: string, action: string) => void
+  addProcessingChunk: (cardId: string, text: string) => void
+  completeProcessing: (cardId: string) => void
+  getProcessing: (cardId: string) => ProcessingState | undefined
 }
 
 export const useCardStore = create<CardState>()(
@@ -29,6 +42,7 @@ export const useCardStore = create<CardState>()(
       cards: [],
       columns: {},
       labels: {},
+      processingCards: {},
 
       addCard: (data) => {
         const id = `card-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
@@ -172,6 +186,39 @@ export const useCardStore = create<CardState>()(
           },
         }))
       },
+
+      startProcessing: (cardId, action) => {
+        set((state) => ({
+          processingCards: {
+            ...state.processingCards,
+            [cardId]: { cardId, action, status: 'running', chunks: [], startedAt: new Date().toISOString() },
+          },
+        }))
+      },
+
+      addProcessingChunk: (cardId, text) => {
+        set((state) => {
+          const existing = state.processingCards[cardId]
+          if (!existing) return state
+          return {
+            processingCards: {
+              ...state.processingCards,
+              [cardId]: { ...existing, chunks: [...existing.chunks, text] },
+            },
+          }
+        })
+      },
+
+      completeProcessing: (cardId) => {
+        set((state) => {
+          const { [cardId]: _, ...rest } = state.processingCards
+          return { processingCards: rest }
+        })
+      },
+
+      getProcessing: (cardId) => {
+        return get().processingCards[cardId]
+      },
     }),
     {
       name: 'cockpit-cards',
@@ -200,6 +247,11 @@ export const useCardStore = create<CardState>()(
           }
         }
         return state as unknown as CardState
+      },
+      partialize: (state) => {
+        // Exclude processingCards from persistence (runtime-only)
+        const { processingCards: _, ...rest } = state
+        return rest as CardState
       },
     },
   ),

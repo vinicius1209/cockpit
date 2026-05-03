@@ -7,9 +7,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { Card, CardType, CardPriority } from '@/entities/card/types'
-import { useCardStore } from '@/entities/card/store'
+import { useCardStore, type ProcessingState } from '@/entities/card/store'
 import { useState, useEffect } from 'react'
-import { Trash2, Bot, FileText, ScrollText, MessageSquare, Rocket } from 'lucide-react'
+import { Trash2, Bot, FileText, ScrollText, MessageSquare, Rocket, Loader2 } from 'lucide-react'
 import { AgentChat } from '@/features/agent-runner/agent-chat'
 import { SpecPanel } from '@/features/spec-engine/spec-panel'
 import { InterviewPanel } from '@/features/agent-runner/interview-panel'
@@ -37,6 +37,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
   const [activeTab, setActiveTab] = useState<TabId>('details')
 
   const isEditing = !!card
+  const processing = useCardStore((s) => card ? s.processingCards[card.id] : undefined) as ProcessingState | undefined
 
   useEffect(() => {
     if (card) {
@@ -106,6 +107,27 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
       <DialogContent className={`sm:max-w-3xl ${isEditing ? 'h-[85vh]' : 'h-auto'} flex flex-col`}>
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Editar Card' : 'Novo Card'}</DialogTitle>
+
+          {/* Processing banner */}
+          {processing && (
+            <div className="flex items-center gap-2 rounded-md bg-amber-500/10 border border-amber-500/20 px-3 py-2 mt-1">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="text-xs font-medium text-amber-500">
+                  {processing.action === 'discovery' ? 'Agent analisando card...' :
+                   processing.action === 'spec' ? 'Gerando especificacao...' :
+                   'Processando...'}
+                </span>
+                {processing.chunks.length > 0 && (
+                  <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                    {processing.chunks[processing.chunks.length - 1]}
+                  </p>
+                )}
+              </div>
+              <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{processing.chunks.length} chunks</span>
+            </div>
+          )}
+
           {isEditing && (
             <div className="flex gap-1 pt-1">
               <Button
@@ -173,6 +195,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
             priority={priority} setPriority={setPriority}
             dueDate={dueDate} setDueDate={setDueDate}
             assignee={assignee} setAssignee={setAssignee}
+            disabled={!!processing}
           />
         ) : null}
 

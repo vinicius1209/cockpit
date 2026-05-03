@@ -58,6 +58,9 @@ async function runCardDiscovery(card: Card, workspaceId: string) {
 
   toast.info('Card Discovery iniciado...', { description: card.title })
 
+  // Start processing state (live card)
+  useCardStore.getState().startProcessing(card.id, 'discovery')
+
   const systemPrompt = `Voce e um analista de software. Investigue o problema descrito no card no contexto do projeto. Seja conciso e pratico. Use portugues brasileiro.`
 
   const userMessage = `Analise este card no contexto do projeto:
@@ -112,7 +115,10 @@ Retorne em formato markdown estruturado.`
         if (!line.startsWith('data: ')) continue
         try {
           const event = JSON.parse(line.slice(6))
-          if (event.type === 'chunk' && event.text) fullText += event.text + '\n'
+          if (event.type === 'chunk' && event.text) {
+            fullText += event.text + '\n'
+            useCardStore.getState().addProcessingChunk(card.id, event.text)
+          }
           if (event.type === 'done' && event.fullText) fullText = event.fullText
         } catch { /* skip */ }
       }
@@ -126,7 +132,9 @@ Retorne em formato markdown estruturado.`
       })
       toast.success('Card Discovery concluido', { description: 'Descricao enriquecida com contexto do codigo' })
     }
+    useCardStore.getState().completeProcessing(card.id)
   } catch (err) {
+    useCardStore.getState().completeProcessing(card.id)
     toast.error('Card Discovery falhou', { description: err instanceof Error ? err.message : 'Erro' })
   }
 }

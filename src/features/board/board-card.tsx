@@ -3,8 +3,9 @@ import { CSS } from '@dnd-kit/utilities'
 import { Badge } from '@/components/ui/badge'
 import { Card as CardUI } from '@/components/ui/card'
 import { CARD_TYPE_CONFIG, CARD_PRIORITY_CONFIG } from '@/shared/lib/constants'
+import { useCardStore } from '@/entities/card/store'
 import type { Card } from '@/entities/card/types'
-import { GripVertical, Calendar, ScrollText } from 'lucide-react'
+import { GripVertical, Calendar, ScrollText, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 
 interface BoardCardProps {
@@ -13,6 +14,7 @@ interface BoardCardProps {
 }
 
 export function BoardCard({ card, onClick }: BoardCardProps) {
+  const processing = useCardStore((s) => s.processingCards[card.id])
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: card.id,
     data: { type: 'card', card },
@@ -30,14 +32,35 @@ export function BoardCard({ card, onClick }: BoardCardProps) {
     <CardUI
       ref={setNodeRef}
       style={style}
-      className={`cursor-pointer border bg-card p-3 transition-shadow hover:shadow-md ${isDragging ? 'opacity-50 shadow-lg' : ''}`}
+      className={`cursor-pointer border bg-card p-3 transition-all hover:shadow-md ${
+        isDragging ? 'opacity-50 shadow-lg' : ''
+      } ${
+        processing ? 'border-amber-500/60 shadow-[0_0_12px_rgba(217,119,6,0.15)] animate-pulse' : ''
+      }`}
       onClick={() => onClick(card)}
     >
+      {/* Processing banner */}
+      {processing && (
+        <div className="flex items-center gap-1.5 mb-2 text-amber-500 text-[11px]">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          <span className="font-medium">
+            {processing.action === 'discovery' ? 'Analisando...' :
+             processing.action === 'spec' ? 'Gerando spec...' :
+             processing.action === 'implementation' ? 'Implementando...' :
+             'Processando...'}
+          </span>
+          {processing.chunks.length > 0 && (
+            <span className="text-[10px] opacity-70 ml-auto">{processing.chunks.length} chunks</span>
+          )}
+        </div>
+      )}
+
       <div className="flex items-start gap-2">
         <button
-          className="mt-0.5 cursor-grab touch-none text-muted-foreground hover:text-foreground"
+          className={`mt-0.5 touch-none ${processing ? 'cursor-not-allowed opacity-30' : 'cursor-grab text-muted-foreground hover:text-foreground'}`}
           {...attributes}
-          {...listeners}
+          {...(processing ? {} : listeners)}
+          disabled={!!processing}
         >
           <GripVertical className="h-4 w-4" />
         </button>
