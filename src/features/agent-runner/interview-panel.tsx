@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import {
   Conversation,
   ConversationContent,
@@ -18,7 +17,8 @@ import { runAgent } from './agent-service'
 import { useProjectStore } from '@/entities/card/project-store'
 import type { Card } from '@/entities/card/types'
 import type { AgentMessage } from '@/entities/agent/types'
-import { Send, Square, Bot, Loader2, Save, MessageSquare } from 'lucide-react'
+import { Send, Square, Bot, Loader2, Save, MessageSquare, CheckCircle2 } from 'lucide-react'
+import { toast } from 'sonner'
 
 interface InterviewPanelProps {
   card: Card
@@ -85,6 +85,7 @@ Faca a primeira pergunta para entender melhor esse card.`,
           setIsStreaming(false)
           if (fullText.includes('ENTREVISTA COMPLETA')) {
             setIsComplete(true)
+            handleSaveNotesAuto([...messages, initialMessage, assistantMsg])
           }
         },
         onError: () => {
@@ -136,6 +137,7 @@ Faca a primeira pergunta para entender melhor esse card.`,
           setIsStreaming(false)
           if (fullText.includes('ENTREVISTA COMPLETA')) {
             setIsComplete(true)
+            handleSaveNotesAuto([...newMessages, assistantMsg])
           }
         },
         onError: () => {
@@ -154,12 +156,24 @@ Faca a primeira pergunta para entender melhor esse card.`,
     setStreamingText('')
   }
 
+  const handleSaveNotesAuto = (msgs: AgentMessage[]) => {
+    const notes = msgs
+      .filter((m) => m.role === 'assistant')
+      .map((m) => m.content)
+      .join('\n\n---\n\n')
+    if (notes.trim()) {
+      updateCard(card.id, { interview_notes: notes })
+      toast.success('Notas da entrevista salvas automaticamente')
+    }
+  }
+
   const handleSaveNotes = () => {
     const notes = messages
       .filter((m) => m.role === 'assistant')
       .map((m) => m.content)
       .join('\n\n---\n\n')
     updateCard(card.id, { interview_notes: notes })
+    toast.success('Notas salvas')
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -170,31 +184,10 @@ Faca a primeira pergunta para entender melhor esse card.`,
   }
 
   const hasStarted = messages.length > 0
+  const messageCount = messages.filter((m) => m.role !== 'system' && !(messages.indexOf(m) === 0 && m.role === 'user')).length
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-2.5 border-b">
-        <MessageSquare className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium flex-1">Modo Entrevista</span>
-        {interviewer && (
-          <Badge variant="outline" className="text-[10px]">{interviewer.name}</Badge>
-        )}
-        {hasStarted && (
-          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleSaveNotes}>
-            <Save className="h-3.5 w-3.5 mr-1" />
-            Salvar notas
-          </Button>
-        )}
-      </div>
-
-      {card.interview_notes && !hasStarted && (
-        <div className="px-4 py-2 border-b bg-muted/30">
-          <p className="text-xs text-muted-foreground mb-1">Notas salvas da entrevista anterior:</p>
-          <p className="text-xs line-clamp-3 whitespace-pre-wrap">{card.interview_notes}</p>
-        </div>
-      )}
-
       {/* Messages */}
       {!hasStarted ? (
         <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
@@ -205,6 +198,13 @@ Faca a primeira pergunta para entender melhor esse card.`,
           <p className="text-xs text-muted-foreground mb-4 max-w-xs">
             O agent fara perguntas para detalhar requisitos, edge cases e criterios de aceite.
           </p>
+
+          {card.interview_notes && (
+            <p className="text-[11px] text-muted-foreground mb-3 px-4 py-2 bg-muted/30 rounded-md max-w-sm">
+              Ja existe notas salvas de uma entrevista anterior. Iniciar nova vai substituir.
+            </p>
+          )}
+
           <Button onClick={startInterview} disabled={!interviewer}>
             <Bot className="h-4 w-4 mr-2" />
             Iniciar Entrevista
@@ -212,18 +212,9 @@ Faca a primeira pergunta para entender melhor esse card.`,
         </div>
       ) : (
         <Conversation className="flex-1 bg-muted/10">
-          <ConversationContent className="gap-6 px-4 py-4">
-            {/* Context banner (first message) */}
-            {messages.length > 0 && messages[0].role === 'user' && (
-              <div className="text-center">
-                <Badge variant="secondary" className="text-[10px]">
-                  Contexto do card enviado automaticamente
-                </Badge>
-              </div>
-            )}
-
+          <ConversationContent className="gap-5 px-4 py-4">
             {messages.filter((m) => m.role !== 'system').map((msg, idx) => {
-              // Skip first user message (context) - show as banner above
+              // Skip first user message (context)
               if (idx === 0 && msg.role === 'user') return null
 
               return (
@@ -262,11 +253,12 @@ Faca a primeira pergunta para entender melhor esse card.`,
 
             {/* Completion banner */}
             {isComplete && (
-              <div className="text-center space-y-2">
-                <Badge className="bg-green-600 text-white">Entrevista Completa</Badge>
-                <p className="text-xs text-muted-foreground">
-                  Clique em "Salvar notas" e depois gere a spec.
-                </p>
+              <div className="flex items-center gap-2 rounded-lg bg-green-500/10 border border-green-500/20 px-4 py-3">
+                <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-green-500">Entrevista Completa</p>
+                  <p className="text-xs text-muted-foreground">Notas salvas automaticamente. Va para a aba Spec para gerar a especificacao.</p>
+                </div>
               </div>
             )}
           </ConversationContent>
@@ -274,27 +266,50 @@ Faca a primeira pergunta para entender melhor esse card.`,
         </Conversation>
       )}
 
-      {/* Input */}
+      {/* Input area */}
       {hasStarted && (
-        <div className="border-t bg-background p-3">
-          <div className="flex items-end gap-2">
-            <Textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Sua resposta..."
-              rows={2}
-              className="resize-none text-sm min-h-[44px]"
-              disabled={isStreaming}
-            />
+        <div className="border-t bg-background">
+          {/* Status bar */}
+          <div className="flex items-center justify-between px-4 py-1.5 border-b bg-muted/20">
+            <span className="text-[11px] text-muted-foreground">
+              {messageCount} mensagen{messageCount !== 1 ? 's' : ''}
+              {isComplete && ' · Completa'}
+            </span>
+            {!isComplete && hasStarted && messages.filter((m) => m.role === 'assistant').length > 0 && (
+              <Button variant="ghost" size="sm" className="h-6 text-[11px]" onClick={handleSaveNotes}>
+                <Save className="h-3 w-3 mr-1" />
+                Salvar notas
+              </Button>
+            )}
+          </div>
+
+          {/* Input */}
+          <div className="p-3">
             {isStreaming ? (
-              <Button variant="destructive" size="icon" className="h-[44px] w-[44px] shrink-0 rounded-lg" onClick={handleCancel}>
-                <Square className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>Agent respondendo...</span>
+                </div>
+                <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleCancel}>
+                  <Square className="h-3 w-3 mr-1" />
+                  Parar
+                </Button>
+              </div>
             ) : (
-              <Button size="icon" className="h-[44px] w-[44px] shrink-0 rounded-lg" onClick={handleSend} disabled={!input.trim()}>
-                <Send className="h-4 w-4" />
-              </Button>
+              <div className="flex items-end gap-2">
+                <Textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={isComplete ? 'Entrevista concluida. Faca mais perguntas se necessario...' : 'Sua resposta...'}
+                  rows={2}
+                  className="resize-none text-sm min-h-[44px]"
+                />
+                <Button size="icon" className="h-[44px] w-[44px] shrink-0 rounded-lg" onClick={handleSend} disabled={!input.trim()}>
+                  <Send className="h-4 w-4" />
+                </Button>
+              </div>
             )}
           </div>
         </div>
