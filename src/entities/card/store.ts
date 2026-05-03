@@ -222,7 +222,7 @@ export const useCardStore = create<CardState>()(
     }),
     {
       name: 'cockpit-cards',
-      version: 3,
+      version: 4,
       storage: createStorageAdapter(createDaemonStorageAdapter('cards')),
       migrate: (persisted: unknown) => {
         const state = persisted as Record<string, unknown>

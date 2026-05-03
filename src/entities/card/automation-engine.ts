@@ -6,13 +6,30 @@ import { toast } from 'sonner'
 
 const DAEMON_URL = import.meta.env.VITE_DAEMON_URL || 'http://localhost:4800'
 
+// Sync column slug → spec_status automatically
+const COLUMN_SPEC_STATUS_MAP: Record<string, string> = {
+  'spec': 'draft',
+  'ready': 'ready',
+  'in-progress': 'in_progress',
+  'review': 'review',
+  'done': 'done',
+}
+
 export async function executeColumnAutomations(
   card: Card,
   targetColumn: BoardColumn,
   workspaceId: string,
 ) {
+  const { updateCard } = useCardStore.getState()
+
+  // 1. Auto-sync spec_status with column
+  const specStatus = COLUMN_SPEC_STATUS_MAP[targetColumn.slug]
+  if (specStatus && card.spec_status !== specStatus) {
+    updateCard(card.id, { spec_status: specStatus as Card['spec_status'] })
+  }
+
+  // 2. Execute enabled automations
   const automations = targetColumn.automations?.filter((a) => a.enabled) || []
-  if (automations.length === 0) return
 
   for (const automation of automations) {
     try {
@@ -20,21 +37,32 @@ export async function executeColumnAutomations(
         case 'run_card_discovery':
           await runCardDiscovery(card, workspaceId)
           break
+
         case 'generate_spec':
           toast.info('Geracao de spec automatica disponivel na aba Spec do card')
           break
+
         case 'run_implementation':
-          toast.info('Implementacao disponivel na aba Implementar do card')
+          // Auto-implement only if assignee is AI Agent
+          if (card.assignee === 'ai-agent') {
+            toast.info('Implementacao automatica iniciada...', { description: card.title })
+            await runAutoImplementation(card, workspaceId)
+          } else {
+            toast.info(`Card pronto para implementacao`, { description: 'Abra o card e use a aba Implementar' })
+          }
           break
+
         case 'run_review':
-          toast.info('Review disponivel na aba AI Agent do card')
+          toast.info('Card em review', { description: 'Abra o card para revisao' })
           break
+
         case 'save_to_vault':
           if (card.spec_content) {
             const docId = createDocFromSpec(card, workspaceId)
             if (docId) toast.success('Spec salva automaticamente no Docs Vault')
           }
           break
+
         case 'notify':
           toast.info(`Card "${card.title}" movido para ${targetColumn.name}`)
           break
@@ -42,6 +70,91 @@ export async function executeColumnAutomations(
     } catch (err) {
       console.error(`[automation] Error executing ${automation.action}:`, err)
     }
+  }
+}
+
+async function runAutoImplementation(card: Card, workspaceId: string) {
+  if (!card.spec_content) {
+    toast.warning('Sem spec para implementar')
+    return
+  }
+
+  const projects = useProjectStore.getState().getWorkspaceProjects(workspaceId)
+  const projectPath = card.project_id
+    ? projects.find((p) => p.id === card.project_id)?.path
+    : projects[0]?.path
+
+  if (!projectPath) {
+    toast.warning('Nenhum projeto vinculado ao workspace')
+    return
+  }
+
+  const { startProcessing, addProcessingChunk, completeProcessing } = useCardStore.getState()
+  startProcessing(card.id, 'implementation')
+
+  try {
+    const response = await fetch(`${DAEMON_URL}/agents/implement`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cardTitle: card.title,
+        cardType: card.type,
+        spec: card.spec_content,
+        interviewNotes: card.interview_notes || undefined,
+        projectPath,
+        createBranch: true,
+      }),
+    })
+
+    if (!response.ok) {
+      toast.error('Implementacao falhou')
+      completeProcessing(card.id)
+      return
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) { completeProcessing(card.id); return }
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let branch: string | null = null
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue
+        try {
+          const event = JSON.parse(line.slice(6))
+          if (event.message) addProcessingChunk(card.id, event.message)
+          if (event.text) addProcessingChunk(card.id, event.text)
+          if (event.branch) branch = event.branch
+          if (event.phase === 'done') {
+            // Move to Review
+            const columns = useCardStore.getState().getWorkspaceColumns(workspaceId)
+            const reviewCol = columns.find((c) => c.slug === 'review')
+            if (reviewCol && event.exitCode === 0) {
+              useCardStore.getState().moveCard(card.id, reviewCol.id, 0)
+              useCardStore.getState().updateCard(card.id, { spec_status: 'review' })
+            }
+            toast.success('Implementacao concluida', { description: branch ? `Branch: ${branch}` : undefined })
+          }
+          if (event.phase === 'error') {
+            toast.error('Implementacao falhou', { description: event.message })
+          }
+        } catch { /* skip */ }
+      }
+    }
+
+    completeProcessing(card.id)
+  } catch (err) {
+    completeProcessing(card.id)
+    toast.error('Implementacao falhou', { description: err instanceof Error ? err.message : 'Erro' })
   }
 }
 
@@ -92,12 +205,12 @@ Retorne em formato markdown estruturado.`
 
     if (!response.ok) {
       toast.error('Card Discovery falhou', { description: 'Daemon offline ou erro' })
+      useCardStore.getState().completeProcessing(card.id)
       return
     }
 
-    // Read SSE stream and accumulate
     const reader = response.body?.getReader()
-    if (!reader) return
+    if (!reader) { useCardStore.getState().completeProcessing(card.id); return }
 
     const decoder = new TextDecoder()
     let fullText = ''

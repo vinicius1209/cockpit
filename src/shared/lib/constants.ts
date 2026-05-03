@@ -25,7 +25,7 @@ export const DEFAULT_COLUMNS = [
   { name: 'Discovery', slug: 'discovery', position: 1, color: '#8b5cf6', automations: [auto('run_card_discovery', true)] },
   { name: 'Spec', slug: 'spec', position: 2, color: '#3b82f6', automations: [auto('generate_spec')] },
   { name: 'Ready', slug: 'ready', position: 3, color: '#06b6d4', automations: [auto('notify', true)] },
-  { name: 'In Progress', slug: 'in-progress', position: 4, color: '#f59e0b', automations: [auto('run_implementation')] },
+  { name: 'In Progress', slug: 'in-progress', position: 4, color: '#f59e0b', automations: [auto('run_implementation', true)] },
   { name: 'Review', slug: 'review', position: 5, color: '#ec4899', automations: [auto('run_review')] },
   { name: 'Done', slug: 'done', position: 6, color: '#10b981', automations: [auto('save_to_vault', true)] },
 ]

@@ -161,7 +161,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
                   <Badge variant="outline" className="ml-1 text-[9px] px-1 py-0">{card.spec_status}</Badge>
                 )}
               </Button>
-              {card?.spec_content && (card?.spec_status === 'ready' || card?.spec_status === 'in_progress' || card?.spec_status === 'review') && (
+              {card?.spec_content && (
                 <Button
                   variant={activeTab === 'implement' ? 'secondary' : 'ghost'}
                   size="sm"
