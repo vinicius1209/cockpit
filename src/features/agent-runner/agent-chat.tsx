@@ -227,11 +227,12 @@ export function AgentChat({ card, workspaceId }: AgentChatProps) {
               </Message>
             )}
 
-            {/* Streaming message */}
+            {/* Streaming message with cursor */}
             {streamingText && (
               <Message from="assistant">
                 <MessageContent>
                   <MessageResponse>{streamingText}</MessageResponse>
+                  <span className="inline-block w-2 h-4 bg-primary/60 animate-pulse" />
                 </MessageContent>
               </Message>
             )}
@@ -249,7 +250,20 @@ export function AgentChat({ card, workspaceId }: AgentChatProps) {
       )}
 
       {/* Input */}
-      <div className="border-t bg-background p-3">
+      <div className="border-t bg-background">
+        {isStreaming ? (
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <span>Agent respondendo...</span>
+            </div>
+            <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleCancel}>
+              <Square className="h-3 w-3 mr-1" />
+              Parar
+            </Button>
+          </div>
+        ) : (
+        <div className="p-3">
         <div className="flex items-end gap-2">
           <Textarea
             value={input}
@@ -258,18 +272,14 @@ export function AgentChat({ card, workspaceId }: AgentChatProps) {
             placeholder="Mensagem para o agent..."
             rows={2}
             className="resize-none text-sm min-h-[44px]"
-            disabled={isStreaming}
           />
-          {isStreaming ? (
-            <Button variant="destructive" size="icon" className="h-[44px] w-[44px] shrink-0 rounded-lg" onClick={handleCancel}>
-              <Square className="h-4 w-4" />
-            </Button>
-          ) : (
+          <span className="hidden" /> {/* placeholder for old ternary */}
             <Button size="icon" className="h-[44px] w-[44px] shrink-0 rounded-lg" onClick={handleSend} disabled={!input.trim() || !selectedAgent}>
               <Send className="h-4 w-4" />
             </Button>
-          )}
         </div>
+        </div>
+        )}
       </div>
     </div>
   )

@@ -278,11 +278,27 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
         </div>
       </div>
 
-      {/* Content: Preview or Editor */}
+      {/* Content: Generating / Preview / Editor */}
       <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
         <div className="p-4 flex-1 flex flex-col">
-          {viewMode === 'preview' && content.trim() ? (
-            <div className="prose prose-sm dark:prose-invert max-w-none">
+          {isGenerating ? (
+            /* Live preview during generation */
+            <div className="flex-1 overflow-y-auto">
+              {content.trim() ? (
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <MessageResponse>{content}</MessageResponse>
+                  <span className="inline-block w-2 h-5 bg-primary/60 animate-pulse ml-0.5 -mb-1" />
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full gap-3">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">Gerando especificacao...</p>
+                  <p className="text-xs text-muted-foreground">O agent esta analisando o card e o codigo do projeto</p>
+                </div>
+              )}
+            </div>
+          ) : viewMode === 'preview' && content.trim() ? (
+            <div className="prose prose-sm dark:prose-invert max-w-none flex-1 overflow-y-auto">
               <MessageResponse>{content}</MessageResponse>
             </div>
           ) : (
