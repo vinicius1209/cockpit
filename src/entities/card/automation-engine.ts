@@ -1,6 +1,7 @@
 import type { Card, BoardColumn } from './types'
 import { useCardStore } from './store'
 import { useProjectStore } from './project-store'
+import { useDocStore } from '@/entities/docs/store'
 import { createDocFromSpec } from '@/features/docs-vault/auto-doc'
 import { toast } from 'sonner'
 import { DAEMON_URL } from '@/shared/lib/constants'
@@ -33,15 +34,28 @@ export async function executeColumnAutomations(
   for (const automation of automations) {
     try {
       switch (automation.action) {
-        case 'run_card_discovery':
+        case 'run_card_discovery': {
+          // Guard: skip if card already has discovery content
+          if (card.description?.includes('## Card Discovery')) {
+            break
+          }
+          // Guard: skip if already processing
+          if (useCardStore.getState().getProcessing(card.id)) {
+            break
+          }
           await runCardDiscovery(card, workspaceId)
           break
+        }
 
         case 'generate_spec':
           toast.info('Geracao de spec automatica disponivel na aba Spec do card')
           break
 
-        case 'run_implementation':
+        case 'run_implementation': {
+          // Guard: skip if already processing
+          if (useCardStore.getState().getProcessing(card.id)) {
+            break
+          }
           // Auto-implement only if assignee is AI Agent
           if (card.assignee === 'ai-agent') {
             toast.info('Implementacao automatica iniciada...', { description: card.title })
@@ -50,17 +64,31 @@ export async function executeColumnAutomations(
             toast.info(`Card pronto para implementacao`, { description: 'Abra o card e use a aba Implementar' })
           }
           break
+        }
 
         case 'run_review':
           toast.info('Card em review', { description: 'Abra o card para revisao' })
           break
 
-        case 'save_to_vault':
+        case 'save_to_vault': {
+          // Guard: skip if spec already saved for this card
           if (card.spec_content) {
-            const docId = createDocFromSpec(card, workspaceId)
-            if (docId) toast.success('Spec salva automaticamente no Docs Vault')
+            const existingDocs = useDocStore.getState().getCardDocs(card.id)
+            const alreadySaved = existingDocs.some((d) => d.tags.includes('spec'))
+            if (alreadySaved) {
+              // Update existing doc instead of creating new one
+              const existing = existingDocs.find((d) => d.tags.includes('spec'))
+              if (existing && existing.content !== card.spec_content) {
+                useDocStore.getState().updateDoc(existing.id, { content: card.spec_content })
+                toast.success('Spec atualizada no Docs Vault')
+              }
+            } else {
+              const docId = createDocFromSpec(card, workspaceId)
+              if (docId) toast.success('Spec salva automaticamente no Docs Vault')
+            }
           }
           break
+        }
 
         case 'notify':
           toast.info(`Card "${card.title}" movido para ${targetColumn.name}`)
