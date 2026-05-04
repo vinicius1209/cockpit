@@ -85,3 +85,16 @@ Items marcados com `[x]` ja foram feitos. Os demais estao priorizados por severi
 
 - [ ] Live preview dos agents trabalhando no dashboard
 - [ ] Session tracking + Branch hyperlink no implement panel (Task #50)
+- [x] Auto PR via `gh` apos implementacao (git flow profile + pr-creator)
+
+## Proxima Sessao — Feedback Loop de Implementacao
+
+> Card implementado pelo agent mas nao resolveu → como dar feedback e re-tentar?
+
+- [ ] **F1** Botao "Rejeitar" no implement panel (fecha PR draft, card volta pra Ready/Spec)
+- [ ] **F2** Botao "Re-implementar com feedback" (textarea pro usuario descrever o problema)
+- [ ] **F3** Feedback salvo no task workspace (`feedback.md`) e enviado no prompt da proxima tentativa
+- [ ] **F4** Contador de tentativas visivel no card (tentativa 1, 2, 3...)
+- [ ] **F5** Agent recebe: spec + log da tentativa anterior + feedback do usuario + screenshot/evidencia
+- [ ] **F6** Card type "revision" ou label automatica quando e re-tentativa
+- [ ] **F7** Limite de tentativas automaticas (max 3, depois exige intervencao humana)

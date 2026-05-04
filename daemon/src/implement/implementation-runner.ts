@@ -1,5 +1,6 @@
 import { executeAgentWithCallbacks, detectInstalledAgents } from '../executor/agent-executor'
 import { TaskWorkspace } from '../tasks/task-workspace'
+import { createPR } from '../git/pr-creator'
 
 export interface ImplementConfig {
   cardTitle: string
@@ -12,16 +13,17 @@ export interface ImplementConfig {
   agent?: string
   model?: string
   createBranch: boolean
+  autoPR?: boolean
 }
 
 export interface ImplementEvent {
-  phase: 'analyzing' | 'branching' | 'implementing' | 'output' | 'file' | 'done' | 'error'
+  phase: 'analyzing' | 'branching' | 'implementing' | 'output' | 'file' | 'creating-pr' | 'done' | 'error'
   message?: string
   text?: string
   branch?: string
   action?: 'modified' | 'created' | 'deleted' | 'changed'
   path?: string
-  summary?: { filesModified: number; filesCreated: number; filesDeleted: number; branch: string | null }
+  summary?: { filesModified: number; filesCreated: number; filesDeleted: number; branch: string | null; prUrl?: string; prNumber?: number }
   exitCode?: number
 }
 
@@ -284,10 +286,37 @@ export async function runImplementation(
       } catch { /* ok */ }
     }
 
+    const summary = { filesModified, filesCreated, filesDeleted, branch: branchName } as {
+      filesModified: number; filesCreated: number; filesDeleted: number; branch: string | null; prUrl?: string; prNumber?: number
+    }
+
+    // Auto-PR: create draft PR if enabled and implementation succeeded
+    if (config.autoPR && branchName && result.exitCode === 0) {
+      emit({ phase: 'creating-pr', message: 'Criando Pull Request...' })
+      try {
+        const pr = await createPR({
+          projectPath,
+          branch: branchName,
+          cardTitle: config.cardTitle,
+          cardType: config.cardType,
+          spec: config.spec,
+          filesModified,
+          filesCreated,
+          filesDeleted,
+          draft: true,
+        })
+        summary.prUrl = pr.url
+        summary.prNumber = pr.number
+        emit({ phase: 'creating-pr', message: `PR #${pr.number} criada: ${pr.url}` })
+      } catch (prErr) {
+        emit({ phase: 'creating-pr', message: `PR falhou: ${prErr instanceof Error ? prErr.message : 'erro'}` })
+      }
+    }
+
     emit({
       phase: 'done',
       message: `${agentName} concluido (${Math.round(result.duration / 1000)}s)`,
-      summary: { filesModified, filesCreated, filesDeleted, branch: branchName },
+      summary,
       exitCode: result.exitCode,
     })
   } catch (err) {

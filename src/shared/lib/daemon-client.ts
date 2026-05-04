@@ -88,4 +88,23 @@ export const daemonClient = {
       return null
     }
   },
+
+  // Git flow
+  analyzeGitFlow: (projectPath: string) =>
+    daemonFetch<Record<string, unknown>>('/git/analyze', {
+      method: 'POST',
+      body: JSON.stringify({ projectPath }),
+    }),
+
+  getGitProfile: (projectPath: string) =>
+    daemonFetch<Record<string, unknown>>(`/git/profile?path=${encodeURIComponent(projectPath)}`),
+
+  getGhAccounts: () =>
+    daemonFetch<{ user: string; active: boolean; host: string }[]>('/git/accounts'),
+
+  switchGhAccount: (user: string) =>
+    daemonFetch<{ switched: boolean }>('/git/switch-account', {
+      method: 'POST',
+      body: JSON.stringify({ user }),
+    }),
 }

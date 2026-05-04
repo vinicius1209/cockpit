@@ -12,7 +12,7 @@ import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Trash2, Plus, X, FolderOpen, Search, Loader2, CheckCircle2, AlertCircle, GitBranch, FileCode, Bot, Wand2, Settings, Tag, Columns3 } from 'lucide-react'
+import { ArrowLeft, Trash2, Plus, X, FolderOpen, Search, Loader2, CheckCircle2, AlertCircle, GitBranch, GitPullRequest, FileCode, Bot, Wand2, Settings, Tag, Columns3 } from 'lucide-react'
 import { AUTOMATION_ACTION_LABELS } from '@/entities/card/types'
 import { daemonClient } from '@/shared/lib/daemon-client'
 import type { InstalledAgent, ScanResult } from '@/entities/card/project-types'
@@ -43,6 +43,9 @@ export function WorkspaceSettingsPage() {
   const [scanning, setScanning] = useState<string | null>(null)
   const [scanResults, setScanResults] = useState<Record<string, ScanResult>>({})
   const [bootstrapping, setBootstrapping] = useState<string | null>(null)
+  const [analyzingGit, setAnalyzingGit] = useState<string | null>(null)
+  const [gitProfiles, setGitProfiles] = useState<Record<string, { baseBranch: string; ghAccount: string; repoOwner: string; repoName: string; hasPrTemplate: boolean }>>({})
+
 
   useEffect(() => {
     if (workspace) {
@@ -97,7 +100,7 @@ export function WorkspaceSettingsPage() {
     const projectName = newProjectName.trim() || newProjectPath.split('/').pop() || 'Projeto'
     addProject({
       workspace_id: workspaceId, name: projectName, path: newProjectPath.trim(),
-      agent_preference: null, auto_scan: false, scan_interval_hours: 4,
+      agent_preference: null, auto_scan: false, scan_interval_hours: 4, auto_pr: false,
     })
     toast.success(`Projeto "${projectName}" adicionado`)
     setNewProjectName('')
@@ -133,6 +136,19 @@ export function WorkspaceSettingsPage() {
     } catch (err) {
       toast.error('Erro no bootstrap', { description: err instanceof Error ? err.message : 'Daemon offline' })
     } finally { setBootstrapping(null) }
+  }
+
+  const handleAnalyzeGitFlow = async (projectPath: string, projectId: string) => {
+    setAnalyzingGit(projectId)
+    try {
+      const profile = await daemonClient.analyzeGitFlow(projectPath) as { baseBranch: string; ghAccount: string; repoOwner: string; repoName: string; hasPrTemplate: boolean }
+      setGitProfiles((prev) => ({ ...prev, [projectId]: profile }))
+      toast.success('Git flow analisado', {
+        description: `Base: ${profile.baseBranch} · Conta: ${profile.ghAccount} · Template: ${profile.hasPrTemplate ? 'sim' : 'nao'}`,
+      })
+    } catch (err) {
+      toast.error('Analise falhou', { description: err instanceof Error ? err.message : 'Erro' })
+    } finally { setAnalyzingGit(null) }
   }
 
   const abbreviatePath = (p: string) => p.replace(/^\/Users\/[^/]+\//, '~/')
@@ -380,6 +396,43 @@ export function WorkspaceSettingsPage() {
                           </div>
                         </>
                       )}
+
+                      {/* Git Flow & Auto-PR */}
+                      <Separator className="my-2.5" />
+                      <div className="pl-7 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <GitPullRequest className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="text-xs">Auto PR apos implementacao</span>
+                          </div>
+                          <Switch
+                            checked={proj.auto_pr ?? false}
+                            onCheckedChange={(checked) => updateProject(proj.id, { auto_pr: checked })}
+                          />
+                        </div>
+                        {daemonOnline && (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs"
+                              onClick={() => handleAnalyzeGitFlow(proj.path, proj.id)}
+                              disabled={analyzingGit === proj.id}
+                            >
+                              {analyzingGit === proj.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><GitBranch className="h-3.5 w-3.5 mr-1" />Analisar Git Flow</>}
+                            </Button>
+                            {gitProfiles[proj.id] && (
+                              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                                <Badge variant="outline" className="text-[10px]">base: {gitProfiles[proj.id].baseBranch}</Badge>
+                                <Badge variant="outline" className="text-[10px]">gh: {gitProfiles[proj.id].ghAccount}</Badge>
+                                {gitProfiles[proj.id].hasPrTemplate && (
+                                  <Badge variant="outline" className="text-[10px] text-green-600">PR template</Badge>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 )

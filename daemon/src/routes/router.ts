@@ -8,6 +8,7 @@ import { handleChatRoutes } from './chat'
 import { handleImplementRoutes } from './implement'
 import { handleDataRoutes } from './data'
 import { handleTaskRoutes } from './tasks'
+import { handleGitRoutes } from './git'
 
 export async function handleRequest(req: Request): Promise<Response> {
   const url = new URL(req.url)
@@ -56,6 +57,11 @@ export async function handleRequest(req: Request): Promise<Response> {
   // Data persistence routes
   if (path.startsWith('/api/data')) {
     return handleDataRoutes(req, url)
+  }
+
+  // Git routes
+  if (path.startsWith('/git')) {
+    return handleGitRoutes(req, url)
   }
 
   // Chat routes

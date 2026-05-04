@@ -12,7 +12,7 @@ import { useProjectStore } from '@/entities/card/project-store'
 import { daemonClient } from '@/shared/lib/daemon-client'
 import type { Card } from '@/entities/card/types'
 import type { ImplementEvent } from '@/entities/card/project-types'
-import { Rocket, Square, Loader2, CheckCircle2, CircleDot, FileText, FilePlus, FileX, GitBranch, AlertCircle, History, RotateCcw } from 'lucide-react'
+import { Rocket, Square, Loader2, CheckCircle2, CircleDot, FileText, FilePlus, FileX, GitBranch, GitPullRequest, AlertCircle, History, RotateCcw, ExternalLink } from 'lucide-react'
 import { DAEMON_URL } from '@/shared/lib/constants'
 
 interface ImplementPanelProps {
@@ -25,7 +25,7 @@ interface TrackedFile {
   action: 'modified' | 'created' | 'deleted' | 'changed'
 }
 
-type ImplPhase = 'idle' | 'analyzing' | 'branching' | 'implementing' | 'done' | 'error'
+type ImplPhase = 'idle' | 'analyzing' | 'branching' | 'implementing' | 'creating-pr' | 'done' | 'error'
 
 export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
   const { moveCard, updateCard, getWorkspaceColumns } = useCardStore()
@@ -44,7 +44,8 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
 
   const activeWorkspace = useWorkspaceStore((s) => s.getActiveWorkspace())
   const projects = getWorkspaceProjects(workspaceId)
-  const projectPath = card.project_id ? projects.find((p) => p.id === card.project_id)?.path : projects[0]?.path
+  const activeProject = card.project_id ? projects.find((p) => p.id === card.project_id) : projects[0]
+  const projectPath = activeProject?.path
   const columns = getWorkspaceColumns(workspaceId)
   const wsSlug = activeWorkspace?.slug || 'default'
 
@@ -100,6 +101,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
           interviewNotes: card.interview_notes || undefined,
           projectPath,
           createBranch: true,
+          autoPR: activeProject?.auto_pr ?? false,
         }),
         signal: abort.signal,
       })
@@ -130,7 +132,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
           try {
             const event = JSON.parse(line.slice(6)) as ImplementEvent
 
-            if (event.phase === 'analyzing' || event.phase === 'branching' || event.phase === 'implementing') {
+            if (event.phase === 'analyzing' || event.phase === 'branching' || event.phase === 'implementing' || event.phase === 'creating-pr') {
               setPhase(event.phase as ImplPhase)
             }
             if (event.branch) setBranch(event.branch)
@@ -178,7 +180,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
     setPhase('idle')
   }
 
-  const isRunning = phase === 'analyzing' || phase === 'branching' || phase === 'implementing'
+  const isRunning = phase === 'analyzing' || phase === 'branching' || phase === 'implementing' || phase === 'creating-pr'
 
   const fileIcon = (action: string) => {
     if (action === 'created') return <FilePlus className="h-3 w-3 text-green-500" />
@@ -282,9 +284,10 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
             { id: 'analyzing', label: 'Analise' },
             { id: 'branching', label: 'Branch' },
             { id: 'implementing', label: 'Agent' },
+            { id: 'creating-pr', label: 'PR' },
             { id: 'done', label: 'Concluido' },
           ].map((step, idx) => {
-            const steps = ['analyzing', 'branching', 'implementing', 'done']
+            const steps = ['analyzing', 'branching', 'implementing', 'creating-pr', 'done']
             const currentIdx = steps.indexOf(phase)
             const stepIdx = idx
             const isDone = currentIdx > stepIdx || phase === 'done'
@@ -353,7 +356,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
       {/* Summary */}
       {summary && phase === 'done' && (
         <div className="border-t px-4 py-2.5 bg-green-500/5">
-          <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-3 text-xs flex-wrap">
             <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
             <span className="font-medium">Implementacao concluida</span>
             {summary.branch && (
@@ -365,6 +368,18 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
             <span className="text-muted-foreground">
               {summary.filesCreated} criado{summary.filesCreated !== 1 ? 's' : ''}, {summary.filesModified} modificado{summary.filesModified !== 1 ? 's' : ''}
             </span>
+            {summary.prUrl && (
+              <a
+                href={summary.prUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                <GitPullRequest className="h-3 w-3" />
+                PR #{summary.prNumber}
+                <ExternalLink className="h-2.5 w-2.5" />
+              </a>
+            )}
           </div>
         </div>
       )}

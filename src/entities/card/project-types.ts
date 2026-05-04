@@ -7,6 +7,7 @@ export interface Project {
   auto_scan: boolean
   scan_interval_hours: number
   last_scan_at: string | null
+  auto_pr: boolean
   created_at: string
 }
 
@@ -90,13 +91,13 @@ export interface DiscoveryResult {
 }
 
 export interface ImplementEvent {
-  phase: 'analyzing' | 'branching' | 'implementing' | 'output' | 'file' | 'done' | 'error'
+  phase: 'analyzing' | 'branching' | 'implementing' | 'output' | 'file' | 'creating-pr' | 'done' | 'error'
   message?: string
   text?: string
   branch?: string
   action?: 'modified' | 'created' | 'deleted' | 'changed'
   path?: string
-  summary?: { filesModified: number; filesCreated: number; filesDeleted: number; branch: string | null }
+  summary?: { filesModified: number; filesCreated: number; filesDeleted: number; branch: string | null; prUrl?: string; prNumber?: number }
   exitCode?: number
 }
 
