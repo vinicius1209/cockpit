@@ -21,7 +21,10 @@ import { toast } from 'sonner'
 
 export function BoardView() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
-  const { getWorkspaceColumns, getColumnCards, moveCard, cards, getWorkspaceLabels } = useCardStore()
+  // Subscribe only to data arrays — re-render when cards/columns/labels change
+  const cards = useCardStore((s) => s.cards)
+  const _columns = useCardStore((s) => s.columns)  // trigger re-render on column changes
+  const _labels = useCardStore((s) => s.labels)     // trigger re-render on label changes
 
   const [activeCard, setActiveCard] = useState<Card | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -42,6 +45,7 @@ export function BoardView() {
     )
   }
 
+  const { getWorkspaceColumns, getColumnCards, moveCard, getWorkspaceLabels } = useCardStore.getState()
   const columns = getWorkspaceColumns(activeWorkspaceId)
 
   const hasFilters = filters.types.length > 0 || filters.priorities.length > 0 || filters.labelIds.length > 0

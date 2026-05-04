@@ -83,6 +83,7 @@ export function CardDetailsPanel({
           placeholder="Titulo do card..."
           className="text-base font-medium resize-none min-h-[44px] border-0 bg-transparent p-0 focus-visible:ring-0 shadow-none"
           rows={1}
+          autoFocus
           disabled={disabled}
           onInput={(e) => {
             const target = e.target as HTMLTextAreaElement

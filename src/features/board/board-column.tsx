@@ -40,6 +40,11 @@ export function BoardColumn({ column, cards, onCardClick, onAddCard }: BoardColu
               <BoardCard key={card.id} card={card} onClick={onCardClick} />
             ))}
           </SortableContext>
+          {cards.length === 0 && !isOver && (
+            <p className="text-[11px] text-muted-foreground/40 text-center py-6">
+              Arraste um card ou clique em "Novo card"
+            </p>
+          )}
         </div>
       </ScrollArea>
 

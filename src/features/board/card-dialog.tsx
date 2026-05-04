@@ -28,7 +28,7 @@ interface CardDialogProps {
 }
 
 export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }: CardDialogProps) {
-  const { addCard, updateCard, deleteCard } = useCardStore()
+  const { addCard, updateCard, deleteCard } = useCardStore.getState()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [type, setType] = useState<CardType>('feature')
