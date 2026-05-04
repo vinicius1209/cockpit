@@ -221,19 +221,67 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
               Nenhum projeto vinculado. Adicione nas configuracoes do workspace.
             </p>
           )}
-          <div className="flex items-center gap-2">
-            <Button onClick={() => handleStart()} disabled={!card.spec_content || !projectPath}>
-              <Rocket className="h-4 w-4 mr-2" />
-              {history ? 'Re-implementar' : 'Iniciar Implementacao'}
-            </Button>
-            {history && (
-              <Button variant="outline" size="sm" onClick={() => setShowHistory(!showHistory)}>
-                <History className="h-4 w-4 mr-1" />
-                Historico
+          <div className="flex items-center gap-2 flex-wrap">
+            {!history ? (
+              <Button onClick={() => handleStart()} disabled={!card.spec_content || !projectPath}>
+                <Rocket className="h-4 w-4 mr-2" />
+                Iniciar Implementacao
               </Button>
+            ) : (
+              <>
+                <Button variant="outline" size="sm" onClick={() => setShowFeedback(!showFeedback)}>
+                  <MessageSquareWarning className="h-4 w-4 mr-1" />
+                  Nao resolveu
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleStart()}>
+                  <RotateCcw className="h-4 w-4 mr-1" />
+                  Re-implementar
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setShowHistory(!showHistory)}>
+                  <History className="h-4 w-4 mr-1" />
+                  Historico
+                </Button>
+              </>
             )}
           </div>
         </div>
+
+        {/* Feedback — idle state */}
+        {showFeedback && history && (
+          <div className="border-t px-4 py-3 bg-amber-500/5 space-y-2.5">
+            <div className="flex items-center gap-2">
+              <MessageSquareWarning className="h-4 w-4 text-amber-500 shrink-0" />
+              <span className="text-xs font-medium">O que nao funcionou?</span>
+            </div>
+            <Textarea
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              placeholder="Ex: 'PDF ainda corta na direita em A4 portrait no celular. Precisa reduzir largura para 210mm.'"
+              rows={3}
+              className="text-xs"
+              autoFocus
+            />
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                className="h-7 text-xs"
+                disabled={!feedbackText.trim() || !card.spec_content || !projectPath}
+                onClick={() => handleStart(feedbackText.trim())}
+              >
+                <Rocket className="h-3 w-3 mr-1" />
+                Re-implementar com feedback
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => { setShowFeedback(false); setFeedbackText('') }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Previous implementation history */}
         {showHistory && history && (
