@@ -354,6 +354,22 @@ export async function runImplementation(
       }
     }
 
+    // Save last result to meta for state restoration
+    if (config.workspaceSlug && config.cardId) {
+      await TaskWorkspace.writeMeta(config.workspaceSlug, config.cardId, {
+        lastRun: {
+          phase: 'done',
+          exitCode: result.exitCode,
+          branch: branchName,
+          summary,
+          duration: Math.round(result.duration / 1000),
+          agent: agentName,
+          attempt: config.attempt || 1,
+          completedAt: new Date().toISOString(),
+        },
+      })
+    }
+
     emit({
       phase: 'done',
       message: `${agentName} concluido (${Math.round(result.duration / 1000)}s)`,
@@ -363,6 +379,19 @@ export async function runImplementation(
   } catch (err) {
     clearInterval(heartbeatInterval)
     stopWatcher?.()
+
+    // Save error to meta
+    if (config.workspaceSlug && config.cardId) {
+      await TaskWorkspace.writeMeta(config.workspaceSlug, config.cardId, {
+        lastRun: {
+          phase: 'error',
+          error: err instanceof Error ? err.message : 'Erro desconhecido',
+          attempt: config.attempt || 1,
+          completedAt: new Date().toISOString(),
+        },
+      }).catch(() => {})
+    }
+
     emit({ phase: 'error', message: err instanceof Error ? err.message : 'Erro desconhecido' })
   }
 }

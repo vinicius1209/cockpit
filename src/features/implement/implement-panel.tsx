@@ -53,12 +53,31 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
   const columns = getWorkspaceColumns(workspaceId)
   const wsSlug = activeWorkspace?.slug || 'default'
 
-  // Load implementation history on mount
+  // Load implementation history + last run state on mount
   useEffect(() => {
     daemonClient.getTaskFile(wsSlug, card.id, 'implementation.md').then((content) => {
       if (content && content.trim()) {
         setHistory(content)
       }
+    })
+    // Restore last run state from meta.json
+    daemonClient.getTaskFile(wsSlug, card.id, 'meta.json').then((content) => {
+      if (!content) return
+      try {
+        const meta = JSON.parse(content)
+        if (meta.lastRun) {
+          const run = meta.lastRun
+          if (run.phase === 'done' && run.summary) {
+            setPhase('done')
+            setSummary(run.summary)
+            setBranch(run.branch || null)
+            if (run.attempt) setAttempt(run.attempt)
+          } else if (run.phase === 'error') {
+            setError(run.error || 'Erro na ultima execucao')
+            setPhase('error')
+          }
+        }
+      } catch { /* invalid json */ }
     })
   }, [wsSlug, card.id])
 
