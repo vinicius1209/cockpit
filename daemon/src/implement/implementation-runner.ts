@@ -263,15 +263,15 @@ export async function runImplementation(
     stopWatcher = () => clearInterval(watchInterval)
   }
 
-  // 6. Heartbeat — emit progress every 5s so frontend knows agent is alive
+  // 6. Heartbeat — emit a single updating status (not output lines)
   const allOutputLines: string[] = []
   let lastChunkAt = Date.now()
   const heartbeatInterval = setInterval(() => {
     const silenceSeconds = Math.floor((Date.now() - lastChunkAt) / 1000)
     if (silenceSeconds >= 5) {
-      emit({ phase: 'output', text: `⏳ Agent trabalhando... (${silenceSeconds}s sem output)` })
+      emit({ phase: 'implementing', message: `Agent trabalhando... (${silenceSeconds}s)` })
     }
-  }, 5000)
+  }, 10000)
 
   // 7. Execute agent
   try {

@@ -305,12 +305,18 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
       <div className="px-4 py-2.5 border-b space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {isRunning && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+            {isRunning && (
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+              </span>
+            )}
             {phase === 'done' && <CheckCircle2 className="h-4 w-4 text-green-500" />}
             {phase === 'error' && <AlertCircle className="h-4 w-4 text-destructive" />}
             <span className="text-sm font-medium">
               {phase === 'done' ? 'Concluido' : phase === 'error' ? 'Erro' : 'Implementando'}
             </span>
+            {isRunning && <span className="text-[10px] text-green-500 font-medium">LIVE</span>}
             {branch && (
               <Badge variant="outline" className="text-[10px]">
                 <GitBranch className="h-2.5 w-2.5 mr-0.5" />
@@ -375,26 +381,14 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
       <Conversation className="flex-1 bg-muted/10">
         <ConversationContent className="gap-0.5 px-4 py-3">
           {outputLines.map((line, i) => (
-            <p key={i} className={`text-[12px] font-mono leading-relaxed ${
-              line.startsWith('⏳') ? 'text-muted-foreground/50 italic' : 'text-muted-foreground'
-            }`}>
+            <p key={i} className="text-[12px] font-mono leading-relaxed text-muted-foreground">
               {line}
             </p>
           ))}
           {isRunning && outputLines.length === 0 && (
-            <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span>Aguardando output do agent...</span>
-            </div>
-          )}
-          {isRunning && outputLines.length > 0 && (
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
-              </span>
-              <span className="text-[10px] text-green-500 font-medium">LIVE</span>
-            </div>
+            <p className="text-[12px] font-mono text-muted-foreground/50 italic py-2">
+              Agent processando...
+            </p>
           )}
         </ConversationContent>
         <ConversationScrollButton />
