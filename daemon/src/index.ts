@@ -49,5 +49,18 @@ function corsHeaders(req: Request): Record<string, string> {
   }
 }
 
+// Graceful shutdown
+function shutdown() {
+  console.log('\n[cockpit-daemon] Shutting down...')
+  server.stop()
+  // SQLite WAL checkpoint happens automatically on close
+  try { require('./persistence/db').getDB()?.close() } catch { /* ok */ }
+  console.log('[cockpit-daemon] Bye')
+  process.exit(0)
+}
+
+process.on('SIGINT', shutdown)
+process.on('SIGTERM', shutdown)
+
 // Re-export for backwards compatibility
 export { jsonResponse } from './http'

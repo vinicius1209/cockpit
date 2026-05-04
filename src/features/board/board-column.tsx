@@ -20,7 +20,7 @@ export function BoardColumn({ column, cards, onCardClick, onAddCard }: BoardColu
   })
 
   return (
-    <div className="flex h-full w-72 shrink-0 flex-col rounded-lg bg-muted/50">
+    <div className="flex h-full w-72 shrink-0 flex-col rounded-lg bg-muted/50" role="region" aria-label={`Coluna ${column.name}`}>
       <div className="flex items-center gap-2 px-3 py-2.5 border-b">
         <div
           className="h-2.5 w-2.5 rounded-full shrink-0"

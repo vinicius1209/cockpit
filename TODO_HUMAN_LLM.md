@@ -161,12 +161,12 @@ Items marcados com `[x]` ja foram feitos.
 ## Backlog — Seguranca (original)
 
 - [x] **S3** Secrets migrados para SQLite (Sprint 2). Nao ha mais secrets.json em plaintext.
-- [ ] **S4** Validar `model` contra lista de modelos do agent no executor
+- [x] **S4** Validar `model` contra lista de modelos do agent (validateModel em agent-executor)
 
 ## Backlog — Resiliencia / Dados (original)
 
-- [ ] **R1** Graceful shutdown no daemon (SIGTERM/SIGINT → cleanup timers, listeners, pending writes)
-- [ ] **R5** Cleanup de jobs antigos no `job-queue.ts` (TTL de 30 dias)
+- [x] **R1** Graceful shutdown no daemon (SIGTERM/SIGINT → server.stop + db.close)
+- [x] **R5** Cleanup de jobs antigos (TTL 30 dias — discovery_jobs, scan_history, sessions)
 - [x] **R7** Banner de "daemon offline" no frontend (Sprint 3 — useDaemonStatus + root layout)
 
 ## Backlog — Performance
@@ -175,7 +175,7 @@ Items marcados com `[x]` ja foram feitos.
 - [x] **P2** Zustand selectors granulares (Sprint 3 — board-view, card-dialog, dashboard)
 - [x] **P3** Lazy mount dos panels no CardDialog (Sprint perf)
 - [ ] **P4** Virtualizacao no board (react-window) para 100+ cards
-- [ ] **P5** Backoff exponencial no git diff polling do implementation-runner
+- [x] **P5** Backoff no git diff polling (3s → 10s over 10 polls, setTimeout recursivo)
 
 ## Backlog — Qualidade de Codigo
 
@@ -196,7 +196,7 @@ Items marcados com `[x]` ja foram feitos.
 
 ## Backlog — UX / Acessibilidade
 
-- [ ] **U1** ARIA labels nos componentes custom (board-card, board-column, conversation)
+- [x] **U1** ARIA: board-column role=region + aria-label, board-card role=button + aria-label + keyboard Enter/Space
 - [ ] **U2** Keyboard navigation no board (setas para mover entre colunas)
 - [x] **U3** Focus management no CardDialog (autofocus no titulo — Sprint 3)
 - [x] **U4** Empty states: coluna sem cards (Sprint 3). Vault/projetos = pendente.

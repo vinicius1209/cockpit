@@ -243,7 +243,11 @@ export async function runImplementation(
   try {
 
   if (gitInfo.hasGit) {
-    const watchInterval = setInterval(async () => {
+    let pollCount = 0
+    const pollDelay = () => Math.min(3000 + pollCount * 700, 10000) // 3s → 10s over ~10 polls
+    let watchTimer: ReturnType<typeof setTimeout> | null = null
+
+    const pollGitDiff = async () => {
       try {
         const diff = await runCmd('git', ['diff', '--name-status', 'HEAD'], projectPath)
         // Also check untracked files
@@ -275,9 +279,12 @@ export async function runImplementation(
       } catch {
         // git might be locked during agent operations
       }
-    }, 3000)
+      pollCount++
+      watchTimer = setTimeout(pollGitDiff, pollDelay())
+    }
 
-    stopWatcher = () => clearInterval(watchInterval)
+    watchTimer = setTimeout(pollGitDiff, pollDelay())
+    stopWatcher = () => { if (watchTimer) clearTimeout(watchTimer) }
   }
 
   // 6. Heartbeat — emit a single updating status (not output lines)

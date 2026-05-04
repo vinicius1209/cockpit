@@ -22,6 +22,7 @@ export async function initDB(): Promise<void> {
 
   runMigrations()
   await migrateFromJSON()
+  cleanupOldData()
 
   console.log(`[db] SQLite ready at ${DB_PATH}`)
 }
@@ -256,4 +257,22 @@ async function importJsonStore(filename: string, importFn: (data: unknown) => vo
       console.log(`[db] Imported ${filename}`)
     }
   } catch { /* skip */ }
+}
+
+// ── Cleanup old data ──
+
+function cleanupOldData(): void {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+  // Delete completed/failed jobs older than 30 days
+  const jobResult = db.query(`DELETE FROM discovery_jobs WHERE completed_at IS NOT NULL AND completed_at < ?`).run(thirtyDaysAgo)
+  if (jobResult.changes > 0) console.log(`[db] Cleaned up ${jobResult.changes} old discovery jobs`)
+
+  // Delete scan history older than 30 days
+  const scanResult = db.query(`DELETE FROM scan_history WHERE created_at < ?`).run(thirtyDaysAgo)
+  if (scanResult.changes > 0) console.log(`[db] Cleaned up ${scanResult.changes} old scan history entries`)
+
+  // Delete completed sessions older than 30 days (keep recent for history)
+  const sessionResult = db.query(`DELETE FROM sessions WHERE completed_at IS NOT NULL AND completed_at < ?`).run(thirtyDaysAgo)
+  if (sessionResult.changes > 0) console.log(`[db] Cleaned up ${sessionResult.changes} old sessions`)
 }

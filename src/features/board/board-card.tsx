@@ -32,6 +32,10 @@ export function BoardCard({ card, onClick }: BoardCardProps) {
     <CardUI
       ref={setNodeRef}
       style={style}
+      role="button"
+      aria-label={`Card: ${card.title}`}
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(card) } }}
       className={`cursor-pointer border bg-card p-3 transition-all hover:shadow-md ${
         isDragging ? 'opacity-50 shadow-lg' : ''
       } ${

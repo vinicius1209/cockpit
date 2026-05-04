@@ -171,10 +171,21 @@ export async function detectInstalledAgents(): Promise<InstalledAgent[]> {
   return agents
 }
 
+function validateModel(agentDef: KnownAgent, model?: string): string | null {
+  if (!model) return null
+  if (agentDef.models.length === 0) return null // agent has no model list (e.g. aider)
+  if (agentDef.models.some((m) => m.id === model)) return null
+  return `Model "${model}" not available for ${agentDef.name}. Valid: ${agentDef.models.map((m) => m.id).join(', ')}`
+}
+
 export async function executeAgent(request: AgentExecRequest): Promise<AgentExecResult> {
   const agentDef = KNOWN_AGENTS.find((a) => a.name === request.agent)
   if (!agentDef) {
     return { agent: request.agent, output: `Agent "${request.agent}" not found`, exitCode: 1, duration: 0 }
+  }
+  const modelErr = validateModel(agentDef, request.model)
+  if (modelErr) {
+    return { agent: request.agent, output: modelErr, exitCode: 1, duration: 0 }
   }
 
   const usePipe = request.prompt.length > 4000
@@ -231,6 +242,10 @@ export async function executeAgentWithCallbacks(
   const agentDef = KNOWN_AGENTS.find((a) => a.name === request.agent)
   if (!agentDef) {
     return { agent: request.agent, output: `Agent "${request.agent}" not found`, exitCode: 1, duration: 0 }
+  }
+  const modelErr = validateModel(agentDef, request.model)
+  if (modelErr) {
+    return { agent: request.agent, output: modelErr, exitCode: 1, duration: 0 }
   }
 
   const usePipe = request.prompt.length > 4000
