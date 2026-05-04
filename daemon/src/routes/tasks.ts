@@ -1,5 +1,6 @@
 import { jsonResponse } from '../index'
 import { TaskWorkspace } from '../tasks/task-workspace'
+import { listSessions, getLatestSession, getSession } from '../tasks/session-manager'
 
 export async function handleTaskRoutes(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
@@ -30,6 +31,29 @@ export async function handleTaskRoutes(req: Request, url: URL): Promise<Response
     } catch (err) {
       return jsonResponse({ error: `Feedback failed: ${err instanceof Error ? err.message : 'unknown'}` }, 500)
     }
+  }
+
+  // GET /api/tasks/:wsSlug/:cardId/sessions — list all sessions
+  const sessionsMatch = path.match(/^\/api\/tasks\/([^/]+)\/([^/]+)\/sessions$/)
+  if (sessionsMatch && req.method === 'GET') {
+    const sessions = await listSessions(sessionsMatch[1], sessionsMatch[2])
+    return jsonResponse(sessions)
+  }
+
+  // GET /api/tasks/:wsSlug/:cardId/sessions/latest — get latest session
+  const latestMatch = path.match(/^\/api\/tasks\/([^/]+)\/([^/]+)\/sessions\/latest$/)
+  if (latestMatch && req.method === 'GET') {
+    const session = await getLatestSession(latestMatch[1], latestMatch[2])
+    if (!session) return jsonResponse(null)
+    return jsonResponse(session)
+  }
+
+  // GET /api/tasks/:wsSlug/:cardId/sessions/:sessionId — get specific session
+  const sessionMatch = path.match(/^\/api\/tasks\/([^/]+)\/([^/]+)\/sessions\/(session-\d+)$/)
+  if (sessionMatch && req.method === 'GET') {
+    const session = await getSession(sessionMatch[1], sessionMatch[2], sessionMatch[3])
+    if (!session) return jsonResponse({ error: 'Session not found' }, 404)
+    return jsonResponse(session)
   }
 
   // GET /api/tasks/:wsSlug/:cardId — list files in task workspace

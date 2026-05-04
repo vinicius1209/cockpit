@@ -1,6 +1,7 @@
 import { executeAgentWithCallbacks, detectInstalledAgents } from '../executor/agent-executor'
 import { TaskWorkspace } from '../tasks/task-workspace'
 import { createPR } from '../git/pr-creator'
+import { createSession, updateSession, appendOutput, appendFile, type SessionFile } from '../tasks/session-manager'
 
 export interface ImplementConfig {
   cardTitle: string
@@ -190,6 +191,20 @@ export async function runImplementation(
     return
   }
 
+  // 3b. Create session for this execution
+  let sessionId: string | null = null
+  const wsSlug = config.workspaceSlug
+  const cId = config.cardId
+  if (wsSlug && cId) {
+    const session = await createSession(wsSlug, cId, {
+      agent: agentName,
+      branch: branchName,
+      attempt: config.attempt || 1,
+      feedback: config.feedback || null,
+    })
+    sessionId = session.id
+  }
+
   // 4. Write feedback (if re-attempt) + task workspace files + copy into project
   let localTaskPath: string | undefined
   if (config.workspaceSlug && config.cardId) {
@@ -239,11 +254,9 @@ export async function runImplementation(
           const key = `${status}:${filePath}`
           if (!seenFiles.has(key)) {
             seenFiles.add(key)
-            emit({
-              phase: 'file',
-              action: status === 'M' ? 'modified' : status === 'D' ? 'deleted' : 'changed',
-              path: filePath,
-            })
+            const action = (status === 'M' ? 'modified' : status === 'D' ? 'deleted' : 'changed') as SessionFile['action']
+            emit({ phase: 'file', action, path: filePath })
+            if (wsSlug && cId && sessionId) appendFile(wsSlug, cId, sessionId, { path: filePath, action }).catch(() => {})
           }
         }
 
@@ -253,6 +266,7 @@ export async function runImplementation(
           if (!seenFiles.has(key)) {
             seenFiles.add(key)
             emit({ phase: 'file', action: 'created', path: filePath })
+            if (wsSlug && cId && sessionId) appendFile(wsSlug, cId, sessionId, { path: filePath, action: 'created' }).catch(() => {})
           }
         }
       } catch {
@@ -285,10 +299,13 @@ export async function runImplementation(
       (chunk) => {
         lastChunkAt = Date.now()
         if (chunk.length > 0) {
-          // Truncate very long lines but don't filter them out
           const text = chunk.length > 500 ? chunk.slice(0, 497) + '...' : chunk
           emit({ phase: 'output', text })
           allOutputLines.push(chunk)
+          // Persist to session (fire-and-forget, batch every few lines)
+          if (wsSlug && cId && sessionId && allOutputLines.length % 5 === 0) {
+            updateSession(wsSlug, cId, sessionId, { output: [...allOutputLines], phase: 'implementing' }).catch(() => {})
+          }
         }
       },
     )
@@ -354,19 +371,15 @@ export async function runImplementation(
       }
     }
 
-    // Save last result to meta for state restoration
-    if (config.workspaceSlug && config.cardId) {
-      await TaskWorkspace.writeMeta(config.workspaceSlug, config.cardId, {
-        lastRun: {
-          phase: 'done',
-          exitCode: result.exitCode,
-          branch: branchName,
-          summary,
-          duration: Math.round(result.duration / 1000),
-          agent: agentName,
-          attempt: config.attempt || 1,
-          completedAt: new Date().toISOString(),
-        },
+    // Finalize session
+    if (wsSlug && cId && sessionId) {
+      await updateSession(wsSlug, cId, sessionId, {
+        phase: 'done',
+        exitCode: result.exitCode,
+        completedAt: new Date().toISOString(),
+        duration: Math.round(result.duration / 1000),
+        summary,
+        output: allOutputLines,
       })
     }
 
@@ -380,15 +393,13 @@ export async function runImplementation(
     clearInterval(heartbeatInterval)
     stopWatcher?.()
 
-    // Save error to meta
-    if (config.workspaceSlug && config.cardId) {
-      await TaskWorkspace.writeMeta(config.workspaceSlug, config.cardId, {
-        lastRun: {
-          phase: 'error',
-          error: err instanceof Error ? err.message : 'Erro desconhecido',
-          attempt: config.attempt || 1,
-          completedAt: new Date().toISOString(),
-        },
+    // Finalize session with error
+    if (wsSlug && cId && sessionId) {
+      await updateSession(wsSlug, cId, sessionId, {
+        phase: 'error',
+        error: err instanceof Error ? err.message : 'Erro desconhecido',
+        completedAt: new Date().toISOString(),
+        output: allOutputLines,
       }).catch(() => {})
     }
 

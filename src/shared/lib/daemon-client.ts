@@ -89,6 +89,13 @@ export const daemonClient = {
     }
   },
 
+  // Sessions
+  getSessions: (wsSlug: string, cardId: string) =>
+    daemonFetch<Record<string, unknown>[]>(`/api/tasks/${wsSlug}/${cardId}/sessions`),
+
+  getLatestSession: (wsSlug: string, cardId: string) =>
+    daemonFetch<Record<string, unknown> | null>(`/api/tasks/${wsSlug}/${cardId}/sessions/latest`),
+
   // Git flow
   analyzeGitFlow: (projectPath: string) =>
     daemonFetch<Record<string, unknown>>('/git/analyze', {

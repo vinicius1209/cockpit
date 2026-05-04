@@ -40,6 +40,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
   const [error, setError] = useState<string | null>(null)
   const [summary, setSummary] = useState<ImplementEvent['summary'] | null>(null)
   const [history, setHistory] = useState<string | null>(null)
+  const [sessions, setSessions] = useState<Array<{ id: string; attempt: number; phase: string; agent: string; branch: string | null; duration: number | null; completedAt: string | null; exitCode: number | null; feedback: string | null }>>([])
   const [showHistory, setShowHistory] = useState(false)
   const [attempt, setAttempt] = useState(1)
   const [feedbackText, setFeedbackText] = useState('')
@@ -53,31 +54,37 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
   const columns = getWorkspaceColumns(workspaceId)
   const wsSlug = activeWorkspace?.slug || 'default'
 
-  // Load implementation history + last run state on mount
+  // Load latest session on mount — restore full state
   useEffect(() => {
-    daemonClient.getTaskFile(wsSlug, card.id, 'implementation.md').then((content) => {
-      if (content && content.trim()) {
-        setHistory(content)
+    daemonClient.getLatestSession(wsSlug, card.id).then((session) => {
+      if (!session) return
+      const s = session as {
+        phase: string; summary: typeof summary; branch: string | null
+        output: string[]; files: TrackedFile[]; error: string | null; attempt: number
       }
-    })
-    // Restore last run state from meta.json
-    daemonClient.getTaskFile(wsSlug, card.id, 'meta.json').then((content) => {
-      if (!content) return
-      try {
-        const meta = JSON.parse(content)
-        if (meta.lastRun) {
-          const run = meta.lastRun
-          if (run.phase === 'done' && run.summary) {
-            setPhase('done')
-            setSummary(run.summary)
-            setBranch(run.branch || null)
-            if (run.attempt) setAttempt(run.attempt)
-          } else if (run.phase === 'error') {
-            setError(run.error || 'Erro na ultima execucao')
-            setPhase('error')
-          }
-        }
-      } catch { /* invalid json */ }
+
+      // Always set history flag if session exists
+      setHistory('has-sessions')
+
+      if (s.phase === 'done' && s.summary) {
+        setPhase('done')
+        setSummary(s.summary)
+        setBranch(s.branch)
+        setOutputLines(s.output || [])
+        setFiles(s.files || [])
+        if (s.attempt) setAttempt(s.attempt)
+      } else if (s.phase === 'error') {
+        setError(s.error || 'Erro na ultima execucao')
+        setPhase('error')
+        setOutputLines(s.output || [])
+        setBranch(s.branch)
+      }
+      // If phase is implementing/analyzing (daemon still running or crashed), show as idle with history
+    }).catch(() => {
+      // Fallback: check implementation.md for legacy history
+      daemonClient.getTaskFile(wsSlug, card.id, 'implementation.md').then((content) => {
+        if (content && content.trim()) setHistory(content)
+      })
     })
   }, [wsSlug, card.id])
 
@@ -256,7 +263,15 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
                   <RotateCcw className="h-4 w-4 mr-1" />
                   Re-implementar
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setShowHistory(!showHistory)}>
+                <Button variant="ghost" size="sm" onClick={() => {
+                  const next = !showHistory
+                  setShowHistory(next)
+                  if (next && sessions.length === 0) {
+                    daemonClient.getSessions(wsSlug, card.id).then((data) => {
+                      setSessions(data as typeof sessions)
+                    }).catch(() => {})
+                  }
+                }}>
                   <History className="h-4 w-4 mr-1" />
                   Historico
                 </Button>
@@ -302,16 +317,45 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
           </div>
         )}
 
-        {/* Previous implementation history */}
+        {/* Sessions timeline */}
         {showHistory && history && (
           <div className="border-t flex-1 min-h-0 overflow-y-auto px-4 py-3 bg-muted/5">
             <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
               <History className="h-3 w-3" />
-              Historico de implementacoes
+              Historico de execucoes ({sessions.length})
             </p>
-            <pre className="text-[11px] font-mono text-muted-foreground whitespace-pre-wrap leading-relaxed">
-              {history}
-            </pre>
+            {sessions.length === 0 && (
+              <p className="text-[11px] text-muted-foreground">Carregando...</p>
+            )}
+            <div className="space-y-2">
+              {sessions.map((s) => (
+                <div key={s.id} className="rounded-md border px-3 py-2 text-[11px] space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {s.phase === 'done' && s.exitCode === 0 && <CheckCircle2 className="h-3 w-3 text-green-500" />}
+                      {s.phase === 'done' && s.exitCode !== 0 && <AlertCircle className="h-3 w-3 text-amber-500" />}
+                      {s.phase === 'error' && <XCircle className="h-3 w-3 text-destructive" />}
+                      <span className="font-medium">Tentativa {s.attempt}</span>
+                      <span className="text-muted-foreground">{s.agent}</span>
+                      {s.branch && (
+                        <Badge variant="outline" className="text-[9px]">
+                          <GitBranch className="h-2 w-2 mr-0.5" />{s.branch}
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="text-muted-foreground tabular-nums">
+                      {s.duration ? `${s.duration}s` : '—'}
+                    </span>
+                  </div>
+                  {s.feedback && (
+                    <p className="text-muted-foreground italic">Feedback: {s.feedback.slice(0, 100)}{s.feedback.length > 100 ? '...' : ''}</p>
+                  )}
+                  {s.completedAt && (
+                    <p className="text-muted-foreground/60">{new Date(s.completedAt).toLocaleString('pt-BR')}</p>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
