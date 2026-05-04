@@ -1,3 +1,12 @@
+const AGENT_TIMEOUT_MS = 5 * 60 * 1000 // 5 minutes
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`Timeout: ${label} excedeu ${ms / 1000}s`)), ms)
+    promise.then(resolve, reject).finally(() => clearTimeout(timer))
+  })
+}
+
 export interface AgentModel {
   id: string
   label: string
@@ -184,7 +193,7 @@ export async function executeAgent(request: AgentExecRequest): Promise<AgentExec
       new Response(proc.stderr).text(),
     ])
 
-    const exitCode = await proc.exited
+    const exitCode = await withTimeout(proc.exited, AGENT_TIMEOUT_MS, request.agent)
     const duration = Date.now() - startTime
 
     return { agent: request.agent, output: stdout || stderr, exitCode, duration }
@@ -245,7 +254,7 @@ export async function executeAgentWithCallbacks(
       }
     }
 
-    const exitCode = await proc.exited
+    const exitCode = await withTimeout(proc.exited, AGENT_TIMEOUT_MS, request.agent)
     const duration = Date.now() - startTime
 
     return { agent: request.agent, output: fullOutput, exitCode, duration }
@@ -276,7 +285,10 @@ export function executeAgentStreaming(request: AgentExecRequest): {
     }
   }
 
-  const args = agentDef.buildArgs(agentDef.headlessFlag, request.prompt, request.model)
+  const usePipe = request.prompt.length > 4000
+  const args = usePipe
+    ? agentDef.buildArgs(agentDef.headlessFlag, '-', request.model)
+    : agentDef.buildArgs(agentDef.headlessFlag, request.prompt, request.model)
 
   let proc: ReturnType<typeof Bun.spawn> | null = null
 
@@ -285,10 +297,17 @@ export function executeAgentStreaming(request: AgentExecRequest): {
       try {
         proc = Bun.spawn([agentDef.command, ...args], {
           cwd: request.projectPath || undefined,
+          stdin: usePipe ? 'pipe' : undefined,
           stdout: 'pipe',
           stderr: 'pipe',
           env: { ...process.env, NO_COLOR: '1' },
         })
+
+        if (usePipe && proc.stdin) {
+          const writer = proc.stdin.getWriter()
+          await writer.write(new TextEncoder().encode(request.prompt))
+          await writer.close()
+        }
 
         const reader = proc.stdout.getReader()
 
@@ -301,9 +320,10 @@ export function executeAgentStreaming(request: AgentExecRequest): {
           controller.enqueue(`data: ${JSON.stringify({ type: 'chunk', data: text })}\n\n`)
         }
 
-        const exitCode = await proc.exited
+        const exitCode = await withTimeout(proc.exited, AGENT_TIMEOUT_MS, request.agent)
         controller.enqueue(`data: ${JSON.stringify({ type: 'done', exitCode })}\n\n`)
       } catch (err) {
+        proc?.kill()
         controller.enqueue(`data: ${JSON.stringify({ type: 'error', data: err instanceof Error ? err.message : 'Unknown' })}\n\n`)
       } finally {
         controller.close()

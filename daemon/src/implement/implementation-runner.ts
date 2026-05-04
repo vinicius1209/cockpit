@@ -75,14 +75,14 @@ function buildImplementationPrompt(config: ImplementConfig, taskPath?: string): 
   if (taskPath) {
     parts.push('')
     parts.push(`## Task Workspace`)
-    parts.push(`Todos os arquivos de contexto desta tarefa estao em: ${taskPath}`)
+    parts.push(`Os arquivos de contexto desta tarefa estao em: .cockpit/task/ (relativo ao projeto)`)
     parts.push('')
     parts.push(`Arquivos disponiveis:`)
-    parts.push(`- **spec.md**: Especificacao tecnica completa — LEIA ESTE ARQUIVO`)
-    parts.push(`- **discovery.md**: Analise previa do card (se existir)`)
-    parts.push(`- **interview.md**: Notas da entrevista (se existir)`)
+    parts.push(`- **.cockpit/task/spec.md**: Especificacao tecnica completa — LEIA ESTE ARQUIVO`)
+    parts.push(`- **.cockpit/task/discovery.md**: Analise previa do card (se existir)`)
+    parts.push(`- **.cockpit/task/interview.md**: Notas da entrevista (se existir)`)
     parts.push('')
-    parts.push(`Leia o arquivo spec.md em ${taskPath}/spec.md para entender o que implementar.`)
+    parts.push(`Leia o arquivo .cockpit/task/spec.md para entender o que implementar.`)
   } else {
     // Fallback: inline content
     parts.push('')
@@ -153,10 +153,11 @@ export async function runImplementation(
     return
   }
 
-  // 4. Write task workspace files + build prompt
-  let taskPath: string | undefined
+  // 4. Write task workspace files + copy into project for sandbox access
+  let localTaskPath: string | undefined
   if (config.workspaceSlug && config.cardId) {
-    taskPath = await TaskWorkspace.sync({
+    // Persist to ~/.cockpit/tasks/ (permanent archive)
+    await TaskWorkspace.sync({
       workspaceSlug: config.workspaceSlug,
       cardId: config.cardId,
       title: config.cardTitle,
@@ -166,10 +167,13 @@ export async function runImplementation(
       branch: branchName || undefined,
     })
     await TaskWorkspace.appendImplementationLog(config.workspaceSlug, config.cardId, `Implementacao iniciada — agent: ${agentName}, branch: ${branchName || 'N/A'}`)
-    emit({ phase: 'implementing', message: `Task workspace: ${taskPath}` })
+
+    // Copy into project dir so agent can read (sandbox-safe)
+    localTaskPath = await TaskWorkspace.copyToProject(config.workspaceSlug, config.cardId, projectPath)
+    emit({ phase: 'implementing', message: `Task files copiados para ${localTaskPath}` })
   }
 
-  const prompt = buildImplementationPrompt(config, taskPath)
+  const prompt = buildImplementationPrompt(config, localTaskPath)
 
   emit({ phase: 'implementing', message: `Executando ${agentName}...` })
 
@@ -216,7 +220,17 @@ export async function runImplementation(
     stopWatcher = () => clearInterval(watchInterval)
   }
 
-  // 6. Execute agent
+  // 6. Heartbeat — emit progress every 5s so frontend knows agent is alive
+  const allOutputLines: string[] = []
+  let lastChunkAt = Date.now()
+  const heartbeatInterval = setInterval(() => {
+    const silenceSeconds = Math.floor((Date.now() - lastChunkAt) / 1000)
+    if (silenceSeconds >= 5) {
+      emit({ phase: 'output', text: `⏳ Agent trabalhando... (${silenceSeconds}s sem output)` })
+    }
+  }, 5000)
+
+  // 7. Execute agent
   try {
     const result = await executeAgentWithCallbacks(
       {
@@ -226,13 +240,30 @@ export async function runImplementation(
         model: config.model,
       },
       (chunk) => {
-        if (chunk.length > 0 && chunk.length < 500) {
-          emit({ phase: 'output', text: chunk })
+        lastChunkAt = Date.now()
+        if (chunk.length > 0) {
+          // Truncate very long lines but don't filter them out
+          const text = chunk.length > 500 ? chunk.slice(0, 497) + '...' : chunk
+          emit({ phase: 'output', text })
+          allOutputLines.push(chunk)
         }
       },
     )
 
+    clearInterval(heartbeatInterval)
     stopWatcher?.()
+
+    // Save full log to task workspace
+    if (config.workspaceSlug && config.cardId) {
+      const logEntry = [
+        `\n## Execucao ${new Date().toISOString().slice(0, 19)}`,
+        `Agent: ${agentName} | Branch: ${branchName || 'N/A'} | Exit: ${result.exitCode} | Duracao: ${Math.round(result.duration / 1000)}s`,
+        '',
+        ...allOutputLines.map((l) => `  ${l}`),
+        '',
+      ].join('\n')
+      await TaskWorkspace.appendImplementationLog(config.workspaceSlug, config.cardId, logEntry)
+    }
 
     // Final git diff for summary
     let filesModified = 0
@@ -260,6 +291,7 @@ export async function runImplementation(
       exitCode: result.exitCode,
     })
   } catch (err) {
+    clearInterval(heartbeatInterval)
     stopWatcher?.()
     emit({ phase: 'error', message: err instanceof Error ? err.message : 'Erro desconhecido' })
   }

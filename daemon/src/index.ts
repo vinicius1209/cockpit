@@ -12,14 +12,14 @@ const server = Bun.serve({
     // CORS for local frontend
     if (req.method === 'OPTIONS') {
       return new Response(null, {
-        headers: corsHeaders(),
+        headers: corsHeaders(req),
       })
     }
 
     try {
       const response = await handleRequest(req)
       // Add CORS headers to all responses
-      for (const [key, value] of Object.entries(corsHeaders())) {
+      for (const [key, value] of Object.entries(corsHeaders(req))) {
         response.headers.set(key, value)
       }
       return response
@@ -32,9 +32,17 @@ const server = Bun.serve({
 
 console.log(`[cockpit-daemon] Running on http://localhost:${server.port}`)
 
-function corsHeaders(): Record<string, string> {
+const ALLOWED_ORIGINS = [
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:4173',
+]
+
+function corsHeaders(req: Request): Record<string, string> {
+  const origin = req.headers.get('Origin') || ''
   return {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0],
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
   }

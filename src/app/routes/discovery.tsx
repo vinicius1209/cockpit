@@ -22,7 +22,7 @@ import { useProjectStore } from '@/entities/card/project-store'
 import { useCardStore } from '@/entities/card/store'
 import { daemonClient } from '@/shared/lib/daemon-client'
 import type { DiscoveryResult, DiscoveryCard, InstalledAgent, JobSummary } from '@/entities/card/project-types'
-import { CARD_TYPE_CONFIG, CARD_PRIORITY_CONFIG } from '@/shared/lib/constants'
+import { CARD_TYPE_CONFIG, CARD_PRIORITY_CONFIG, DAEMON_URL } from '@/shared/lib/constants'
 import type { CardType, CardPriority } from '@/entities/card/types'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -166,7 +166,6 @@ export function DiscoveryPage() {
     // Slow-path: with agent → job queue + SSE
     try {
       const { jobId } = await daemonClient.startDiscovery(selectedProject.path, agent, selectedModel || undefined)
-      const DAEMON_URL = import.meta.env.VITE_DAEMON_URL || 'http://localhost:4800'
       const es = new EventSource(`${DAEMON_URL}/discovery/stream/${jobId}`)
 
       es.onmessage = (event) => {

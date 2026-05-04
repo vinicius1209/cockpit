@@ -1,5 +1,7 @@
 import type { CardType, CardPriority, ColumnAutomation } from '@/entities/card/types'
 
+export const DAEMON_URL = import.meta.env.VITE_DAEMON_URL || 'http://localhost:4800'
+
 export const CARD_TYPE_CONFIG: Record<CardType, { label: string; color: string; bgColor: string }> = {
   feature: { label: 'Feature', color: 'text-blue-600', bgColor: 'bg-blue-100 dark:bg-blue-900/30' },
   bugfix: { label: 'Bugfix', color: 'text-red-600', bgColor: 'bg-red-100 dark:bg-red-900/30' },

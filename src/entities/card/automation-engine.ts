@@ -3,8 +3,7 @@ import { useCardStore } from './store'
 import { useProjectStore } from './project-store'
 import { createDocFromSpec } from '@/features/docs-vault/auto-doc'
 import { toast } from 'sonner'
-
-const DAEMON_URL = import.meta.env.VITE_DAEMON_URL || 'http://localhost:4800'
+import { DAEMON_URL } from '@/shared/lib/constants'
 
 // Sync column slug → spec_status automatically
 const COLUMN_SPEC_STATUS_MAP: Record<string, string> = {

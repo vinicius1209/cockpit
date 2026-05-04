@@ -85,6 +85,34 @@ export class TaskWorkspace {
     }
   }
 
+  // ── Copy to project (for agent sandbox access) ──
+
+  static async copyToProject(wsSlug: string, cardId: string, projectPath: string): Promise<string> {
+    const localDir = join(projectPath, '.cockpit', 'task')
+    await mkdir(localDir, { recursive: true })
+
+    const filesToCopy = ['spec.md', 'discovery.md', 'interview.md', 'meta.json']
+
+    for (const filename of filesToCopy) {
+      const content = await this.readFile(wsSlug, cardId, filename)
+      if (content !== null) {
+        await Bun.write(join(localDir, filename), content)
+      }
+    }
+
+    // Ensure .cockpit/ is in .gitignore
+    const gitignorePath = join(projectPath, '.gitignore')
+    const gitignoreFile = Bun.file(gitignorePath)
+    if (await gitignoreFile.exists()) {
+      const content = await gitignoreFile.text()
+      if (!content.includes('.cockpit/')) {
+        await Bun.write(gitignorePath, content.trimEnd() + '\n\n# Cockpit task workspace\n.cockpit/\n')
+      }
+    }
+
+    return localDir
+  }
+
   // ── Sync (bulk write from frontend) ──
 
   static async sync(data: {

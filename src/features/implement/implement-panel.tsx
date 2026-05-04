@@ -6,15 +6,14 @@ import {
   ConversationContent,
   ConversationScrollButton,
 } from '@/components/ai-elements/conversation'
-// Message components available but not used in terminal mode
 import { useCardStore } from '@/entities/card/store'
 import { useWorkspaceStore } from '@/entities/workspace/store'
 import { useProjectStore } from '@/entities/card/project-store'
+import { daemonClient } from '@/shared/lib/daemon-client'
 import type { Card } from '@/entities/card/types'
 import type { ImplementEvent } from '@/entities/card/project-types'
-import { Rocket, Square, Loader2, CheckCircle2, CircleDot, FileText, FilePlus, FileX, GitBranch, AlertCircle } from 'lucide-react'
-
-const DAEMON_URL = import.meta.env.VITE_DAEMON_URL || 'http://localhost:4800'
+import { Rocket, Square, Loader2, CheckCircle2, CircleDot, FileText, FilePlus, FileX, GitBranch, AlertCircle, History, RotateCcw } from 'lucide-react'
+import { DAEMON_URL } from '@/shared/lib/constants'
 
 interface ImplementPanelProps {
   card: Card
@@ -39,12 +38,24 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [summary, setSummary] = useState<ImplementEvent['summary'] | null>(null)
+  const [history, setHistory] = useState<string | null>(null)
+  const [showHistory, setShowHistory] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   const activeWorkspace = useWorkspaceStore((s) => s.getActiveWorkspace())
   const projects = getWorkspaceProjects(workspaceId)
   const projectPath = card.project_id ? projects.find((p) => p.id === card.project_id)?.path : projects[0]?.path
   const columns = getWorkspaceColumns(workspaceId)
+  const wsSlug = activeWorkspace?.slug || 'default'
+
+  // Load implementation history on mount
+  useEffect(() => {
+    daemonClient.getTaskFile(wsSlug, card.id, 'implementation.md').then((content) => {
+      if (content && content.trim()) {
+        setHistory(content)
+      }
+    })
+  }, [wsSlug, card.id])
 
   // Timer
   useEffect(() => {
@@ -64,6 +75,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
     setError(null)
     setSummary(null)
     setElapsed(0)
+    setShowHistory(false)
 
     // Move card to In Progress
     const inProgressCol = columns.find((c) => c.slug === 'in-progress')
@@ -83,7 +95,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
           cardTitle: card.title,
           cardType: card.type,
           cardId: card.id,
-          workspaceSlug: activeWorkspace?.slug || 'default',
+          workspaceSlug: wsSlug,
           spec: card.spec_content,
           interviewNotes: card.interview_notes || undefined,
           projectPath,
@@ -139,6 +151,10 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
                 moveCard(card.id, reviewCol.id, 0)
                 updateCard(card.id, { spec_status: 'review' })
               }
+              // Reload history
+              daemonClient.getTaskFile(wsSlug, card.id, 'implementation.md').then((content) => {
+                if (content) setHistory(content)
+              })
             }
             if (event.phase === 'error') {
               setError(event.message || 'Erro desconhecido')
@@ -155,7 +171,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
       setError(err instanceof Error ? err.message : 'Erro de conexao')
       setPhase('error')
     }
-  }, [card, projectPath, columns, moveCard, updateCard, workspaceId])
+  }, [card, projectPath, columns, moveCard, updateCard, workspaceId, wsSlug])
 
   const handleCancel = () => {
     abortRef.current?.abort()
@@ -170,31 +186,54 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
     return <FileText className="h-3 w-3 text-yellow-500" />
   }
 
-  // Idle state — show start button
+  // Idle state — show start button + history
   if (phase === 'idle' && !summary) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-6 text-center">
-        <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-          <Rocket className="h-7 w-7 text-primary" />
+      <div className="flex flex-col h-full">
+        <div className="flex flex-col items-center justify-center flex-1 p-6 text-center">
+          <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+            <Rocket className="h-7 w-7 text-primary" />
+          </div>
+          <h3 className="text-sm font-semibold mb-1">Implementar com AI Agent</h3>
+          <p className="text-xs text-muted-foreground max-w-xs mb-1">
+            O agent vai ler a spec, criar uma branch, e implementar as mudancas no codigo.
+          </p>
+          {projectPath && (
+            <p className="text-[11px] text-muted-foreground mb-4">
+              Projeto: {projectPath.replace(/^\/Users\/[^/]+\//, '~/')}
+            </p>
+          )}
+          {!projectPath && (
+            <p className="text-[11px] text-destructive mb-4">
+              Nenhum projeto vinculado. Adicione nas configuracoes do workspace.
+            </p>
+          )}
+          <div className="flex items-center gap-2">
+            <Button onClick={handleStart} disabled={!card.spec_content || !projectPath}>
+              <Rocket className="h-4 w-4 mr-2" />
+              {history ? 'Re-implementar' : 'Iniciar Implementacao'}
+            </Button>
+            {history && (
+              <Button variant="outline" size="sm" onClick={() => setShowHistory(!showHistory)}>
+                <History className="h-4 w-4 mr-1" />
+                Historico
+              </Button>
+            )}
+          </div>
         </div>
-        <h3 className="text-sm font-semibold mb-1">Implementar com AI Agent</h3>
-        <p className="text-xs text-muted-foreground max-w-xs mb-1">
-          O agent vai ler a spec, criar uma branch, e implementar as mudancas no codigo.
-        </p>
-        {projectPath && (
-          <p className="text-[11px] text-muted-foreground mb-4">
-            Projeto: {projectPath.replace(/^\/Users\/[^/]+\//, '~/')}
-          </p>
+
+        {/* Previous implementation history */}
+        {showHistory && history && (
+          <div className="border-t flex-1 min-h-0 overflow-y-auto px-4 py-3 bg-muted/5">
+            <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
+              <History className="h-3 w-3" />
+              Historico de implementacoes
+            </p>
+            <pre className="text-[11px] font-mono text-muted-foreground whitespace-pre-wrap leading-relaxed">
+              {history}
+            </pre>
+          </div>
         )}
-        {!projectPath && (
-          <p className="text-[11px] text-destructive mb-4">
-            Nenhum projeto vinculado. Adicione nas configuracoes do workspace.
-          </p>
-        )}
-        <Button onClick={handleStart} disabled={!card.spec_content || !projectPath}>
-          <Rocket className="h-4 w-4 mr-2" />
-          Iniciar Implementacao
-        </Button>
       </div>
     )
   }
@@ -226,6 +265,12 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
               <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={handleCancel}>
                 <Square className="h-3 w-3 mr-1" />
                 Cancelar
+              </Button>
+            )}
+            {phase === 'done' && (
+              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setPhase('idle'); setSummary(null) }}>
+                <RotateCcw className="h-3 w-3 mr-1" />
+                Nova execucao
               </Button>
             )}
           </div>
@@ -260,9 +305,11 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
 
       {/* Terminal output */}
       <Conversation className="flex-1 bg-muted/10">
-        <ConversationContent className="gap-1 px-4 py-3">
+        <ConversationContent className="gap-0.5 px-4 py-3">
           {outputLines.map((line, i) => (
-            <p key={i} className="text-[12px] font-mono text-muted-foreground leading-relaxed">
+            <p key={i} className={`text-[12px] font-mono leading-relaxed ${
+              line.startsWith('⏳') ? 'text-muted-foreground/50 italic' : 'text-muted-foreground'
+            }`}>
               {line}
             </p>
           ))}
@@ -270,6 +317,15 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
             <div className="flex items-center gap-2 text-muted-foreground text-sm py-4">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               <span>Aguardando output do agent...</span>
+            </div>
+          )}
+          {isRunning && outputLines.length > 0 && (
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+              </span>
+              <span className="text-[10px] text-green-500 font-medium">LIVE</span>
             </div>
           )}
         </ConversationContent>

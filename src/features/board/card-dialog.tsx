@@ -15,6 +15,7 @@ import { SpecPanel } from '@/features/spec-engine/spec-panel'
 import { InterviewPanel } from '@/features/agent-runner/interview-panel'
 import { ImplementPanel } from '@/features/implement/implement-panel'
 import { CardDetailsPanel } from './card-details-panel'
+import { ErrorBoundary } from '@/components/ui/error-boundary'
 
 type TabId = 'details' | 'interview' | 'spec' | 'implement' | 'agent'
 
@@ -205,16 +206,24 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
         {isEditing && card && (
           <>
             <div className={`flex-1 min-h-0 overflow-hidden ${activeTab === 'interview' ? 'flex flex-col' : 'hidden'}`}>
-              <InterviewPanel card={card} workspaceId={workspaceId} />
+              <ErrorBoundary fallbackLabel="Entrevista">
+                <InterviewPanel card={card} workspaceId={workspaceId} />
+              </ErrorBoundary>
             </div>
             <div className={`flex-1 min-h-0 overflow-hidden ${activeTab === 'spec' ? 'flex flex-col' : 'hidden'}`}>
-              <SpecPanel card={card} workspaceId={workspaceId} />
+              <ErrorBoundary fallbackLabel="Spec">
+                <SpecPanel card={card} workspaceId={workspaceId} />
+              </ErrorBoundary>
             </div>
             <div className={`flex-1 min-h-0 overflow-hidden ${activeTab === 'implement' ? 'flex flex-col' : 'hidden'}`}>
-              <ImplementPanel card={card} workspaceId={workspaceId} />
+              <ErrorBoundary fallbackLabel="Implementacao">
+                <ImplementPanel card={card} workspaceId={workspaceId} />
+              </ErrorBoundary>
             </div>
             <div className={`flex-1 min-h-0 overflow-hidden ${activeTab === 'agent' ? 'flex flex-col' : 'hidden'}`}>
-              <AgentChat card={card} workspaceId={workspaceId} />
+              <ErrorBoundary fallbackLabel="AI Agent">
+                <AgentChat card={card} workspaceId={workspaceId} />
+              </ErrorBoundary>
             </div>
           </>
         )}

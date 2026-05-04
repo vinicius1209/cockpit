@@ -3,14 +3,6 @@ import { runDiscovery } from '../discovery/discovery-engine'
 import { diffScan, getScanHistory, linkFindingToCard } from '../discovery/scan-differ'
 import { createJob, executeJobAsync, getJob, subscribeToJob, listJobs } from '../discovery/job-queue'
 
-function corsHeaders(): Record<string, string> {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-  }
-}
-
 export async function handleDiscoveryRoutes(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
 
@@ -124,7 +116,6 @@ export async function handleDiscoveryRoutes(req: Request, url: URL): Promise<Res
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
-        ...corsHeaders(),
       },
     })
   }

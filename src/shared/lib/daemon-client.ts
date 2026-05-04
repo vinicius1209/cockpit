@@ -1,6 +1,5 @@
 import type { ScanResult, InstalledAgent, DiscoveryResult, JobSummary } from '@/entities/card/project-types'
-
-const DAEMON_URL = import.meta.env.VITE_DAEMON_URL || 'http://localhost:4800'
+import { DAEMON_URL } from '@/shared/lib/constants'
 
 async function daemonFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${DAEMON_URL}${path}`, {
@@ -79,4 +78,14 @@ export const daemonClient = {
 
   getTaskFiles: (wsSlug: string, cardId: string) =>
     daemonFetch<{ taskPath: string; files: string[] }>(`/api/tasks/${wsSlug}/${cardId}`),
+
+  getTaskFile: async (wsSlug: string, cardId: string, filename: string): Promise<string | null> => {
+    try {
+      const res = await fetch(`${DAEMON_URL}/api/tasks/${wsSlug}/${cardId}/${filename}`)
+      if (!res.ok) return null
+      return await res.text()
+    } catch {
+      return null
+    }
+  },
 }

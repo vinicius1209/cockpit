@@ -1,6 +1,5 @@
 import type { StorageAdapter } from '../types'
-
-const DAEMON_URL = import.meta.env.VITE_DAEMON_URL || 'http://localhost:4800'
+import { DAEMON_URL } from '@/shared/lib/constants'
 
 export function createDaemonStorageAdapter(storeName: string): StorageAdapter {
   return {
