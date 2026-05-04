@@ -235,9 +235,12 @@ export async function runImplementation(
 
   emit({ phase: 'implementing', message: `Executando ${agentName}...` })
 
-  // 5. File watcher (git diff polling)
+  // 5. File watcher + heartbeat + agent execution — wrapped in try/finally for cleanup
   const seenFiles = new Set<string>()
   let stopWatcher: (() => void) | null = null
+  let heartbeatInterval: ReturnType<typeof setInterval> | null = null
+
+  try {
 
   if (gitInfo.hasGit) {
     const watchInterval = setInterval(async () => {
@@ -280,7 +283,7 @@ export async function runImplementation(
   // 6. Heartbeat — emit a single updating status (not output lines)
   const allOutputLines: string[] = []
   let lastChunkAt = Date.now()
-  const heartbeatInterval = setInterval(() => {
+  heartbeatInterval = setInterval(() => {
     const silenceSeconds = Math.floor((Date.now() - lastChunkAt) / 1000)
     if (silenceSeconds >= 5) {
       emit({ phase: 'implementing', message: `Agent trabalhando... (${silenceSeconds}s)` })
@@ -309,9 +312,6 @@ export async function runImplementation(
         }
       },
     )
-
-    clearInterval(heartbeatInterval)
-    stopWatcher?.()
 
     // Save full log to task workspace
     if (config.workspaceSlug && config.cardId) {
@@ -390,9 +390,6 @@ export async function runImplementation(
       exitCode: result.exitCode,
     })
   } catch (err) {
-    clearInterval(heartbeatInterval)
-    stopWatcher?.()
-
     // Finalize session with error
     if (wsSlug && cId && sessionId) {
       await updateSession(wsSlug, cId, sessionId, {
@@ -404,5 +401,11 @@ export async function runImplementation(
     }
 
     emit({ phase: 'error', message: err instanceof Error ? err.message : 'Erro desconhecido' })
+  }
+
+  } finally {
+    // Guaranteed cleanup of intervals regardless of success/error path
+    if (heartbeatInterval) clearInterval(heartbeatInterval)
+    stopWatcher?.()
   }
 }

@@ -17,6 +17,7 @@ import { BoardCard } from './board-card'
 import { CardDialog } from './card-dialog'
 import { BoardFiltersBar, type BoardFilters } from './board-filters'
 import type { Card } from '@/entities/card/types'
+import { toast } from 'sonner'
 
 export function BoardView() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
@@ -112,6 +113,9 @@ export function BoardView() {
       if (targetCol && activeCard.column_id !== targetColumnId) {
         import('@/entities/card/automation-engine').then(({ executeColumnAutomations }) => {
           executeColumnAutomations(activeCard, targetCol, activeWorkspaceId)
+        }).catch((err) => {
+          console.error('[automation] Failed:', err)
+          toast.error('Automacao falhou', { description: err instanceof Error ? err.message : 'Erro desconhecido' })
         })
       }
     }

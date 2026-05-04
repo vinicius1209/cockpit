@@ -99,21 +99,21 @@ Items marcados com `[x]` ja foram feitos.
 
 ## ALTOS — Resource Leaks (6 issues)
 
-- [ ] **RL1** `agent-executor.ts:176-207` — Timeout nao mata o processo spawned. Zombie processes acumulam
-- [ ] **RL2** `implementation-runner.ts:243` — `watchInterval` criado mas nao limpo se erro antes do clearInterval
-- [ ] **RL3** `implementation-runner.ts:283` — `heartbeatInterval` mesmo padrao
-- [ ] **RL4** `discovery.ts:64-121` — Subscriber nao limpo se client desconecta. Memory leak
-- [ ] **RL5** `agent-executor.ts:236-309` — Streaming: consumer desconecta mas processo continua
-- [ ] **RL6** `agent-executor.ts:186-189` — Pipe write falha mas processo nao e morto
+- [x] **RL1** `agent-executor.ts` — proc hoisted, proc.kill() no catch de timeout/erro em executeAgent e executeAgentWithCallbacks
+- [x] **RL2** `implementation-runner.ts` — try/finally garante clearInterval do watchInterval
+- [x] **RL3** `implementation-runner.ts` — try/finally garante clearInterval do heartbeatInterval
+- [x] **RL4** `discovery.ts` — cancel() callback no ReadableStream chama unsubscribe(). try/catch no send() detecta disconnect.
+- [x] **RL5** `agent-executor.ts` — proc.kill() no catch do executeAgentStreaming (ja existia)
+- [x] **RL6** `agent-executor.ts` — try/catch no pipe write, proc.kill() se falha
 
 ---
 
 ## ALTOS — Error Handling (4 issues)
 
-- [ ] **EH1** `automation-engine.ts:97-100` — Automacao falha mas card state nao reflete erro. User sem feedback
-- [ ] **EH2** `board-view.tsx:113` — `import()` fire-and-forget. Automacao falha silenciosamente
-- [ ] **EH3** `daemon-storage.ts:26-28` — Daemon offline silenciado. App usa dados stale indefinidamente
-- [ ] **EH4** `file-store.ts:18-26` — JSON corrompido → reset silencioso para default. Data loss sem warning
+- [x] **EH1** `automation-engine.ts` — catch agora mostra toast.error com nome da automacao e mensagem do erro
+- [x] **EH2** `board-view.tsx` — .catch() no import() com toast.error e console.error
+- [ ] **EH3** `daemon-storage.ts` — Parcial: timestamp-based conflict detection (C7). Banner offline = R7 no backlog
+- [x] **EH4** `file-store.ts` — console.error com path e erro ao detectar JSON corrompido (fixado em C9)
 
 ---
 

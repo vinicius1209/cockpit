@@ -71,17 +71,24 @@ export async function handleDiscoveryRoutes(req: Request, url: URL): Promise<Res
     const job = getJob(jobId)
     if (!job) return jsonResponse({ error: 'Job not found' }, 404)
 
+    let unsubscribe: (() => void) | null = null
+
     const stream = new ReadableStream({
       start(controller) {
         const encoder = new TextEncoder()
 
         function send(data: Record<string, unknown>) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
+          } catch {
+            // Stream already closed (client disconnected)
+            unsubscribe?.()
+          }
         }
 
         // Catch-up: send existing progress
         for (const p of job.progress) {
-          send(p)
+          send(p as unknown as Record<string, unknown>)
         }
 
         // If already done, send result and close
@@ -97,8 +104,8 @@ export async function handleDiscoveryRoutes(req: Request, url: URL): Promise<Res
         }
 
         // Subscribe to live updates
-        const unsubscribe = subscribeToJob(jobId, (event) => {
-          send(event)
+        unsubscribe = subscribeToJob(jobId, (event) => {
+          send(event as unknown as Record<string, unknown>)
 
           if (event.phase === 'completed' || event.phase === 'failed') {
             send({
@@ -107,10 +114,16 @@ export async function handleDiscoveryRoutes(req: Request, url: URL): Promise<Res
               result: job.result,
               error: job.error,
             })
-            unsubscribe()
+            unsubscribe?.()
+            unsubscribe = null
             controller.close()
           }
         })
+      },
+      cancel() {
+        // Client disconnected — cleanup subscriber
+        unsubscribe?.()
+        unsubscribe = null
       },
     })
 

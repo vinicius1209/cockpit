@@ -96,6 +96,9 @@ export async function executeColumnAutomations(
       }
     } catch (err) {
       console.error(`[automation] Error executing ${automation.action}:`, err)
+      toast.error(`Automacao "${automation.action}" falhou`, {
+        description: err instanceof Error ? err.message : 'Erro desconhecido',
+      })
     }
   }
 }

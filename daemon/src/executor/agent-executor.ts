@@ -172,9 +172,10 @@ export async function executeAgent(request: AgentExecRequest): Promise<AgentExec
     ? agentDef.buildArgs(agentDef.headlessFlag, '-', request.model)
     : agentDef.buildArgs(agentDef.headlessFlag, request.prompt, request.model)
   const startTime = Date.now()
+  let proc: ReturnType<typeof Bun.spawn> | null = null
 
   try {
-    const proc = Bun.spawn([agentDef.command, ...args], {
+    proc = Bun.spawn([agentDef.command, ...args], {
       cwd: request.projectPath || undefined,
       stdin: usePipe ? 'pipe' : undefined,
       stdout: 'pipe',
@@ -183,9 +184,14 @@ export async function executeAgent(request: AgentExecRequest): Promise<AgentExec
     })
 
     if (usePipe && proc.stdin) {
-      const writer = proc.stdin.getWriter()
-      await writer.write(new TextEncoder().encode(request.prompt))
-      await writer.close()
+      try {
+        const writer = proc.stdin.getWriter()
+        await writer.write(new TextEncoder().encode(request.prompt))
+        await writer.close()
+      } catch {
+        proc.kill()
+        return { agent: request.agent, output: 'Failed to write prompt to stdin', exitCode: 1, duration: Date.now() - startTime }
+      }
     }
 
     const [stdout, stderr] = await Promise.all([
@@ -198,6 +204,7 @@ export async function executeAgent(request: AgentExecRequest): Promise<AgentExec
 
     return { agent: request.agent, output: stdout || stderr, exitCode, duration }
   } catch (err) {
+    proc?.kill()
     return {
       agent: request.agent,
       output: err instanceof Error ? err.message : 'Unknown error',
@@ -216,15 +223,15 @@ export async function executeAgentWithCallbacks(
     return { agent: request.agent, output: `Agent "${request.agent}" not found`, exitCode: 1, duration: 0 }
   }
 
-  // For large prompts, use stdin instead of CLI argument to avoid OS limits
   const usePipe = request.prompt.length > 4000
   const args = usePipe
     ? agentDef.buildArgs(agentDef.headlessFlag, '-', request.model)
     : agentDef.buildArgs(agentDef.headlessFlag, request.prompt, request.model)
   const startTime = Date.now()
+  let proc: ReturnType<typeof Bun.spawn> | null = null
 
   try {
-    const proc = Bun.spawn([agentDef.command, ...args], {
+    proc = Bun.spawn([agentDef.command, ...args], {
       cwd: request.projectPath || undefined,
       stdin: usePipe ? 'pipe' : undefined,
       stdout: 'pipe',
@@ -232,11 +239,15 @@ export async function executeAgentWithCallbacks(
       env: { ...process.env, NO_COLOR: '1' },
     })
 
-    // Write prompt to stdin if piping
     if (usePipe && proc.stdin) {
-      const writer = proc.stdin.getWriter()
-      await writer.write(new TextEncoder().encode(request.prompt))
-      await writer.close()
+      try {
+        const writer = proc.stdin.getWriter()
+        await writer.write(new TextEncoder().encode(request.prompt))
+        await writer.close()
+      } catch {
+        proc.kill()
+        return { agent: request.agent, output: 'Failed to write prompt to stdin', exitCode: 1, duration: Date.now() - startTime }
+      }
     }
 
     const reader = proc.stdout.getReader()
@@ -259,6 +270,7 @@ export async function executeAgentWithCallbacks(
 
     return { agent: request.agent, output: fullOutput, exitCode, duration }
   } catch (err) {
+    proc?.kill()
     return {
       agent: request.agent,
       output: err instanceof Error ? err.message : 'Unknown error',
