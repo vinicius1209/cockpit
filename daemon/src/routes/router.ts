@@ -7,6 +7,7 @@ import { handleSecretsRoutes } from './secrets'
 import { handleChatRoutes } from './chat'
 import { handleImplementRoutes } from './implement'
 import { handleDataRoutes } from './data'
+import { handleTaskRoutes } from './tasks'
 
 export async function handleRequest(req: Request): Promise<Response> {
   const url = new URL(req.url)
@@ -45,6 +46,11 @@ export async function handleRequest(req: Request): Promise<Response> {
   // Secrets routes
   if (path.startsWith('/secrets')) {
     return handleSecretsRoutes(req, url)
+  }
+
+  // Task workspace routes
+  if (path.startsWith('/api/tasks')) {
+    return handleTaskRoutes(req, url)
   }
 
   // Data persistence routes

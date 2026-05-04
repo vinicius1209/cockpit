@@ -8,6 +8,7 @@ import {
 } from '@/components/ai-elements/conversation'
 // Message components available but not used in terminal mode
 import { useCardStore } from '@/entities/card/store'
+import { useWorkspaceStore } from '@/entities/workspace/store'
 import { useProjectStore } from '@/entities/card/project-store'
 import type { Card } from '@/entities/card/types'
 import type { ImplementEvent } from '@/entities/card/project-types'
@@ -40,6 +41,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
   const [summary, setSummary] = useState<ImplementEvent['summary'] | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
+  const activeWorkspace = useWorkspaceStore((s) => s.getActiveWorkspace())
   const projects = getWorkspaceProjects(workspaceId)
   const projectPath = card.project_id ? projects.find((p) => p.id === card.project_id)?.path : projects[0]?.path
   const columns = getWorkspaceColumns(workspaceId)
@@ -80,6 +82,8 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
         body: JSON.stringify({
           cardTitle: card.title,
           cardType: card.type,
+          cardId: card.id,
+          workspaceSlug: activeWorkspace?.slug || 'default',
           spec: card.spec_content,
           interviewNotes: card.interview_notes || undefined,
           projectPath,

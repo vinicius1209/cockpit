@@ -91,6 +91,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
         spec_content: null,
         interview_notes: null,
         interview_messages: null,
+        task_workspace_path: null,
       })
     }
     onClose()

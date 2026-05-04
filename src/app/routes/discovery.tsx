@@ -275,6 +275,7 @@ export function DiscoveryPage() {
       spec_content: null,
       interview_notes: null,
       interview_messages: null,
+      task_workspace_path: null,
     })
 
     // Link finding to card via fingerprint

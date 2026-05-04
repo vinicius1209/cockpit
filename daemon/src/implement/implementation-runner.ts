@@ -1,8 +1,11 @@
 import { executeAgentWithCallbacks, detectInstalledAgents } from '../executor/agent-executor'
+import { TaskWorkspace } from '../tasks/task-workspace'
 
 export interface ImplementConfig {
   cardTitle: string
   cardType: string
+  cardId?: string
+  workspaceSlug?: string
   spec: string
   interviewNotes?: string
   projectPath: string
@@ -60,22 +63,37 @@ export function generateBranchName(cardType: string, cardTitle: string): string 
   return `${prefix}/${slug}`
 }
 
-function buildImplementationPrompt(config: ImplementConfig): string {
+function buildImplementationPrompt(config: ImplementConfig, taskPath?: string): string {
   const parts: string[] = []
 
-  parts.push(`Voce recebeu uma spec tecnica para implementar. Implemente as mudancas no codigo deste projeto.`)
+  parts.push(`Voce recebeu uma tarefa para implementar no codigo deste projeto.`)
   parts.push('')
   parts.push(`## Card`)
   parts.push(`Titulo: ${config.cardTitle}`)
   parts.push(`Tipo: ${config.cardType}`)
-  parts.push('')
-  parts.push(`## Spec Tecnica`)
-  parts.push(config.spec)
 
-  if (config.interviewNotes) {
+  if (taskPath) {
     parts.push('')
-    parts.push(`## Notas da Entrevista`)
-    parts.push(config.interviewNotes)
+    parts.push(`## Task Workspace`)
+    parts.push(`Todos os arquivos de contexto desta tarefa estao em: ${taskPath}`)
+    parts.push('')
+    parts.push(`Arquivos disponiveis:`)
+    parts.push(`- **spec.md**: Especificacao tecnica completa — LEIA ESTE ARQUIVO`)
+    parts.push(`- **discovery.md**: Analise previa do card (se existir)`)
+    parts.push(`- **interview.md**: Notas da entrevista (se existir)`)
+    parts.push('')
+    parts.push(`Leia o arquivo spec.md em ${taskPath}/spec.md para entender o que implementar.`)
+  } else {
+    // Fallback: inline content
+    parts.push('')
+    parts.push(`## Spec Tecnica`)
+    parts.push(config.spec)
+
+    if (config.interviewNotes) {
+      parts.push('')
+      parts.push(`## Notas da Entrevista`)
+      parts.push(config.interviewNotes)
+    }
   }
 
   parts.push('')
@@ -135,8 +153,23 @@ export async function runImplementation(
     return
   }
 
-  // 4. Build prompt
-  const prompt = buildImplementationPrompt(config)
+  // 4. Write task workspace files + build prompt
+  let taskPath: string | undefined
+  if (config.workspaceSlug && config.cardId) {
+    taskPath = await TaskWorkspace.sync({
+      workspaceSlug: config.workspaceSlug,
+      cardId: config.cardId,
+      title: config.cardTitle,
+      type: config.cardType,
+      spec: config.spec,
+      interviewNotes: config.interviewNotes,
+      branch: branchName || undefined,
+    })
+    await TaskWorkspace.appendImplementationLog(config.workspaceSlug, config.cardId, `Implementacao iniciada — agent: ${agentName}, branch: ${branchName || 'N/A'}`)
+    emit({ phase: 'implementing', message: `Task workspace: ${taskPath}` })
+  }
+
+  const prompt = buildImplementationPrompt(config, taskPath)
 
   emit({ phase: 'implementing', message: `Executando ${agentName}...` })
 

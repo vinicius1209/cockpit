@@ -65,4 +65,18 @@ export const daemonClient = {
     params.set('limit', String(limit))
     return daemonFetch<JobSummary[]>(`/discovery/jobs?${params}`)
   },
+
+  syncTaskWorkspace: (data: {
+    workspaceSlug: string; cardId: string;
+    title?: string; type?: string; spec?: string;
+    interviewNotes?: string; interviewMessages?: Record<string, unknown>[];
+    discoveryOutput?: string;
+  }) =>
+    daemonFetch<{ ok: boolean; taskPath: string }>('/api/tasks/sync', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getTaskFiles: (wsSlug: string, cardId: string) =>
+    daemonFetch<{ taskPath: string; files: string[] }>(`/api/tasks/${wsSlug}/${cardId}`),
 }
