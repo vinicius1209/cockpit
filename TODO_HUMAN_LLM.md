@@ -171,20 +171,20 @@ Items marcados com `[x]` ja foram feitos.
 
 ## Backlog — Performance
 
-- [ ] **P1** Cache `detectInstalledAgents` (chamada a cada request, deveria cachear por 60s)
+- [x] **P1** Cache `detectInstalledAgents` 60s (Sprint perf)
 - [x] **P2** Zustand selectors granulares (Sprint 3 — board-view, card-dialog, dashboard)
-- [ ] **P3** Lazy mount dos panels no CardDialog (montar so quando tab ativa, nao CSS hidden)
+- [x] **P3** Lazy mount dos panels no CardDialog (Sprint perf)
 - [ ] **P4** Virtualizacao no board (react-window) para 100+ cards
 - [ ] **P5** Backoff exponencial no git diff polling do implementation-runner
 
 ## Backlog — Qualidade de Codigo
 
-- [ ] **Q1** Remover duplicacao `todosToCards` (manter so em `discovery-engine-utils.ts`)
+- [x] **Q1** Remover duplicacao `todosToCards` (Sprint code quality)
 - [ ] **Q2** Unificar schema SSE (um formato para chat, agents, discovery)
 - [ ] **Q3** Mover `automation-engine.ts` de entities/ para features/automation/
 - [ ] **Q4** Extrair form state do `card-dialog.tsx` para custom hook (reduzir 18 props drilling)
-- [ ] **Q5** Logging estruturado no daemon (JSON com request ID, duracao, contexto)
-- [ ] **Q6** Consolidar prompts de discovery (duplicados em engine e job-queue)
+- [x] **Q5** Logging estruturado no daemon (logger.ts com timestamp+level+module)
+- [x] **Q6** Consolidar prompts de discovery (buildDiscoveryAgentPrompt em utils)
 
 ## Backlog — Testes
 
@@ -204,7 +204,7 @@ Items marcados com `[x]` ja foram feitos.
 
 ## Backlog — Cleanup de Deps
 
-- [ ] **D1** Verificar e remover deps nao usadas: `@supabase/supabase-js`, `@xyflow/react`, `@rive-app/react-webgl2`, `media-chrome`, `embla-carousel-react`, `react-jsx-parser`, `tokenlens`, `ai` (Vercel SDK), `next-themes`
+- [x] **D1** Removidas 7 deps nao usadas: @xyflow, @rive-app, media-chrome, embla-carousel, react-jsx-parser, tokenlens, next-themes. Mantidas: @supabase (1 uso), ai (type import)
 
 ## Pendente (features)
 
