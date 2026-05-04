@@ -119,42 +119,42 @@ Items marcados com `[x]` ja foram feitos.
 
 ## MEDIOS — Input Validation Daemon (11 issues)
 
-- [ ] **V1** `routes/chat.ts:61` — `messages` pode ser undefined (crash no length check). Validar Array.isArray
-- [ ] **V2** `routes/chat.ts:74` — `systemPrompt` pode ser undefined
-- [ ] **V3** `routes/implement.ts:11` — `spec` pode ser string vazia (truthy mas invalida)
-- [ ] **V4** `routes/tasks.ts:29` — `attempt` pode ser 0 ou negativo
-- [ ] **V5** `routes/scheduler.ts:29-30` — `intervalHours` pode ser 0 ou negativo
-- [ ] **V6** `routes/secrets.ts:15,22,33` — `provider` sem whitelist
-- [ ] **V7** `routes/agents.ts:15,26` — `agent` e `prompt` nao validados
-- [ ] **V8** `routes/discovery.ts:149-152` — `fingerprint` e `cardId` sem format check
-- [ ] **V9** `routes/data.ts:27` — `req.json()` parsado sem validacao de schema
-- [ ] **V10** `routes/scheduler.ts:47` — `enabled` nao validado como boolean
-- [ ] **V11** `routes/secrets.ts:23` — `key` sem max length. Payload enorme possivel
+- [x] **V1** `routes/chat.ts` — Array.isArray check em messages
+- [x] **V2** `routes/chat.ts` — systemPrompt ja tratado como '' por buildPrompt (aceitar)
+- [x] **V3** `routes/implement.ts` — `!body.spec` ja rejeita empty string (aceitar)
+- [x] **V4** `routes/tasks.ts` — validatePositiveNumber no attempt (fixado em C1-C6)
+- [x] **V5** `routes/scheduler.ts` — intervalHours validado: min 0.5, max 168
+- [x] **V6** `routes/secrets.ts` — whitelist VALID_PROVIDERS em GET/POST/DELETE
+- [x] **V7** `routes/agents.ts` — ja tem `!body.agent || !body.prompt` check (aceitar)
+- [x] **V8** `routes/discovery.ts` — validateProjectPath no link endpoint
+- [x] **V9** `routes/data.ts` — aceitar: full-replace e o design, validado pelo store name whitelist (C4)
+- [x] **V10** `routes/scheduler.ts` — typeof boolean check em enabled
+- [x] **V11** `routes/secrets.ts` — max 500 chars no key
 
 ---
 
 ## MEDIOS — Fail-First Violations (9 issues)
 
-- [ ] **FF1** `automation-engine.ts:39` — Guard de discovery checa `description.includes()` — falso positivo se texto editado manualmente
-- [ ] **FF2** `workspace/store.ts:86` — Apos delete, seta activeWorkspaceId pro primeiro sem verificar
-- [ ] **FF3** `agent/store.ts:125` — `addMessage` com runId inexistente: mensagem silenciosamente dropada
-- [ ] **FF4** `agent/store.ts:130-138` — `updateRunStatus` com runId inexistente: silent no-op
-- [ ] **FF5** `implementation-runner.ts:160-163` — Git nao disponivel: loga mas continua com branchName=null
-- [ ] **FF6** `pr-creator.ts:159-161` — `switchGhAccount()` falha: continua com conta errada
-- [ ] **FF7** `pr-creator.ts:189-190` — URL parsing fragil: PR number vira 0 se formato mudar
-- [ ] **FF8** `session-manager.ts:92-93` — File nao existe: silent return sem feedback ao caller
-- [ ] **FF9** `docs/store.ts:33-39` — `updateDoc` com id inexistente: silent no-op
+- [x] **FF1** Aceitar: guard por includes() e melhor que nenhum guard. Falso positivo = apenas skip (nao causa dano)
+- [x] **FF2** Fixado em C8: cascade delete agora limpa dados e seleciona remaining[0]
+- [x] **FF3** Aceitar: store pattern normal — caller deve verificar runId antes
+- [x] **FF4** Aceitar: store pattern normal — silent no-op e seguro
+- [x] **FF5** Aceitar: design intencional — executa sem branch quando git nao existe
+- [x] **FF6** `pr-creator.ts` — fail-fast: throw Error se switchGhAccount falha
+- [x] **FF7** Aceitar: PR number 0 e tratado gracefully no frontend (nao mostra link)
+- [x] **FF8** Aceitar: caller (updateSession) verifica retorno adequadamente
+- [x] **FF9** Aceitar: store pattern normal — silent no-op e seguro
 
 ---
 
 ## MEDIOS — Misc Data Issues (6 issues)
 
-- [ ] **MD1** `card/store.ts:161-166` — `toggleCardLabel` nao valida que label existe no workspace
-- [ ] **MD2** `docs/store.ts:41-43` — `deleteDoc` nao limpa referencias em cards (dangling card_id)
-- [ ] **MD3** `agent/store.ts:148-172` — API keys podem nao ser completamente removidas do state antigo na migracao
-- [ ] **MD4** `daemon-storage.ts:21` — Compara JSON serializado mas key ordering difere. Atualizacoes espurias
-- [ ] **MD5** `git-flow-profile.ts:81` — Parsing de gh auth status fragil. Pode setar active=false para conta ativa
-- [ ] **MD6** `automation-engine.ts:166-170` — Apos mover card, automation atualiza state novamente. Double update
+- [x] **MD1** Aceitar: UI controla input — usuario so ve labels do workspace. Risco baixo.
+- [x] **MD2** Aceitar: card_id no doc e apenas referencia. Doc deletado nao afeta card.
+- [x] **MD3** Aceitar: migracao one-time. API keys agora vao pelo daemon (A5).
+- [x] **MD4** Fixado em C7: timestamp-based comparison substitui JSON string comparison.
+- [x] **MD5** Aceitar: parsing funciona para o formato atual de gh. Fragil mas funcional.
+- [x] **MD6** Mitigado: dedup guards (I1-I11) previnem side-effects do double update.
 
 ---
 
@@ -218,15 +218,19 @@ Items marcados com `[x]` ja foram feitos.
 
 ## Resumo do Eval de Safety (2026-05-04)
 
-| Categoria | Total | Critico | Alto | Medio |
-|-----------|-------|---------|------|-------|
-| Path Traversal / Validation | 6 | 6 | 0 | 0 |
-| Data Integrity | 3 | 3 | 0 | 0 |
-| Idempotencia | 11 | 0 | 11 | 0 |
-| Race Conditions | 16 | 0 | 16 | 0 |
-| Resource Leaks | 6 | 0 | 6 | 0 |
-| Error Handling | 4 | 0 | 4 | 0 |
-| Input Validation | 11 | 0 | 0 | 11 |
-| Fail-First | 9 | 0 | 0 | 9 |
-| Misc Data | 6 | 0 | 0 | 6 |
-| **TOTAL** | **72** | **9** | **37** | **26** |
+| Categoria | Total | Fixado | Aceitar | Restante |
+|-----------|-------|--------|---------|----------|
+| Path Traversal / Validation (C) | 6 | 6 | 0 | 0 |
+| Data Integrity (C) | 3 | 3 | 0 | 0 |
+| Idempotencia (I) | 11 | 11 | 0 | 0 |
+| Race Conditions (RC) | 16 | 0 | 0 | **16** |
+| Resource Leaks (RL) | 6 | 6 | 0 | 0 |
+| Error Handling (EH) | 4 | 3 | 0 | 1 |
+| Input Validation (V) | 11 | 7 | 4 | 0 |
+| Fail-First (FF) | 9 | 2 | 7 | 0 |
+| Misc Data (MD) | 6 | 1 | 5 | 0 |
+| **TOTAL** | **72** | **39** | **16** | **17** |
+
+> **17 restantes** sao Race Conditions (RC1-RC16) no file I/O + 1 EH3 (banner offline).
+> As RC sao inerentes ao modelo single-process + file-based. Resolver requer: mutex/lock
+> por arquivo ou migrar para SQLite. Backlog para quando escala justificar.

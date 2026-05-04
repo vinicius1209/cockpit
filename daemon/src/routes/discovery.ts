@@ -166,7 +166,9 @@ export async function handleDiscoveryRoutes(req: Request, url: URL): Promise<Res
     if (!body.projectPath || !body.fingerprint || !body.cardId) {
       return jsonResponse({ error: 'Missing required fields' }, 400)
     }
-    linkFindingToCard(body.projectPath, body.fingerprint, body.cardId)
+    const linkPath = validateProjectPath(body.projectPath)
+    if (!linkPath) return jsonResponse({ error: 'Invalid projectPath' }, 400)
+    linkFindingToCard(linkPath, body.fingerprint, body.cardId)
     return jsonResponse({ linked: true })
   }
 

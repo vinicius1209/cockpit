@@ -159,9 +159,12 @@ export async function createPR(config: CreatePRConfig): Promise<PRResult> {
     console.error(`[pr-creator] Failed to check existing PRs: ${err instanceof Error ? err.message : 'unknown'}`)
   }
 
-  // 3. Ensure correct gh account
+  // 3. Ensure correct gh account (fail-fast if switch fails)
   if (profile.ghAccount) {
-    await switchGhAccount(profile.ghAccount)
+    const switched = await switchGhAccount(profile.ghAccount)
+    if (!switched) {
+      throw new Error(`Falha ao trocar para conta gh "${profile.ghAccount}". Verifique gh auth status.`)
+    }
   }
 
   // 4. Push branch to remote

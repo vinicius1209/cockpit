@@ -26,11 +26,15 @@ export async function handleSchedulerRoutes(req: Request, url: URL): Promise<Res
       intervalHours: number
     }
 
-    if (!body.projectPath || !body.projectName || !body.workspaceId || !body.intervalHours) {
+    if (!body.projectPath || !body.projectName || !body.workspaceId) {
       return jsonResponse({ error: 'Missing required fields' }, 400)
     }
+    const hours = Number(body.intervalHours)
+    if (isNaN(hours) || hours < 0.5 || hours > 168) {
+      return jsonResponse({ error: 'intervalHours must be between 0.5 and 168' }, 400)
+    }
 
-    const job = addScheduledJob(body)
+    const job = addScheduledJob({ ...body, intervalHours: hours })
     return jsonResponse(job)
   }
 
@@ -45,6 +49,9 @@ export async function handleSchedulerRoutes(req: Request, url: URL): Promise<Res
   const toggleMatch = path.match(/^\/scheduler\/jobs\/([^/]+)\/toggle$/)
   if (toggleMatch && req.method === 'POST') {
     const body = await req.json() as { enabled: boolean }
+    if (typeof body.enabled !== 'boolean') {
+      return jsonResponse({ error: '"enabled" must be a boolean' }, 400)
+    }
     const job = toggleJob(toggleMatch[1], body.enabled)
     if (!job) return jsonResponse({ error: 'Job not found' }, 404)
     return jsonResponse(job)

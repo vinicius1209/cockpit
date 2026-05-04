@@ -58,8 +58,8 @@ export async function handleChatRoutes(req: Request, url: URL): Promise<Response
   if (path === '/chat/run' && req.method === 'POST') {
     const body = await req.json() as ChatRequest
 
-    if (!body.messages || body.messages.length === 0) {
-      return jsonResponse({ error: 'Missing "messages"' }, 400)
+    if (!Array.isArray(body.messages) || body.messages.length === 0) {
+      return jsonResponse({ error: 'Missing or invalid "messages"' }, 400)
     }
 
     // Pick agent: use specified or find first available
