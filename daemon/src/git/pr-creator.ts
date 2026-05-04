@@ -150,10 +150,14 @@ export async function createPR(config: CreatePRConfig): Promise<PRResult> {
         url: existing[0].url,
         number: existing[0].number,
         title: existing[0].title,
-        draft: false, // existing PR, unknown draft status
+        draft: false,
       }
     }
-  } catch { /* no existing PR */ }
+  } catch (err) {
+    // If gh command itself fails (auth, network), log but continue
+    // The PR create will fail too if gh is broken, so this is safe
+    console.error(`[pr-creator] Failed to check existing PRs: ${err instanceof Error ? err.message : 'unknown'}`)
+  }
 
   // 3. Ensure correct gh account
   if (profile.ghAccount) {

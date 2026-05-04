@@ -48,6 +48,10 @@ export function addScheduledJob(config: {
   agent?: string
   intervalHours: number
 }): ScheduledJob {
+  // Dedup: check if job already exists for same project
+  const existing = Object.values(getJobMap()).find((j) => j.projectPath === config.projectPath)
+  if (existing) return existing
+
   const id = `sched-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
   const intervalMs = config.intervalHours * 60 * 60 * 1000
 

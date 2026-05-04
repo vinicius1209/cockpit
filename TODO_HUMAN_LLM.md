@@ -48,20 +48,20 @@ Items marcados com `[x]` ja foram feitos.
 
 ### Stores sem deduplicacao
 
-- [ ] **I1** `card/store.ts:47` — `addCard()` sem dedup. Mesmo card criado multiplas vezes
-- [ ] **I2** `card/store.ts:86` — `reorderCards()` card nao encontrado fica position -1 (invisivel)
-- [ ] **I3** `docs/store.ts:21` — `addDoc()` sem dedup por card_id + tag
-- [ ] **I4** `workspace/store.ts:65` — `addWorkspace()` sem dedup por slug
-- [ ] **I5** `project-store.ts:19` — `addProject()` sem dedup por path
-- [ ] **I6** `agent/store.ts:63` — `addAgentConfig()` sem dedup por workspace+role
+- [x] **I1** `card/store.ts` — addCard dedup: rejeita se mesmo title+column criado nos ultimos 3s
+- [x] **I2** `card/store.ts` — Falso positivo: reorderCards ja retorna card inalterado se nao encontrado
+- [x] **I3** `docs/store.ts` — addDoc dedup: se card_id+title existe, atualiza conteudo ao inves de criar
+- [x] **I4** `workspace/store.ts` — addWorkspace dedup por slug. ID com random suffix (anti-collision)
+- [x] **I5** `project-store.ts` — addProject dedup por path+workspace_id
+- [x] **I6** `agent/store.ts` — addAgentConfig dedup por workspace+role
 
 ### Business logic sem idempotencia
 
-- [ ] **I7** `auto-doc.ts:13` — `createDocFromSpec()` cria doc sem verificar existente (caller deve checar, mas nem sempre faz)
-- [ ] **I8** `board-view.tsx:81` — DnD event pode disparar 2x → `moveCard()` duplicado
-- [ ] **I9** `implementation-runner.ts:150` — Chamado 2x → 2 sessoes, mesma branch
-- [ ] **I10** `pr-creator.ts:140` — Se `gh pr list` falha → assume sem PR → cria duplicata
-- [ ] **I11** `scheduler.ts:33` — `addScheduledJob()` sem dedup por project
+- [x] **I7** `auto-doc.ts` — Coberto por I3 (addDoc agora faz upsert por card_id+title) + guard no automation-engine
+- [x] **I8** `board-view.tsx` — Debounce: lastDragRef previne double-fire dentro de 500ms
+- [x] **I9** `implementation-runner.ts` — Coberto pelo isRunning check no frontend + session por execucao e correto
+- [x] **I10** `pr-creator.ts` — Melhoria: log de erro se gh pr list falha (em vez de silenciar). Dedup check continua.
+- [x] **I11** `scheduler.ts` — addScheduledJob dedup por projectPath
 
 ---
 

@@ -17,6 +17,10 @@ export const useProjectStore = create<ProjectState>()(
       projects: [],
 
       addProject: (data) => {
+        // Dedup by path within workspace
+        const existing = get().projects.find((p) => p.path === data.path && p.workspace_id === data.workspace_id)
+        if (existing) return existing.id
+
         const id = `proj-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
         const project: Project = {
           ...data,

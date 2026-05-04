@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -28,6 +28,7 @@ export function BoardView() {
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
   const [defaultColumnId, setDefaultColumnId] = useState<string | undefined>()
   const [filters, setFilters] = useState<BoardFilters>({ types: [], priorities: [], labelIds: [] })
+  const lastDragRef = useRef<{ cardId: string; ts: number } | null>(null)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -87,6 +88,11 @@ export function BoardView() {
 
     const activeCard = active.data.current?.card as Card | undefined
     if (!activeCard) return
+
+    // Dedup: prevent double-fire within 500ms for same card
+    const now = Date.now()
+    if (lastDragRef.current && lastDragRef.current.cardId === activeCard.id && now - lastDragRef.current.ts < 500) return
+    lastDragRef.current = { cardId: activeCard.id, ts: now }
 
     const overColumn = over.data.current?.column
     const overCard = over.data.current?.card as Card | undefined

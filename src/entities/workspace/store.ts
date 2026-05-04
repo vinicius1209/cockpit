@@ -63,9 +63,13 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       activeWorkspaceId: 'ws-prime',
 
       addWorkspace: (data) => {
+        // Dedup by slug
+        const existing = get().workspaces.find((w) => w.slug === data.slug)
+        if (existing) return
+
         const workspace: Workspace = {
           ...data,
-          id: `ws-${Date.now()}`,
+          id: `ws-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }

@@ -19,6 +19,19 @@ export const useDocStore = create<DocState>()(
       docs: [],
 
       addDoc: (data) => {
+        // Dedup: if doc with same card_id + title exists, update instead
+        if (data.card_id) {
+          const existing = get().docs.find((d) => d.card_id === data.card_id && d.title === data.title)
+          if (existing) {
+            set((state) => ({
+              docs: state.docs.map((d) =>
+                d.id === existing.id ? { ...d, content: data.content, tags: data.tags, updated_at: new Date().toISOString() } : d
+              ),
+            }))
+            return existing.id
+          }
+        }
+
         const id = `doc-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
         const doc: Doc = {
           ...data,

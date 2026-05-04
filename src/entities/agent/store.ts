@@ -61,6 +61,11 @@ export const useAgentStore = create<AgentState>()(
       },
 
       addAgentConfig: (config) => {
+        // Dedup by workspace + role
+        const wsConfigs = get().configs[config.workspace_id] || []
+        const existing = wsConfigs.find((c) => c.role === config.role)
+        if (existing) return existing.id
+
         const id = `agent-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
         const agentConfig: AgentConfig = {
           ...config,

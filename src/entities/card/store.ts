@@ -45,6 +45,13 @@ export const useCardStore = create<CardState>()(
       processingCards: {},
 
       addCard: (data) => {
+        // Dedup: reject if same title+column created in last 3 seconds
+        const recent = get().cards.find((c) =>
+          c.title === data.title && c.column_id === data.column_id &&
+          Date.now() - new Date(c.created_at).getTime() < 3000
+        )
+        if (recent) return recent.id
+
         const id = `card-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
         const card: Card = {
           ...data,
