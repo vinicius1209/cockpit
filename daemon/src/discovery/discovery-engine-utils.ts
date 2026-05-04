@@ -49,3 +49,27 @@ export function todosToCards(todos: TodoItem[], subProjectNames: string[]): Disc
 
   return cards
 }
+
+export function buildDiscoveryAgentPrompt(scanResult: {
+  name: string
+  stack: string[]
+  git?: { branch: string } | null
+  dependencies: Record<string, string>
+  structure: string[]
+  subProjects: { name: string; indicator: string }[]
+}): string {
+  const subProjectList = scanResult.subProjects.length > 0
+    ? `\nSub-projetos: ${scanResult.subProjects.map((sp) => `${sp.name} (${sp.indicator})`).join(', ')}`
+    : ''
+
+  return `Analise este projeto e retorne SOMENTE um JSON array com problemas, debitos tecnicos e melhorias encontrados.
+
+Projeto: ${scanResult.name}
+Stack: ${scanResult.stack.join(', ')}
+Branch: ${scanResult.git?.branch || 'unknown'}
+Dependencias: ${Object.keys(scanResult.dependencies).join(', ')}
+Estrutura: ${scanResult.structure.slice(0, 20).join(', ')}${subProjectList}
+
+Formato de resposta (JSON puro, sem markdown):
+[{"title":"descricao curta","description":"descricao detalhada","type":"bugfix|improvement|chore|discovery","priority":"critical|high|medium|low","subProject":"nome-ou-null"}]`
+}

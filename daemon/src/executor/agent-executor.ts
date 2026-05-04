@@ -122,7 +122,15 @@ const KNOWN_AGENTS: KnownAgent[] = [
   },
 ]
 
+let cachedAgents: InstalledAgent[] | null = null
+let cachedAt = 0
+const CACHE_TTL = 60_000 // 60 seconds
+
 export async function detectInstalledAgents(): Promise<InstalledAgent[]> {
+  if (cachedAgents && Date.now() - cachedAt < CACHE_TTL) {
+    return cachedAgents
+  }
+
   const agents: InstalledAgent[] = []
 
   for (const agent of KNOWN_AGENTS) {
@@ -158,6 +166,8 @@ export async function detectInstalledAgents(): Promise<InstalledAgent[]> {
     }
   }
 
+  cachedAgents = agents
+  cachedAt = Date.now()
   return agents
 }
 

@@ -156,7 +156,7 @@ export async function executeJobAsync(jobId: string): Promise<void> {
     const cards: DiscoveryCard[] = []
 
     // TODOs
-    const { todosToCards } = await import('./discovery-engine-utils')
+    const { todosToCards, buildDiscoveryAgentPrompt } = await import('./discovery-engine-utils')
     cards.push(...todosToCards(scanResult.todos, subProjectNames))
 
     // Git status
@@ -191,20 +191,7 @@ export async function executeJobAsync(jobId: string): Promise<void> {
       const agentDef = agents.find((a) => a.name === job.agent)
 
       if (agentDef) {
-        const subProjectList = scanResult.subProjects.length > 0
-          ? `\nSub-projetos: ${scanResult.subProjects.map((sp) => `${sp.name} (${sp.indicator})`).join(', ')}`
-          : ''
-
-        const prompt = `Analise este projeto e retorne SOMENTE um JSON array com problemas, debitos tecnicos e melhorias encontrados.
-
-Projeto: ${scanResult.name}
-Stack: ${scanResult.stack.join(', ')}
-Branch: ${scanResult.git?.branch || 'unknown'}
-Dependencias: ${Object.keys(scanResult.dependencies).join(', ')}
-Estrutura: ${scanResult.structure.slice(0, 20).join(', ')}${subProjectList}
-
-Formato de resposta (JSON puro, sem markdown):
-[{"title":"descricao curta","description":"descricao detalhada","type":"bugfix|improvement|chore|discovery","priority":"critical|high|medium|low","subProject":"nome-ou-null"}]`
+        const prompt = buildDiscoveryAgentPrompt(scanResult)
 
         try {
           const result = await executeAgentWithCallbacks(

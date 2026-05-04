@@ -202,30 +202,30 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
           />
         ) : null}
 
-        {/* Keep panels mounted but hidden to preserve state across tab switches */}
+        {/* Lazy mount: only render active panel (state persisted in sessions/SQLite) */}
         {isEditing && card && (
-          <>
-            <div className={`flex-1 min-h-0 overflow-hidden ${activeTab === 'interview' ? 'flex flex-col' : 'hidden'}`}>
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            {activeTab === 'interview' && (
               <ErrorBoundary fallbackLabel="Entrevista">
                 <InterviewPanel card={card} workspaceId={workspaceId} />
               </ErrorBoundary>
-            </div>
-            <div className={`flex-1 min-h-0 overflow-hidden ${activeTab === 'spec' ? 'flex flex-col' : 'hidden'}`}>
+            )}
+            {activeTab === 'spec' && (
               <ErrorBoundary fallbackLabel="Spec">
                 <SpecPanel card={card} workspaceId={workspaceId} />
               </ErrorBoundary>
-            </div>
-            <div className={`flex-1 min-h-0 overflow-hidden ${activeTab === 'implement' ? 'flex flex-col' : 'hidden'}`}>
+            )}
+            {activeTab === 'implement' && (
               <ErrorBoundary fallbackLabel="Implementacao">
                 <ImplementPanel card={card} workspaceId={workspaceId} />
               </ErrorBoundary>
-            </div>
-            <div className={`flex-1 min-h-0 overflow-hidden ${activeTab === 'agent' ? 'flex flex-col' : 'hidden'}`}>
+            )}
+            {activeTab === 'agent' && (
               <ErrorBoundary fallbackLabel="AI Agent">
                 <AgentChat card={card} workspaceId={workspaceId} />
               </ErrorBoundary>
-            </div>
-          </>
+            )}
+          </div>
         )}
 
         {/* Footer — fixed at bottom */}
