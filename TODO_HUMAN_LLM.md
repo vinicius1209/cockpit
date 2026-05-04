@@ -71,8 +71,8 @@ Items marcados com `[x]` ja foram feitos.
 
 - [ ] **RC1** `daemon-storage.ts:33-45` — `setItem` escreve localStorage + daemon fire-and-forget. Daemon offline = dados perdidos
 - [ ] **RC2** `daemon-storage.ts:16-24` — Daemon retorna dados diferentes → sobrescreve localStorage sem checar timestamps
-- [ ] **RC3** `file-store.ts:38-40` — `update()` le → transforma → escreve em 3 passos. Sem lock
-- [ ] **RC4** `git-flow-profile.ts:199-202` — Le all profiles + modifica 1 + escreve tudo. Analise concurrent perde dados
+- [x] **RC3** Fixado: SQLite `INSERT OR REPLACE` atomico (Sprint 2)
+- [x] **RC4** Fixado: SqliteJsonStore com atomic SQL write (Sprint 2)
 
 ### Task Workspace (read-modify-write sem lock)
 
@@ -83,10 +83,10 @@ Items marcados com `[x]` ja foram feitos.
 
 ### Session Manager (read-modify-write sem lock)
 
-- [ ] **RC9** `session-manager.ts:46-83` — `createSession` conta arquivos + cria. Duas sessoes simultaneas geram mesmo ID
-- [ ] **RC10** `session-manager.ts:85-98` — `updateSession` le + merge + escreve. Lost update
-- [ ] **RC11** `session-manager.ts:100-113` — `appendOutput` le + appenda + escreve. Concurrent lost
-- [ ] **RC12** `session-manager.ts:115-130` — `appendFile` le + appenda + escreve. Concurrent lost
+- [x] **RC9** Fixado: Session ID com timestamp+random, INSERT atomico no SQLite (Sprint 2)
+- [x] **RC10** Fixado: UPDATE sessions SET ... atomico no SQLite (Sprint 2)
+- [x] **RC11** Fixado: json_insert atomico no SQLite (Sprint 2)
+- [x] **RC12** Fixado: SELECT + UPDATE atomico no SQLite (Sprint 2)
 
 ### Frontend state
 
@@ -112,7 +112,7 @@ Items marcados com `[x]` ja foram feitos.
 
 - [x] **EH1** `automation-engine.ts` — catch agora mostra toast.error com nome da automacao e mensagem do erro
 - [x] **EH2** `board-view.tsx` — .catch() no import() com toast.error e console.error
-- [ ] **EH3** `daemon-storage.ts` — Parcial: timestamp-based conflict detection (C7). Banner offline = R7 no backlog
+- [x] **EH3** Banner offline implementado (R7). Timestamp conflict detection (C7). SQLite como source of truth (Sprint 2).
 - [x] **EH4** `file-store.ts` — console.error com path e erro ao detectar JSON corrompido (fixado em C9)
 
 ---
@@ -160,19 +160,19 @@ Items marcados com `[x]` ja foram feitos.
 
 ## Backlog — Seguranca (original)
 
-- [ ] **S3** Secrets: usar file permissions 600 no `secrets.json` ou keychain do OS
+- [x] **S3** Secrets migrados para SQLite (Sprint 2). Nao ha mais secrets.json em plaintext.
 - [ ] **S4** Validar `model` contra lista de modelos do agent no executor
 
 ## Backlog — Resiliencia / Dados (original)
 
 - [ ] **R1** Graceful shutdown no daemon (SIGTERM/SIGINT → cleanup timers, listeners, pending writes)
 - [ ] **R5** Cleanup de jobs antigos no `job-queue.ts` (TTL de 30 dias)
-- [ ] **R7** Banner de "daemon offline" no frontend quando fetch falha
+- [x] **R7** Banner de "daemon offline" no frontend (Sprint 3 — useDaemonStatus + root layout)
 
 ## Backlog — Performance
 
 - [ ] **P1** Cache `detectInstalledAgents` (chamada a cada request, deveria cachear por 60s)
-- [ ] **P2** Zustand selectors granulares (substituir destructuring de store inteiro)
+- [x] **P2** Zustand selectors granulares (Sprint 3 — board-view, card-dialog, dashboard)
 - [ ] **P3** Lazy mount dos panels no CardDialog (montar so quando tab ativa, nao CSS hidden)
 - [ ] **P4** Virtualizacao no board (react-window) para 100+ cards
 - [ ] **P5** Backoff exponencial no git diff polling do implementation-runner
@@ -188,18 +188,18 @@ Items marcados com `[x]` ja foram feitos.
 
 ## Backlog — Testes
 
-- [ ] **T1** Setup vitest no frontend + bun:test no daemon
-- [ ] **T2** Testes unitarios: card store mutations, automation-engine, agent-service
-- [ ] **T3** Testes unitarios daemon: agent-executor, task-workspace, file-store
-- [ ] **T4** Testes de integracao: rotas do daemon (tasks, data, implement)
+- [x] **T1** Setup vitest no frontend + bun:test no daemon (Sprint 1)
+- [x] **T2** Testes unitarios: card store, docs store, workspace store (Sprint 1 — 24 tests)
+- [x] **T3** Testes unitarios daemon: validation, branch-name, file-store, session-manager, task-workspace (Sprint 1 — 64 tests)
+- [x] **T4** Testes de integracao: rotas do daemon com input validation (Sprint 1 — 15 tests)
 - [ ] **T5** Testes E2E: fluxo card Inbox → Discovery → Spec → Implement
 
 ## Backlog — UX / Acessibilidade
 
 - [ ] **U1** ARIA labels nos componentes custom (board-card, board-column, conversation)
 - [ ] **U2** Keyboard navigation no board (setas para mover entre colunas)
-- [ ] **U3** Focus management no CardDialog (autofocus no titulo)
-- [ ] **U4** Empty states: coluna sem cards, vault sem docs, sem projetos vinculados
+- [x] **U3** Focus management no CardDialog (autofocus no titulo — Sprint 3)
+- [x] **U4** Empty states: coluna sem cards (Sprint 3). Vault/projetos = pendente.
 - [ ] **U5** Loading skeletons (usar Skeleton component existente)
 
 ## Backlog — Cleanup de Deps
@@ -208,7 +208,7 @@ Items marcados com `[x]` ja foram feitos.
 
 ## Pendente (features)
 
-- [ ] Live preview dos agents trabalhando no dashboard
+- [x] Live preview dos agents trabalhando no dashboard (Sprint 3 — widget Live Agents)
 - [ ] Session tracking + Branch hyperlink no implement panel (Task #50)
 - [ ] **F1** Botao "Rejeitar" no implement panel (fecha PR draft, card volta pra Ready/Spec)
 - [ ] **F6** Card type "revision" ou label automatica quando e re-tentativa
