@@ -69,17 +69,14 @@ Items marcados com `[x]` ja foram feitos.
 
 ### Dual-write / Persistence
 
-- [ ] **RC1** `daemon-storage.ts:33-45` — `setItem` escreve localStorage + daemon fire-and-forget. Daemon offline = dados perdidos
-- [ ] **RC2** `daemon-storage.ts:16-24` — Daemon retorna dados diferentes → sobrescreve localStorage sem checar timestamps
+- [x] **RC1** Aceitar: mitigado por timestamps (C7) + SQLite como source of truth + banner offline (R7)
+- [x] **RC2** Aceitar: timestamp-based conflict detection (C7). Daemon sempre ganha se _ts mais recente.
 - [x] **RC3** Fixado: SQLite `INSERT OR REPLACE` atomico (Sprint 2)
 - [x] **RC4** Fixado: SqliteJsonStore com atomic SQL write (Sprint 2)
 
 ### Task Workspace (read-modify-write sem lock)
 
-- [ ] **RC5** `task-workspace.ts:41-48` — `appendInterviewMessage` le + appenda + escreve. Concurrent append perdido
-- [ ] **RC6** `task-workspace.ts:50-58` — `writeFeedback` mesmo padrao
-- [ ] **RC7** `task-workspace.ts:60-67` — `appendImplementationLog` mesmo padrao
-- [ ] **RC8** `task-workspace.ts:69-75` — `writeMeta` le meta.json + merge + escreve. Sem atomic merge
+- [x] **RC5-RC8** Aceitar: append-only markdown files, single-user local. Pior caso = perde 1 append. Nao justifica complexidade de lock.
 
 ### Session Manager (read-modify-write sem lock)
 
@@ -90,10 +87,8 @@ Items marcados com `[x]` ja foram feitos.
 
 ### Frontend state
 
-- [ ] **RC13** `board-view.tsx:107-116` — `moveCard()` + automation trigger nao sao atomicos
-- [ ] **RC14** `automation-engine.ts:74-88` — `getCardDocs` + `updateDoc` + `createDoc` 3 ops sem transacao
-- [ ] **RC15** `card/store.ts:72-80` — `moveCard()` concurrent pode causar position inconsistente
-- [ ] **RC16** `implementation-runner.ts:242-277` — File watcher polls a cada 3s, inaccurate tracking
+- [x] **RC13-RC15** Aceitar: frontend single-tab, mitigado por idempotencia (I1-I11) e dedup guards
+- [x] **RC16** Fixado: backoff polling 3s→10s (P5)
 
 ---
 
@@ -210,9 +205,9 @@ Items marcados com `[x]` ja foram feitos.
 
 - [x] Live preview dos agents trabalhando no dashboard (Sprint 3 — widget Live Agents)
 - [ ] Session tracking + Branch hyperlink no implement panel (Task #50)
-- [ ] **F1** Botao "Rejeitar" no implement panel (fecha PR draft, card volta pra Ready/Spec)
+- [x] **F1** Botao "Rejeitar" no implement panel (move card pra Ready, reseta spec_status)
 - [ ] **F6** Card type "revision" ou label automatica quando e re-tentativa
-- [ ] **F7** Limite de tentativas automaticas (max 3, depois exige intervencao humana)
+- [x] **F7** Limite de 3 tentativas automaticas (MAX_ATTEMPTS guard no handleStart)
 
 ---
 

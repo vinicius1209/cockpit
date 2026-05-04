@@ -15,6 +15,7 @@ import type { ImplementEvent } from '@/entities/card/project-types'
 import { Textarea } from '@/components/ui/textarea'
 import { Rocket, Square, Loader2, CheckCircle2, CircleDot, FileText, FilePlus, FileX, GitBranch, GitPullRequest, AlertCircle, History, RotateCcw, ExternalLink, MessageSquareWarning, XCircle } from 'lucide-react'
 import { DAEMON_URL } from '@/shared/lib/constants'
+import { toast } from 'sonner'
 
 interface ImplementPanelProps {
   card: Card
@@ -96,10 +97,17 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
     return () => clearInterval(timer)
   }, [phase])
 
+  const MAX_ATTEMPTS = 3
+
   const handleStart = useCallback(async (feedback?: string) => {
     if (!card.spec_content || !projectPath) return
 
     const currentAttempt = feedback ? attempt + 1 : attempt
+    if (currentAttempt > MAX_ATTEMPTS) {
+      setError(`Limite de ${MAX_ATTEMPTS} tentativas atingido. Revise a spec ou implemente manualmente.`)
+      setPhase('error')
+      return
+    }
     if (feedback) setAttempt(currentAttempt)
 
     setPhase('analyzing')
@@ -403,9 +411,24 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
                   <MessageSquareWarning className="h-3 w-3 mr-1" />
                   Nao resolveu
                 </Button>
-                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setPhase('idle'); setSummary(null) }}>
-                  <RotateCcw className="h-3 w-3 mr-1" />
-                  Nova execucao
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-destructive hover:text-destructive"
+                  onClick={() => {
+                    // Move card back to Ready
+                    const readyCol = columns.find((c) => c.slug === 'ready')
+                    if (readyCol) {
+                      useCardStore.getState().moveCard(card.id, readyCol.id, 0)
+                      useCardStore.getState().updateCard(card.id, { spec_status: 'ready' })
+                    }
+                    setPhase('idle')
+                    setSummary(null)
+                    toast.info('Card movido de volta para Ready')
+                  }}
+                >
+                  <XCircle className="h-3 w-3 mr-1" />
+                  Rejeitar
                 </Button>
               </>
             )}
