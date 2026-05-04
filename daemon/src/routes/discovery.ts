@@ -2,6 +2,7 @@ import { jsonResponse } from '../index'
 import { runDiscovery } from '../discovery/discovery-engine'
 import { diffScan, getScanHistory, linkFindingToCard } from '../discovery/scan-differ'
 import { createJob, executeJobAsync, getJob, subscribeToJob, listJobs } from '../discovery/job-queue'
+import { validateProjectPath } from '../validation'
 
 export async function handleDiscoveryRoutes(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
@@ -9,13 +10,14 @@ export async function handleDiscoveryRoutes(req: Request, url: URL): Promise<Res
   // POST /discovery/run — synchronous (fast-path, scanner only)
   if (path === '/discovery/run' && req.method === 'POST') {
     const body = await req.json() as { projectPath: string; agent?: string; model?: string }
-    if (!body.projectPath) {
-      return jsonResponse({ error: 'Missing "projectPath"' }, 400)
+    const runPath = validateProjectPath(body.projectPath || '')
+    if (!runPath) {
+      return jsonResponse({ error: 'Invalid or missing "projectPath"' }, 400)
     }
 
     try {
-      const result = await runDiscovery(body.projectPath, body.agent, body.model)
-      const diff = diffScan(body.projectPath, result.cards)
+      const result = await runDiscovery(runPath, body.agent, body.model)
+      const diff = diffScan(runPath, result.cards)
 
       return jsonResponse({
         ...result,
@@ -47,11 +49,12 @@ export async function handleDiscoveryRoutes(req: Request, url: URL): Promise<Res
   // POST /discovery/start — async job (returns immediately)
   if (path === '/discovery/start' && req.method === 'POST') {
     const body = await req.json() as { projectPath: string; agent?: string; model?: string }
-    if (!body.projectPath) {
-      return jsonResponse({ error: 'Missing "projectPath"' }, 400)
+    const startPath = validateProjectPath(body.projectPath || '')
+    if (!startPath) {
+      return jsonResponse({ error: 'Invalid or missing "projectPath"' }, 400)
     }
 
-    const job = createJob(body.projectPath, body.agent, body.model)
+    const job = createJob(startPath, body.agent, body.model)
 
     // Fire and forget
     executeJobAsync(job.id).catch((err) => {

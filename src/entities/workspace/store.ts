@@ -81,10 +81,36 @@ export const useWorkspaceStore = create<WorkspaceState>()(
       },
 
       deleteWorkspace: (id) => {
-        set((state) => ({
-          workspaces: state.workspaces.filter((w) => w.id !== id),
-          activeWorkspaceId: state.activeWorkspaceId === id ? state.workspaces[0]?.id ?? null : state.activeWorkspaceId,
-        }))
+        // Cascade: clean up associated data in other stores
+        // Uses dynamic import to avoid circular dependency
+        import('@/entities/card/store').then(({ useCardStore }) => {
+          const cardState = useCardStore.getState()
+          // Delete cards belonging to this workspace
+          const cardsToDelete = cardState.cards.filter((c) => c.workspace_id === id)
+          for (const card of cardsToDelete) cardState.deleteCard(card.id)
+          // Columns and labels are keyed by workspace_id — remove them
+          useCardStore.setState((s) => {
+            const { [id]: _cols, ...restCols } = s.columns
+            const { [id]: _lbls, ...restLbls } = s.labels
+            return { columns: restCols, labels: restLbls }
+          })
+        })
+        import('@/entities/docs/store').then(({ useDocStore }) => {
+          const docs = useDocStore.getState().docs.filter((d) => d.workspace_id === id)
+          for (const doc of docs) useDocStore.getState().deleteDoc(doc.id)
+        })
+        import('@/entities/card/project-store').then(({ useProjectStore }) => {
+          const projects = useProjectStore.getState().projects.filter((p) => p.workspace_id === id)
+          for (const proj of projects) useProjectStore.getState().deleteProject(proj.id)
+        })
+
+        set((state) => {
+          const remaining = state.workspaces.filter((w) => w.id !== id)
+          return {
+            workspaces: remaining,
+            activeWorkspaceId: state.activeWorkspaceId === id ? remaining[0]?.id ?? null : state.activeWorkspaceId,
+          }
+        })
       },
 
       setActiveWorkspace: (id) => set({ activeWorkspaceId: id }),

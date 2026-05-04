@@ -52,14 +52,10 @@ export async function createSession(wsSlug: string, cardId: string, data: {
   const dir = sessionsDir(wsSlug, cardId)
   await mkdir(dir, { recursive: true })
 
-  // Count existing sessions for sequential ID
-  let count = 0
-  try {
-    const entries = await readdir(dir)
-    count = entries.filter((e) => e.endsWith('.json')).length
-  } catch { /* dir might not exist yet */ }
-
-  const id = `session-${String(count + 1).padStart(3, '0')}`
+  // Use timestamp + random suffix for collision-free IDs
+  const ts = Date.now()
+  const rand = Math.random().toString(36).slice(2, 6)
+  const id = `session-${ts}-${rand}`
 
   const session: ImplementSession = {
     id,

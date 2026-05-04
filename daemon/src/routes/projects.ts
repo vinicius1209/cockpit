@@ -1,6 +1,7 @@
 import { jsonResponse } from '../index'
 import { scanProject } from '../scanner/project-scanner'
 import { bootstrapProject } from '../bootstrap/bootstrapper'
+import { validateProjectPath } from '../validation'
 
 export async function handleProjectRoutes(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
@@ -8,12 +9,13 @@ export async function handleProjectRoutes(req: Request, url: URL): Promise<Respo
   // POST /projects/scan — scan a project
   if (path === '/projects/scan' && req.method === 'POST') {
     const body = await req.json() as { path: string }
-    if (!body.path) {
-      return jsonResponse({ error: 'Missing "path" field' }, 400)
+    const validPath = validateProjectPath(body.path || '')
+    if (!validPath) {
+      return jsonResponse({ error: 'Invalid or missing "path"' }, 400)
     }
 
     try {
-      const result = await scanProject(body.path)
+      const result = await scanProject(validPath)
       return jsonResponse(result)
     } catch (err) {
       return jsonResponse({ error: `Scan failed: ${err instanceof Error ? err.message : 'Unknown'}` }, 500)
@@ -23,12 +25,13 @@ export async function handleProjectRoutes(req: Request, url: URL): Promise<Respo
   // POST /projects/bootstrap — auto-generate agent configs
   if (path === '/projects/bootstrap' && req.method === 'POST') {
     const body = await req.json() as { path: string; force?: boolean }
-    if (!body.path) {
-      return jsonResponse({ error: 'Missing "path" field' }, 400)
+    const validBootstrapPath = validateProjectPath(body.path || '')
+    if (!validBootstrapPath) {
+      return jsonResponse({ error: 'Invalid or missing "path"' }, 400)
     }
 
     try {
-      const result = await bootstrapProject(body.path, body.force)
+      const result = await bootstrapProject(validBootstrapPath, body.force)
       return jsonResponse(result)
     } catch (err) {
       return jsonResponse({ error: `Bootstrap failed: ${err instanceof Error ? err.message : 'Unknown'}` }, 500)

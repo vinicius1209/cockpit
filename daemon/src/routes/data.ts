@@ -1,5 +1,6 @@
 import { jsonResponse } from '../index'
 import { getDataStore, listDataStores } from '../persistence/data-stores'
+import { validateStoreName } from '../validation'
 
 export async function handleDataRoutes(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
@@ -12,6 +13,7 @@ export async function handleDataRoutes(req: Request, url: URL): Promise<Response
   // GET /api/data/:store — load store data
   const getMatch = path.match(/^\/api\/data\/([^/]+)$/)
   if (getMatch && req.method === 'GET') {
+    if (!validateStoreName(getMatch[1])) return jsonResponse({ error: `Invalid store name` }, 400)
     const store = getDataStore(getMatch[1])
     if (!store) return jsonResponse({ error: `Store "${getMatch[1]}" not found` }, 404)
     return jsonResponse(store.get())
@@ -20,6 +22,7 @@ export async function handleDataRoutes(req: Request, url: URL): Promise<Response
   // POST /api/data/:store — save store data (full replace)
   const postMatch = path.match(/^\/api\/data\/([^/]+)$/)
   if (postMatch && req.method === 'POST') {
+    if (!validateStoreName(postMatch[1])) return jsonResponse({ error: `Invalid store name` }, 400)
     const store = getDataStore(postMatch[1])
     if (!store) return jsonResponse({ error: `Store "${postMatch[1]}" not found` }, 404)
 

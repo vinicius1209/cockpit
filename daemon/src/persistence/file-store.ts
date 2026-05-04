@@ -1,12 +1,13 @@
 import { join } from 'node:path'
 import { homedir } from 'node:os'
-import { mkdir } from 'node:fs/promises'
+import { mkdir, rename } from 'node:fs/promises'
 
 const DATA_DIR = join(homedir(), '.cockpit', 'data')
 
 export class DaemonFileStore<T> {
   private filePath: string
   private data: T
+  private writing = false
 
   constructor(filename: string, private defaultValue: T) {
     this.filePath = join(DATA_DIR, filename)
@@ -21,7 +22,8 @@ export class DaemonFileStore<T> {
         this.data = await file.json()
         console.log(`[persistence] Loaded ${this.filePath}`)
       }
-    } catch {
+    } catch (err) {
+      console.error(`[persistence] Corrupt file ${this.filePath}, resetting to default:`, err)
       this.data = structuredClone(this.defaultValue)
     }
   }
@@ -32,10 +34,24 @@ export class DaemonFileStore<T> {
 
   async set(value: T): Promise<void> {
     this.data = value
-    await Bun.write(this.filePath, JSON.stringify(value))
+    // Atomic write: write to .tmp then rename
+    const tmpPath = this.filePath + '.tmp'
+    await Bun.write(tmpPath, JSON.stringify(value))
+    await rename(tmpPath, this.filePath)
   }
 
   async update(fn: (current: T) => T): Promise<void> {
-    await this.set(fn(this.data))
+    // Serialize updates to prevent concurrent read-modify-write
+    if (this.writing) {
+      // Wait for current write to finish then retry
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      return this.update(fn)
+    }
+    this.writing = true
+    try {
+      await this.set(fn(this.data))
+    } finally {
+      this.writing = false
+    }
   }
 }

@@ -1,5 +1,6 @@
 import { jsonResponse } from '../index'
 import { runImplementation, type ImplementConfig, type ImplementEvent } from '../implement/implementation-runner'
+import { validateProjectPath } from '../validation'
 
 export async function handleImplementRoutes(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
@@ -11,6 +12,11 @@ export async function handleImplementRoutes(req: Request, url: URL): Promise<Res
     if (!body.spec || !body.projectPath || !body.cardTitle) {
       return jsonResponse({ error: 'Missing required fields: spec, projectPath, cardTitle' }, 400)
     }
+    const validPath = validateProjectPath(body.projectPath)
+    if (!validPath) {
+      return jsonResponse({ error: 'Invalid projectPath' }, 400)
+    }
+    body.projectPath = validPath
 
     const stream = new ReadableStream({
       async start(controller) {

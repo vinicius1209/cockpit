@@ -1,6 +1,9 @@
 import type { StorageAdapter } from '../types'
 import { DAEMON_URL } from '@/shared/lib/constants'
 
+// Track last write timestamp per store to detect stale data
+const lastWriteTs: Record<string, number> = {}
+
 export function createDaemonStorageAdapter(storeName: string): StorageAdapter {
   return {
     getItem: (name) => {
@@ -15,11 +18,20 @@ export function createDaemonStorageAdapter(storeName: string): StorageAdapter {
         })
         .then((data) => {
           if (data && typeof data === 'object' && Object.keys(data).length > 0) {
-            const serialized = JSON.stringify(data)
-            const current = window.localStorage.getItem(name)
-            // Only update if daemon has different data
-            if (serialized !== current) {
-              window.localStorage.setItem(name, serialized)
+            // Wrap with timestamp for conflict detection
+            const daemonPayload = data as { state?: unknown; _ts?: number }
+            const daemonTs = daemonPayload._ts || 0
+            const localTs = lastWriteTs[name] || 0
+
+            // Only overwrite localStorage if daemon data is newer than our last write
+            if (daemonTs > localTs) {
+              const serialized = JSON.stringify(data)
+              const current = window.localStorage.getItem(name)
+              if (serialized !== current) {
+                window.localStorage.setItem(name, serialized)
+                // Trigger Zustand rehydration
+                window.dispatchEvent(new StorageEvent('storage', { key: name, newValue: serialized }))
+              }
             }
           }
         })
@@ -31,21 +43,35 @@ export function createDaemonStorageAdapter(storeName: string): StorageAdapter {
     },
 
     setItem: (name, value) => {
-      // Save to localStorage immediately (fast)
-      window.localStorage.setItem(name, value)
+      // Stamp with timestamp
+      const ts = Date.now()
+      lastWriteTs[name] = ts
 
-      // Save to daemon (persistent, fire-and-forget)
+      let stamped: string
+      try {
+        const parsed = JSON.parse(value)
+        parsed._ts = ts
+        stamped = JSON.stringify(parsed)
+      } catch {
+        stamped = value
+      }
+
+      // Save to localStorage immediately (fast)
+      window.localStorage.setItem(name, stamped)
+
+      // Save to daemon (persistent)
       fetch(`${DAEMON_URL}/api/data/${storeName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: value,
+        body: stamped,
       }).catch(() => {
-        // Daemon offline — data saved in localStorage, will sync later
+        // Daemon offline — data saved in localStorage, will sync on next getItem
       })
     },
 
     removeItem: (name) => {
       window.localStorage.removeItem(name)
+      delete lastWriteTs[name]
     },
   }
 }

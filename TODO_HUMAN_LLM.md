@@ -27,20 +27,20 @@ Items marcados com `[x]` ja foram feitos.
 
 ### Path Traversal / Input Validation
 
-- [ ] **C1** `routes/tasks.ts:12` — `workspaceSlug` e `cardId` sem sanitizacao. `../../etc/passwd` possivel
-- [ ] **C2** `routes/git.ts:10,50` — `projectPath` e `user` nao validados. Injecao possivel
-- [ ] **C3** `routes/implement.ts:11` — `projectPath` aceita qualquer caminho
-- [ ] **C4** `routes/data.ts:15` — nome do store nao validado contra whitelist
-- [ ] **C5** `routes/projects.ts:11` — `path` aceita qualquer caminho
-- [ ] **C6** `routes/discovery.ts:11,49` — `projectPath` nao validado
+- [x] **C1** `routes/tasks.ts` — sanitizeSlug + sanitizeFilename em todos os params
+- [x] **C2** `routes/git.ts` — validateProjectPath + sanitizeGhUser
+- [x] **C3** `routes/implement.ts` — validateProjectPath
+- [x] **C4** `routes/data.ts` — validateStoreName (whitelist)
+- [x] **C5** `routes/projects.ts` — validateProjectPath (scan + bootstrap)
+- [x] **C6** `routes/discovery.ts` — validateProjectPath (run + start)
 
-> **Solucao**: criar middleware `validatePath(path)` e `sanitizeSlug(slug)` no daemon. Rejeitar `..`, validar que path esta dentro de `$HOME`. Whitelist de stores em data.ts.
+> Modulo centralizado: `daemon/src/validation.ts` com sanitizeSlug, validateProjectPath, sanitizeFilename, validateStoreName, sanitizeGhUser, validatePositiveNumber.
 
 ### Data Integrity
 
-- [ ] **C7** `daemon-storage.ts:6-45` — Split-brain: localStorage e daemon podem divergir permanentemente. Sem timestamp, sem merge, sem conflict resolution
-- [ ] **C8** `workspace/store.ts:83-88` — Cascade delete ausente: deletar workspace orphana cards, docs, labels, columns, projects
-- [ ] **C9** `file-store.ts:33-40` — Race condition: `Bun.write()` nao e atomico. Escritas simultaneas corrompem JSON
+- [x] **C7** `daemon-storage.ts` — Timestamp-based conflict detection. setItem stampa _ts, getItem so sobrescreve se daemon _ts > local _ts. Dispara StorageEvent para rehydration.
+- [x] **C8** `workspace/store.ts` — Cascade delete: remove cards, docs, columns, labels, projects do workspace via dynamic import.
+- [x] **C9** `file-store.ts` — Atomic write (tmp + rename). Serialized updates via writing flag. Session ID com timestamp+random (nao sequential count).
 
 ---
 
