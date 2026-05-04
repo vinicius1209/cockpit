@@ -16,7 +16,7 @@ import {
   Cell,
   Legend,
 } from 'recharts'
-import { BarChart3, Clock, Zap, TrendingUp } from 'lucide-react'
+import { BarChart3, Clock, Zap, TrendingUp, Bot, Loader2, AlertCircle, Rocket } from 'lucide-react'
 
 const TYPE_COLORS: Record<string, string> = {
   feature: '#3b82f6',
@@ -35,7 +35,26 @@ const PRIORITY_COLORS: Record<string, string> = {
 }
 
 export function MetricsPage() {
-  const metrics = useMetrics()
+  const { metrics, loading, error } = useMetrics()
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full gap-2 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        <span>Carregando metricas...</span>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full gap-3 text-muted-foreground">
+        <AlertCircle className="h-8 w-8 text-destructive" />
+        <p className="text-sm">Erro ao carregar metricas</p>
+        <p className="text-xs">{error}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -87,35 +106,29 @@ export function MetricsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {(() => {
-              const avgAll = metrics.perWorkspace
-                .filter((w) => w.avgLeadTimeDays !== null)
-                .map((w) => w.avgLeadTimeDays!)
-              const avg = avgAll.length > 0 ? (avgAll.reduce((a, b) => a + b, 0) / avgAll.length).toFixed(1) : null
-              return (
-                <>
-                  <p className="text-3xl font-bold">{avg ?? '-'}</p>
-                  <p className="text-xs text-muted-foreground mt-1">dias (criacao ate conclusao)</p>
-                </>
-              )
-            })()}
+            <p className="text-3xl font-bold">{metrics.avgLeadTimeDays ?? '-'}</p>
+            <p className="text-xs text-muted-foreground mt-1">dias (criacao ate conclusao)</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Workspaces Ativos</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground flex items-center gap-1.5">
+              <Bot className="h-4 w-4" />
+              Sessoes de Agent
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{metrics.perWorkspace.filter((w) => w.totalCards > 0).length}</p>
-            <p className="text-xs text-muted-foreground mt-1">de {metrics.perWorkspace.length} total</p>
+            <p className="text-3xl font-bold">{metrics.sessions.total}</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {metrics.sessions.done} ok · {metrics.sessions.errors} erro{metrics.sessions.errors !== 1 ? 's' : ''}
+            </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Charts Row 1 */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Velocity */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Velocity Semanal</CardTitle>
@@ -138,32 +151,37 @@ export function MetricsPage() {
           </CardContent>
         </Card>
 
-        {/* Cards por workspace */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Cards por Workspace</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={metrics.workspaceBreakdown.filter((w) => w.cards > 0)}
-                    dataKey="cards"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label={(props: any) => `${props.name}: ${props.value}`}
-                  >
-                    {metrics.workspaceBreakdown.map((entry) => (
-                      <Cell key={entry.name} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+              {metrics.workspaceBreakdown.filter((w) => w.cards > 0).length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={metrics.workspaceBreakdown.filter((w) => w.cards > 0)}
+                      dataKey="cards"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label={(props: { name: string; value: number }) => `${props.name}: ${props.value}`}
+                    >
+                      {metrics.workspaceBreakdown.map((entry) => (
+                        <Cell key={entry.name} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                  Nenhum card criado ainda
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -171,111 +189,154 @@ export function MetricsPage() {
 
       {/* Charts Row 2 */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Por tipo */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Distribuicao por Tipo</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={metrics.typeBreakdown} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis type="number" allowDecimals={false} tick={{ fill: 'var(--color-muted-foreground)' }} />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={90}
-                    tick={{ fill: 'var(--color-muted-foreground)' }}
-                    tickFormatter={(v: string) => CARD_TYPE_CONFIG[v as CardType]?.label || v}
-                  />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '8px' }}
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    formatter={(value: any, _name: any, props: any) => [value, CARD_TYPE_CONFIG[props?.payload?.name as CardType]?.label || props?.payload?.name]}
-                  />
-                  <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                    {metrics.typeBreakdown.map((entry) => (
-                      <Cell key={entry.name} fill={TYPE_COLORS[entry.name] || '#6b7280'} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+              {metrics.typeBreakdown.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={metrics.typeBreakdown} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                    <XAxis type="number" allowDecimals={false} tick={{ fill: 'var(--color-muted-foreground)' }} />
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      width={90}
+                      tick={{ fill: 'var(--color-muted-foreground)' }}
+                      tickFormatter={(v: string) => CARD_TYPE_CONFIG[v as CardType]?.label || v}
+                    />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: 'var(--color-card)', border: '1px solid var(--color-border)', borderRadius: '8px' }}
+                    />
+                    <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                      {metrics.typeBreakdown.map((entry) => (
+                        <Cell key={entry.name} fill={TYPE_COLORS[entry.name] || '#6b7280'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                  Sem dados
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Por prioridade */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Distribuicao por Prioridade</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={metrics.priorityBreakdown}
-                    dataKey="count"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={80}
-                    label={(props: any) => `${CARD_PRIORITY_CONFIG[props?.name as CardPriority]?.label || props?.name}: ${props?.value}`}
-                  >
-                    {metrics.priorityBreakdown.map((entry) => (
-                      <Cell key={entry.name} fill={PRIORITY_COLORS[entry.name] || '#6b7280'} />
-                    ))}
-                  </Pie>
-                  {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                  <Tooltip formatter={(value: any, name: any) => [value, CARD_PRIORITY_CONFIG[name as CardPriority]?.label || name]} />
-                  <Legend formatter={(value: string) => CARD_PRIORITY_CONFIG[value as CardPriority]?.label || value} />
-                </PieChart>
-              </ResponsiveContainer>
+              {metrics.priorityBreakdown.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={metrics.priorityBreakdown}
+                      dataKey="count"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={80}
+                      label={(props: { name: string; value: number }) => `${CARD_PRIORITY_CONFIG[props.name as CardPriority]?.label || props.name}: ${props.value}`}
+                    >
+                      {metrics.priorityBreakdown.map((entry) => (
+                        <Cell key={entry.name} fill={PRIORITY_COLORS[entry.name] || '#6b7280'} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend formatter={(value: string) => CARD_PRIORITY_CONFIG[value as CardPriority]?.label || value} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                  Sem dados
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Per workspace detail */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Detalhes por Workspace</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {metrics.perWorkspace.map((ws) => (
-              <div key={ws.workspaceId} className="flex items-center gap-4 py-3 border-b last:border-0">
-                <div className="h-4 w-4 rounded-full shrink-0" style={{ backgroundColor: ws.workspaceColor }} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{ws.workspaceName}</p>
-                  <div className="flex items-center gap-2 mt-1 flex-wrap">
-                    <Badge variant="outline" className="text-[10px]">{ws.totalCards} cards</Badge>
-                    <Badge variant="outline" className="text-[10px] text-green-600">{ws.doneCards} done</Badge>
-                    <Badge variant="outline" className="text-[10px] text-blue-600">{ws.inProgressCards} in progress</Badge>
-                    {ws.avgLeadTimeDays !== null && (
-                      <Badge variant="outline" className="text-[10px]">
-                        <Clock className="h-2.5 w-2.5 mr-0.5" />
-                        {ws.avgLeadTimeDays}d lead time
-                      </Badge>
-                    )}
+      {/* Per workspace detail + Agent stats */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle className="text-base">Detalhes por Workspace</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {metrics.perWorkspace.map((ws) => (
+                <div key={ws.workspaceId} className="flex items-center gap-4 py-3 border-b last:border-0">
+                  <div className="h-4 w-4 rounded-full shrink-0" style={{ backgroundColor: ws.workspaceColor }} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{ws.workspaceName}</p>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <Badge variant="outline" className="text-[10px]">{ws.totalCards} cards</Badge>
+                      <Badge variant="outline" className="text-[10px] text-green-600">{ws.doneCards} done</Badge>
+                      <Badge variant="outline" className="text-[10px] text-blue-600">{ws.inProgressCards} in progress</Badge>
+                    </div>
+                  </div>
+                  <div className="flex gap-1 flex-wrap">
+                    {Object.entries(ws.byType).map(([type, count]) => {
+                      const config = CARD_TYPE_CONFIG[type as CardType]
+                      return (
+                        <Badge key={type} variant="secondary" className={`text-[10px] ${config?.bgColor} ${config?.color} border-0`}>
+                          {count} {config?.label}
+                        </Badge>
+                      )
+                    })}
                   </div>
                 </div>
-                <div className="flex gap-1 flex-wrap">
-                  {Object.entries(ws.byType).map(([type, count]) => {
-                    const config = CARD_TYPE_CONFIG[type as CardType]
-                    return (
-                      <Badge key={type} variant="secondary" className={`text-[10px] ${config?.bgColor} ${config?.color} border-0`}>
-                        {count} {config?.label}
-                      </Badge>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+              {metrics.perWorkspace.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">Nenhum workspace encontrado</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <Rocket className="h-4 w-4" />
+              Agent Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-sm text-muted-foreground">Implementacoes</span>
+              <span className="text-sm font-medium">{metrics.sessions.total}</span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-sm text-muted-foreground">Sucesso</span>
+              <span className="text-sm font-medium text-green-600">{metrics.sessions.done}</span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-sm text-muted-foreground">Erros</span>
+              <span className="text-sm font-medium text-destructive">{metrics.sessions.errors}</span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-sm text-muted-foreground">Taxa de sucesso</span>
+              <span className="text-sm font-medium">
+                {metrics.sessions.total > 0 ? `${Math.round((metrics.sessions.done / metrics.sessions.total) * 100)}%` : '-'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-2 border-b">
+              <span className="text-sm text-muted-foreground">Discovery scans</span>
+              <span className="text-sm font-medium">{metrics.discoveryJobs.total}</span>
+            </div>
+            <div className="flex items-center justify-between py-2">
+              <span className="text-sm text-muted-foreground">Em progresso</span>
+              <span className="text-sm font-medium text-amber-500">{metrics.totalInProgress}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

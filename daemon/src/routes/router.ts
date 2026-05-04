@@ -9,6 +9,7 @@ import { handleImplementRoutes } from './implement'
 import { handleDataRoutes } from './data'
 import { handleTaskRoutes } from './tasks'
 import { handleGitRoutes } from './git'
+import { handleMetricsRoutes } from './metrics'
 
 export async function handleRequest(req: Request): Promise<Response> {
   const url = new URL(req.url)
@@ -52,6 +53,11 @@ export async function handleRequest(req: Request): Promise<Response> {
   // Task workspace routes
   if (path.startsWith('/api/tasks')) {
     return handleTaskRoutes(req, url)
+  }
+
+  // Metrics
+  if (path === '/api/metrics') {
+    return handleMetricsRoutes(req, url)
   }
 
   // Data persistence routes

@@ -89,6 +89,10 @@ export const daemonClient = {
     }
   },
 
+  // Metrics
+  getMetrics: () =>
+    daemonFetch<Record<string, unknown>>('/api/metrics'),
+
   // Sessions
   getSessions: (wsSlug: string, cardId: string) =>
     daemonFetch<Record<string, unknown>[]>(`/api/tasks/${wsSlug}/${cardId}/sessions`),
