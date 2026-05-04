@@ -25,9 +25,9 @@ export interface DiscoveryJob {
   error: string | null
 }
 
-import { DaemonFileStore } from '../persistence/file-store'
+import { SqliteJsonStore } from '../persistence/sqlite-json-store'
 
-const jobFileStore = new DaemonFileStore<Record<string, DiscoveryJob>>('jobs.json', {})
+const jobFileStore = new SqliteJsonStore<Record<string, DiscoveryJob>>('jobs', {})
 const jobListeners = new Map<string, Set<(event: JobProgress) => void>>()
 
 export async function initJobStore(): Promise<void> {

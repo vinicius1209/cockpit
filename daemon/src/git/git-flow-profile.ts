@@ -1,6 +1,6 @@
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { join } from 'node:path'
-import { DaemonFileStore } from '../persistence/file-store'
+import { SqliteJsonStore } from '../persistence/sqlite-json-store'
 
 export interface GitFlowProfile {
   projectPath: string
@@ -22,7 +22,7 @@ export interface GhAccount {
   host: string
 }
 
-const profileStore = new DaemonFileStore<Record<string, GitFlowProfile>>('git-profiles.json', {})
+const profileStore = new SqliteJsonStore<Record<string, GitFlowProfile>>('git-profiles', {})
 
 export async function initGitProfiles(): Promise<void> {
   await profileStore.init()

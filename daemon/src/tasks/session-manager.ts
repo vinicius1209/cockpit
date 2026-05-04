@@ -1,8 +1,4 @@
-import { join } from 'node:path'
-import { homedir } from 'node:os'
-import { mkdir, readdir } from 'node:fs/promises'
-
-const TASKS_DIR = join(homedir(), '.cockpit', 'tasks')
+import { getDB } from '../persistence/db'
 
 export interface SessionFile {
   path: string
@@ -35,12 +31,42 @@ export interface ImplementSession {
   error: string | null
 }
 
-function sessionsDir(wsSlug: string, cardId: string): string {
-  return join(TASKS_DIR, wsSlug, cardId, 'sessions')
+interface SessionRow {
+  id: string
+  workspace_slug: string
+  card_id: string
+  attempt: number
+  agent: string
+  branch: string | null
+  phase: string
+  exit_code: number | null
+  started_at: string
+  completed_at: string | null
+  duration: number | null
+  feedback: string | null
+  summary: string | null
+  output: string | null
+  files: string | null
+  error: string | null
 }
 
-function sessionPath(wsSlug: string, cardId: string, sessionId: string): string {
-  return join(sessionsDir(wsSlug, cardId), `${sessionId}.json`)
+function rowToSession(row: SessionRow): ImplementSession {
+  return {
+    id: row.id,
+    attempt: row.attempt,
+    agent: row.agent,
+    branch: row.branch,
+    phase: row.phase as ImplementSession['phase'],
+    exitCode: row.exit_code,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    duration: row.duration,
+    feedback: row.feedback,
+    summary: row.summary ? JSON.parse(row.summary) : null,
+    output: row.output ? JSON.parse(row.output) : [],
+    files: row.files ? JSON.parse(row.files) : [],
+    error: row.error,
+  }
 }
 
 export async function createSession(wsSlug: string, cardId: string, data: {
@@ -49,10 +75,6 @@ export async function createSession(wsSlug: string, cardId: string, data: {
   attempt: number
   feedback: string | null
 }): Promise<ImplementSession> {
-  const dir = sessionsDir(wsSlug, cardId)
-  await mkdir(dir, { recursive: true })
-
-  // Use timestamp + random suffix for collision-free IDs
   const ts = Date.now()
   const rand = Math.random().toString(36).slice(2, 6)
   const id = `session-${ts}-${rand}`
@@ -74,7 +96,12 @@ export async function createSession(wsSlug: string, cardId: string, data: {
     error: null,
   }
 
-  await Bun.write(sessionPath(wsSlug, cardId, id), JSON.stringify(session, null, 2))
+  getDB().query(`INSERT INTO sessions (id, workspace_slug, card_id, attempt, agent, branch, phase, started_at, feedback, output, files)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    id, wsSlug, cardId, data.attempt, data.agent, data.branch,
+    'analyzing', session.startedAt, data.feedback, '[]', '[]',
+  )
+
   return session
 }
 
@@ -84,13 +111,22 @@ export async function updateSession(
   sessionId: string,
   updates: Partial<ImplementSession>,
 ): Promise<void> {
-  const path = sessionPath(wsSlug, cardId, sessionId)
-  const file = Bun.file(path)
-  if (!await file.exists()) return
+  const sets: string[] = []
+  const values: unknown[] = []
 
-  const current = await file.json() as ImplementSession
-  const updated = { ...current, ...updates }
-  await Bun.write(path, JSON.stringify(updated, null, 2))
+  if (updates.phase !== undefined) { sets.push('phase = ?'); values.push(updates.phase) }
+  if (updates.exitCode !== undefined) { sets.push('exit_code = ?'); values.push(updates.exitCode) }
+  if (updates.completedAt !== undefined) { sets.push('completed_at = ?'); values.push(updates.completedAt) }
+  if (updates.duration !== undefined) { sets.push('duration = ?'); values.push(updates.duration) }
+  if (updates.summary !== undefined) { sets.push('summary = ?'); values.push(JSON.stringify(updates.summary)) }
+  if (updates.output !== undefined) { sets.push('output = ?'); values.push(JSON.stringify(updates.output)) }
+  if (updates.files !== undefined) { sets.push('files = ?'); values.push(JSON.stringify(updates.files)) }
+  if (updates.error !== undefined) { sets.push('error = ?'); values.push(updates.error) }
+
+  if (sets.length === 0) return
+
+  values.push(sessionId)
+  getDB().query(`UPDATE sessions SET ${sets.join(', ')} WHERE id = ?`).run(...values)
 }
 
 export async function appendOutput(
@@ -99,13 +135,11 @@ export async function appendOutput(
   sessionId: string,
   line: string,
 ): Promise<void> {
-  const path = sessionPath(wsSlug, cardId, sessionId)
-  const file = Bun.file(path)
-  if (!await file.exists()) return
-
-  const current = await file.json() as ImplementSession
-  current.output.push(line)
-  await Bun.write(path, JSON.stringify(current, null, 2))
+  // Atomic JSON array append in SQLite
+  getDB().query(`UPDATE sessions SET output = json_insert(
+    CASE WHEN output IS NULL THEN '[]' ELSE output END,
+    '$[#]', ?
+  ) WHERE id = ?`).run(line, sessionId)
 }
 
 export async function appendFile(
@@ -114,42 +148,34 @@ export async function appendFile(
   sessionId: string,
   trackedFile: SessionFile,
 ): Promise<void> {
-  const path = sessionPath(wsSlug, cardId, sessionId)
-  const file = Bun.file(path)
-  if (!await file.exists()) return
+  // Check if file already tracked (read from DB, not memory)
+  const row = getDB().query('SELECT files FROM sessions WHERE id = ?').get(sessionId) as { files: string } | null
+  if (!row) return
 
-  const current = await file.json() as ImplementSession
-  if (!current.files.some((f) => f.path === trackedFile.path)) {
-    current.files.push(trackedFile)
-    await Bun.write(path, JSON.stringify(current, null, 2))
-  }
+  const files: SessionFile[] = JSON.parse(row.files || '[]')
+  if (files.some((f) => f.path === trackedFile.path)) return
+
+  files.push(trackedFile)
+  getDB().query('UPDATE sessions SET files = ? WHERE id = ?').run(JSON.stringify(files), sessionId)
 }
 
 export async function listSessions(wsSlug: string, cardId: string): Promise<ImplementSession[]> {
-  const dir = sessionsDir(wsSlug, cardId)
-  try {
-    const entries = await readdir(dir)
-    const sessions: ImplementSession[] = []
-    for (const entry of entries.filter((e) => e.endsWith('.json')).sort()) {
-      const file = Bun.file(join(dir, entry))
-      if (await file.exists()) {
-        sessions.push(await file.json())
-      }
-    }
-    return sessions
-  } catch {
-    return []
-  }
+  const rows = getDB().query(
+    'SELECT * FROM sessions WHERE workspace_slug = ? AND card_id = ? ORDER BY started_at ASC',
+  ).all(wsSlug, cardId) as SessionRow[]
+
+  return rows.map(rowToSession)
 }
 
 export async function getLatestSession(wsSlug: string, cardId: string): Promise<ImplementSession | null> {
-  const sessions = await listSessions(wsSlug, cardId)
-  return sessions.length > 0 ? sessions[sessions.length - 1] : null
+  const row = getDB().query(
+    'SELECT * FROM sessions WHERE workspace_slug = ? AND card_id = ? ORDER BY started_at DESC LIMIT 1',
+  ).get(wsSlug, cardId) as SessionRow | null
+
+  return row ? rowToSession(row) : null
 }
 
 export async function getSession(wsSlug: string, cardId: string, sessionId: string): Promise<ImplementSession | null> {
-  const path = sessionPath(wsSlug, cardId, sessionId)
-  const file = Bun.file(path)
-  if (!await file.exists()) return null
-  return await file.json()
+  const row = getDB().query('SELECT * FROM sessions WHERE id = ?').get(sessionId) as SessionRow | null
+  return row ? rowToSession(row) : null
 }

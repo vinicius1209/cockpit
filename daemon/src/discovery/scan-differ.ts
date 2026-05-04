@@ -41,9 +41,9 @@ function generateFingerprint(card: DiscoveryCard): string {
   return `fp-${Math.abs(hash).toString(36)}`
 }
 
-import { DaemonFileStore } from '../persistence/file-store'
+import { SqliteJsonStore } from '../persistence/sqlite-json-store'
 
-const historyFileStore = new DaemonFileStore<Record<string, ScanHistory[]>>('scan-history.json', {})
+const historyFileStore = new SqliteJsonStore<Record<string, ScanHistory[]>>('scan-history', {})
 
 export async function initScanHistory(): Promise<void> {
   await historyFileStore.init()

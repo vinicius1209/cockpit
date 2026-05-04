@@ -1,19 +1,14 @@
-import { initSecrets } from './secrets-store'
-import { initDataStores } from './data-stores'
-import { initScanHistory } from '../discovery/scan-differ'
-import { initJobStore } from '../discovery/job-queue'
+import { initDB } from './db'
 import { initSchedulerStore } from '../scheduler/scheduler'
-import { initGitProfiles } from '../git/git-flow-profile'
 
 export async function initPersistence(): Promise<void> {
   console.log('[persistence] Initializing...')
-  await Promise.all([
-    initSecrets(),
-    initDataStores(),
-    initScanHistory(),
-    initJobStore(),
-    initSchedulerStore(),
-    initGitProfiles(),
-  ])
+
+  // SQLite handles all stores now
+  await initDB()
+
+  // Scheduler needs to restore timers after DB is ready
+  await initSchedulerStore()
+
   console.log('[persistence] Ready')
 }

@@ -1,10 +1,13 @@
-import { describe, test, expect } from 'bun:test'
+import { describe, test, expect, beforeAll } from 'bun:test'
+import { initDB } from '../persistence/db'
 import { createSession, updateSession, appendOutput, appendFile, listSessions, getLatestSession, getSession } from '../tasks/session-manager'
 
-// These tests use real task workspace in ~/.cockpit/tasks/
-// with a unique test workspace slug to avoid conflicts
 const WS = '_test_sessions_' + Date.now()
 const CARD = 'card-test-sess'
+
+beforeAll(async () => {
+  await initDB()
+})
 
 describe('session-manager', () => {
   test('createSession creates a session with correct fields', async () => {
@@ -77,22 +80,25 @@ describe('session-manager', () => {
     expect(loaded!.files.length).toBe(2)
   })
 
-  test('listSessions returns all sessions sorted', async () => {
+  test('listSessions returns all sessions', async () => {
     const sessions = await listSessions(WS, CARD)
     expect(sessions.length).toBeGreaterThanOrEqual(2)
 
-    // Should be sorted by filename (timestamp-based IDs sort chronologically)
+    // Should be sorted by started_at ascending
     for (let i = 1; i < sessions.length; i++) {
-      expect(sessions[i].id >= sessions[i - 1].id).toBe(true)
+      expect(sessions[i].startedAt >= sessions[i - 1].startedAt).toBe(true)
     }
   })
 
-  test('getLatestSession returns most recent', async () => {
+  test('getLatestSession returns most recent by startedAt', async () => {
     const latest = await getLatestSession(WS, CARD)
     expect(latest).not.toBeNull()
 
     const all = await listSessions(WS, CARD)
-    expect(latest!.id).toBe(all[all.length - 1].id)
+    // Latest should have the most recent startedAt
+    for (const s of all) {
+      expect(latest!.startedAt >= s.startedAt).toBe(true)
+    }
   })
 
   test('getSession with invalid ID returns null', async () => {

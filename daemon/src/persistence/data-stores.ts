@@ -1,24 +1,24 @@
-import { DaemonFileStore } from './file-store'
+import { getDB } from './db'
 
-const stores: Record<string, DaemonFileStore<unknown>> = {
-  cards: new DaemonFileStore('cockpit-cards.json', {}),
-  workspaces: new DaemonFileStore('cockpit-workspaces.json', {}),
-  agents: new DaemonFileStore('cockpit-agents.json', {}),
-  docs: new DaemonFileStore('cockpit-docs.json', {}),
-  projects: new DaemonFileStore('cockpit-projects.json', {}),
-}
+const VALID_STORES = ['cards', 'workspaces', 'agents', 'docs', 'projects']
 
-export async function initDataStores(): Promise<void> {
-  for (const [name, store] of Object.entries(stores)) {
-    await store.init()
-    console.log(`[data-store] ${name} loaded`)
+export function getDataStore(name: string): { get: () => unknown; set: (value: unknown) => void } | undefined {
+  if (!VALID_STORES.includes(name)) return undefined
+
+  return {
+    get: () => {
+      const row = getDB().query('SELECT data FROM kv_stores WHERE store_name = ?').get(name) as { data: string } | null
+      if (!row) return {}
+      try { return JSON.parse(row.data) } catch { return {} }
+    },
+    set: (value: unknown) => {
+      getDB().query(
+        'INSERT OR REPLACE INTO kv_stores (store_name, data, updated_at) VALUES (?, ?, ?)',
+      ).run(name, JSON.stringify(value), new Date().toISOString())
+    },
   }
 }
 
-export function getDataStore(name: string): DaemonFileStore<unknown> | undefined {
-  return stores[name]
-}
-
 export function listDataStores(): string[] {
-  return Object.keys(stores)
+  return VALID_STORES
 }

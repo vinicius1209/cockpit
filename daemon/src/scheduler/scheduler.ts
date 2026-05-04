@@ -1,5 +1,5 @@
 import { runDiscovery, type DiscoveryResult } from '../discovery/discovery-engine'
-import { DaemonFileStore } from '../persistence/file-store'
+import { SqliteJsonStore } from '../persistence/sqlite-json-store'
 
 export interface ScheduledJob {
   id: string
@@ -14,7 +14,7 @@ export interface ScheduledJob {
   nextRun: string
 }
 
-const schedFileStore = new DaemonFileStore<Record<string, ScheduledJob>>('scheduled-jobs.json', {})
+const schedFileStore = new SqliteJsonStore<Record<string, ScheduledJob>>('scheduled-jobs', {})
 const timers = new Map<string, Timer>()
 
 export async function initSchedulerStore(): Promise<void> {
