@@ -1,4 +1,4 @@
-import { jsonResponse } from '../index'
+import { jsonResponse } from '../http'
 import { runDiscovery } from '../discovery/discovery-engine'
 import { diffScan, getScanHistory, linkFindingToCard } from '../discovery/scan-differ'
 import { createJob, executeJobAsync, getJob, subscribeToJob, listJobs } from '../discovery/job-queue'

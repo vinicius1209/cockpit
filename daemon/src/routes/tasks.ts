@@ -1,4 +1,4 @@
-import { jsonResponse } from '../index'
+import { jsonResponse } from '../http'
 import { TaskWorkspace } from '../tasks/task-workspace'
 import { listSessions, getLatestSession, getSession } from '../tasks/session-manager'
 import { sanitizeSlug, sanitizeFilename, validatePositiveNumber } from '../validation'

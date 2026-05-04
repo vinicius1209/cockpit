@@ -1,4 +1,4 @@
-import { jsonResponse } from '../index'
+import { jsonResponse } from '../http'
 import { getSecret, setSecret, removeSecret, listSecrets } from '../persistence/secrets-store'
 
 const VALID_PROVIDERS = ['claude', 'openai', 'gemini']

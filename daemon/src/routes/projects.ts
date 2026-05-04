@@ -1,4 +1,4 @@
-import { jsonResponse } from '../index'
+import { jsonResponse } from '../http'
 import { scanProject } from '../scanner/project-scanner'
 import { bootstrapProject } from '../bootstrap/bootstrapper'
 import { validateProjectPath } from '../validation'

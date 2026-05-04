@@ -1,4 +1,4 @@
-import { jsonResponse } from '../index'
+import { jsonResponse } from '../http'
 import {
   getScheduledJobs,
   getJob,

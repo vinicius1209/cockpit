@@ -1,4 +1,4 @@
-import { jsonResponse } from '../index'
+import { jsonResponse } from '../http'
 import { runImplementation, type ImplementConfig, type ImplementEvent } from '../implement/implementation-runner'
 import { validateProjectPath } from '../validation'
 

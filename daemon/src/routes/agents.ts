@@ -1,4 +1,4 @@
-import { jsonResponse } from '../index'
+import { jsonResponse } from '../http'
 import { detectInstalledAgents, executeAgent, executeAgentStreaming } from '../executor/agent-executor'
 
 export async function handleAgentRoutes(req: Request, url: URL): Promise<Response> {

@@ -1,4 +1,4 @@
-import { jsonResponse } from '../index'
+import { jsonResponse } from '../http'
 import { analyzeGitFlow, getProfile, getAllProfiles, listGhAccounts, switchGhAccount } from '../git/git-flow-profile'
 import { validateProjectPath, sanitizeGhUser } from '../validation'
 

@@ -1,5 +1,6 @@
 import { handleRequest } from './routes/router'
 import { initPersistence } from './persistence'
+import { jsonResponse } from './http'
 
 const PORT = Number(process.env.COCKPIT_DAEMON_PORT || 4800)
 
@@ -48,9 +49,5 @@ function corsHeaders(req: Request): Record<string, string> {
   }
 }
 
-export function jsonResponse(data: unknown, status = 200): Response {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  })
-}
+// Re-export for backwards compatibility
+export { jsonResponse } from './http'

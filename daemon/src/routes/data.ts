@@ -1,4 +1,4 @@
-import { jsonResponse } from '../index'
+import { jsonResponse } from '../http'
 import { getDataStore, listDataStores } from '../persistence/data-stores'
 import { validateStoreName } from '../validation'
 

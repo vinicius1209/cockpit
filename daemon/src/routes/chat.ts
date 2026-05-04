@@ -1,4 +1,4 @@
-import { jsonResponse } from '../index'
+import { jsonResponse } from '../http'
 import { executeAgentWithCallbacks, detectInstalledAgents } from '../executor/agent-executor'
 import { getSecret } from '../persistence/secrets-store'
 

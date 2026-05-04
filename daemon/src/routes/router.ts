@@ -1,4 +1,4 @@
-import { jsonResponse } from '../index'
+import { jsonResponse } from '../http'
 import { handleProjectRoutes } from './projects'
 import { handleAgentRoutes } from './agents'
 import { handleDiscoveryRoutes } from './discovery'
