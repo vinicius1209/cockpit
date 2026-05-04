@@ -1,16 +1,19 @@
 import type { StorageAdapter } from '../types'
 import { DAEMON_URL } from '@/shared/lib/constants'
 
+// Skip daemon sync in test environment
+const IS_TEST = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test'
+
 // Track last write timestamp per store to detect stale data
 const lastWriteTs: Record<string, number> = {}
 
 export function createDaemonStorageAdapter(storeName: string): StorageAdapter {
   return {
     getItem: (name) => {
-      // Sync: return from localStorage (fast, immediate)
       const local = window.localStorage.getItem(name)
 
-      // Async: sync from daemon in background (source of truth)
+      if (IS_TEST) return local // Skip daemon sync in tests
+
       fetch(`${DAEMON_URL}/api/data/${storeName}`)
         .then((r) => {
           if (!r.ok) return null
@@ -43,7 +46,11 @@ export function createDaemonStorageAdapter(storeName: string): StorageAdapter {
     },
 
     setItem: (name, value) => {
-      // Stamp with timestamp
+      if (IS_TEST) {
+        window.localStorage.setItem(name, value)
+        return
+      }
+
       const ts = Date.now()
       lastWriteTs[name] = ts
 
