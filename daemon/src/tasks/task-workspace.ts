@@ -47,6 +47,16 @@ export class TaskWorkspace {
     await Bun.write(filePath, existing + line)
   }
 
+  static async writeFeedback(wsSlug: string, cardId: string, feedback: string, attempt: number): Promise<string> {
+    const taskPath = await this.ensure(wsSlug, cardId)
+    const filePath = join(taskPath, 'feedback.md')
+    const file = Bun.file(filePath)
+    const existing = await file.exists() ? await file.text() : ''
+    const entry = `## Feedback — Tentativa ${attempt} (${new Date().toISOString().slice(0, 19)})\n\n${feedback}\n\n`
+    await Bun.write(filePath, existing + entry)
+    return filePath
+  }
+
   static async appendImplementationLog(wsSlug: string, cardId: string, entry: string): Promise<void> {
     const taskPath = await this.ensure(wsSlug, cardId)
     const filePath = join(taskPath, 'implementation.md')
@@ -91,7 +101,7 @@ export class TaskWorkspace {
     const localDir = join(projectPath, '.cockpit', 'task')
     await mkdir(localDir, { recursive: true })
 
-    const filesToCopy = ['spec.md', 'discovery.md', 'interview.md', 'meta.json']
+    const filesToCopy = ['spec.md', 'discovery.md', 'interview.md', 'feedback.md', 'implementation.md', 'meta.json']
 
     for (const filename of filesToCopy) {
       const content = await this.readFile(wsSlug, cardId, filename)

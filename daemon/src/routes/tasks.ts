@@ -18,6 +18,20 @@ export async function handleTaskRoutes(req: Request, url: URL): Promise<Response
     }
   }
 
+  // POST /api/tasks/feedback — save user feedback for re-implementation
+  if (path === '/api/tasks/feedback' && req.method === 'POST') {
+    try {
+      const body = await req.json() as { workspaceSlug: string; cardId: string; feedback: string; attempt: number }
+      if (!body.workspaceSlug || !body.cardId || !body.feedback) {
+        return jsonResponse({ error: 'Missing workspaceSlug, cardId, or feedback' }, 400)
+      }
+      const filePath = await TaskWorkspace.writeFeedback(body.workspaceSlug, body.cardId, body.feedback, body.attempt || 1)
+      return jsonResponse({ ok: true, filePath })
+    } catch (err) {
+      return jsonResponse({ error: `Feedback failed: ${err instanceof Error ? err.message : 'unknown'}` }, 500)
+    }
+  }
+
   // GET /api/tasks/:wsSlug/:cardId — list files in task workspace
   const listMatch = path.match(/^\/api\/tasks\/([^/]+)\/([^/]+)$/)
   if (listMatch && req.method === 'GET') {

@@ -12,7 +12,8 @@ import { useProjectStore } from '@/entities/card/project-store'
 import { daemonClient } from '@/shared/lib/daemon-client'
 import type { Card } from '@/entities/card/types'
 import type { ImplementEvent } from '@/entities/card/project-types'
-import { Rocket, Square, Loader2, CheckCircle2, CircleDot, FileText, FilePlus, FileX, GitBranch, GitPullRequest, AlertCircle, History, RotateCcw, ExternalLink } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { Rocket, Square, Loader2, CheckCircle2, CircleDot, FileText, FilePlus, FileX, GitBranch, GitPullRequest, AlertCircle, History, RotateCcw, ExternalLink, MessageSquareWarning, XCircle } from 'lucide-react'
 import { DAEMON_URL } from '@/shared/lib/constants'
 
 interface ImplementPanelProps {
@@ -40,6 +41,9 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
   const [summary, setSummary] = useState<ImplementEvent['summary'] | null>(null)
   const [history, setHistory] = useState<string | null>(null)
   const [showHistory, setShowHistory] = useState(false)
+  const [attempt, setAttempt] = useState(1)
+  const [feedbackText, setFeedbackText] = useState('')
+  const [showFeedback, setShowFeedback] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
 
   const activeWorkspace = useWorkspaceStore((s) => s.getActiveWorkspace())
@@ -66,8 +70,11 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
     return () => clearInterval(timer)
   }, [phase])
 
-  const handleStart = useCallback(async () => {
+  const handleStart = useCallback(async (feedback?: string) => {
     if (!card.spec_content || !projectPath) return
+
+    const currentAttempt = feedback ? attempt + 1 : attempt
+    if (feedback) setAttempt(currentAttempt)
 
     setPhase('analyzing')
     setOutputLines([])
@@ -77,6 +84,8 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
     setSummary(null)
     setElapsed(0)
     setShowHistory(false)
+    setShowFeedback(false)
+    setFeedbackText('')
 
     // Move card to In Progress
     const inProgressCol = columns.find((c) => c.slug === 'in-progress')
@@ -102,6 +111,8 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
           projectPath,
           createBranch: true,
           autoPR: activeProject?.auto_pr ?? false,
+          feedback: feedback || undefined,
+          attempt: currentAttempt,
         }),
         signal: abort.signal,
       })
@@ -173,7 +184,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
       setError(err instanceof Error ? err.message : 'Erro de conexao')
       setPhase('error')
     }
-  }, [card, projectPath, columns, moveCard, updateCard, workspaceId, wsSlug])
+  }, [card, projectPath, columns, moveCard, updateCard, workspaceId, wsSlug, attempt])
 
   const handleCancel = () => {
     abortRef.current?.abort()
@@ -211,7 +222,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
             </p>
           )}
           <div className="flex items-center gap-2">
-            <Button onClick={handleStart} disabled={!card.spec_content || !projectPath}>
+            <Button onClick={() => handleStart()} disabled={!card.spec_content || !projectPath}>
               <Rocket className="h-4 w-4 mr-2" />
               {history ? 'Re-implementar' : 'Iniciar Implementacao'}
             </Button>
@@ -270,10 +281,16 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
               </Button>
             )}
             {phase === 'done' && (
-              <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setPhase('idle'); setSummary(null) }}>
-                <RotateCcw className="h-3 w-3 mr-1" />
-                Nova execucao
-              </Button>
+              <>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowFeedback(!showFeedback)}>
+                  <MessageSquareWarning className="h-3 w-3 mr-1" />
+                  Nao resolveu
+                </Button>
+                <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setPhase('idle'); setSummary(null) }}>
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Nova execucao
+                </Button>
+              </>
             )}
           </div>
         </div>
@@ -390,6 +407,45 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
           <div className="flex items-center gap-2 text-xs text-destructive">
             <AlertCircle className="h-4 w-4 shrink-0" />
             {error}
+          </div>
+        </div>
+      )}
+
+      {/* Feedback — "Nao resolveu" */}
+      {showFeedback && phase === 'done' && (
+        <div className="border-t px-4 py-3 bg-amber-500/5 space-y-2.5">
+          <div className="flex items-center gap-2">
+            <MessageSquareWarning className="h-4 w-4 text-amber-500 shrink-0" />
+            <span className="text-xs font-medium">O que nao funcionou? (tentativa {attempt})</span>
+          </div>
+          <Textarea
+            value={feedbackText}
+            onChange={(e) => setFeedbackText(e.target.value)}
+            placeholder="Descreva o problema: ex. 'PDF ainda corta na direita em A4 portrait no celular. Precisa reduzir largura para 210mm.'"
+            rows={3}
+            className="text-xs"
+          />
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              className="h-7 text-xs"
+              disabled={!feedbackText.trim()}
+              onClick={() => handleStart(feedbackText.trim())}
+            >
+              <Rocket className="h-3 w-3 mr-1" />
+              Re-implementar com feedback
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-xs"
+              onClick={() => { setShowFeedback(false); setFeedbackText('') }}
+            >
+              Cancelar
+            </Button>
+            <span className="text-[10px] text-muted-foreground ml-auto">
+              Tentativa {attempt + 1} de 3
+            </span>
           </div>
         </div>
       )}

@@ -14,6 +14,8 @@ export interface ImplementConfig {
   model?: string
   createBranch: boolean
   autoPR?: boolean
+  feedback?: string
+  attempt?: number
 }
 
 export interface ImplementEvent {
@@ -67,8 +69,15 @@ export function generateBranchName(cardType: string, cardTitle: string): string 
 
 function buildImplementationPrompt(config: ImplementConfig, taskPath?: string): string {
   const parts: string[] = []
+  const isRetry = (config.attempt || 1) > 1
 
-  parts.push(`Voce recebeu uma tarefa para implementar no codigo deste projeto.`)
+  if (isRetry) {
+    parts.push(`## ATENCAO: Esta e a tentativa ${config.attempt} de implementacao.`)
+    parts.push(`A tentativa anterior NAO resolveu o problema. O usuario testou e reportou feedback.`)
+    parts.push('')
+  }
+
+  parts.push(`Voce recebeu uma tarefa para ${isRetry ? 'CORRIGIR' : 'implementar'} no codigo deste projeto.`)
   parts.push('')
   parts.push(`## Card`)
   parts.push(`Titulo: ${config.cardTitle}`)
@@ -83,8 +92,18 @@ function buildImplementationPrompt(config: ImplementConfig, taskPath?: string): 
     parts.push(`- **.cockpit/task/spec.md**: Especificacao tecnica completa — LEIA ESTE ARQUIVO`)
     parts.push(`- **.cockpit/task/discovery.md**: Analise previa do card (se existir)`)
     parts.push(`- **.cockpit/task/interview.md**: Notas da entrevista (se existir)`)
+    if (isRetry) {
+      parts.push(`- **.cockpit/task/feedback.md**: FEEDBACK DO USUARIO — LEIA ESTE ARQUIVO (critico!)`)
+      parts.push(`- **.cockpit/task/implementation.md**: Log das tentativas anteriores`)
+    }
     parts.push('')
-    parts.push(`Leia o arquivo .cockpit/task/spec.md para entender o que implementar.`)
+    if (isRetry) {
+      parts.push(`IMPORTANTE: Leia .cockpit/task/feedback.md PRIMEIRO para entender o que deu errado.`)
+      parts.push(`Depois leia .cockpit/task/spec.md para contexto completo.`)
+      parts.push(`Corrija os problemas descritos no feedback. Nao refaca tudo — ajuste o que ja foi feito.`)
+    } else {
+      parts.push(`Leia o arquivo .cockpit/task/spec.md para entender o que implementar.`)
+    }
   } else {
     // Fallback: inline content
     parts.push('')
@@ -96,17 +115,33 @@ function buildImplementationPrompt(config: ImplementConfig, taskPath?: string): 
       parts.push(`## Notas da Entrevista`)
       parts.push(config.interviewNotes)
     }
+
+    if (isRetry && config.feedback) {
+      parts.push('')
+      parts.push(`## FEEDBACK DO USUARIO (tentativa ${(config.attempt || 1) - 1} nao resolveu)`)
+      parts.push(config.feedback)
+      parts.push('')
+      parts.push(`Corrija os problemas acima. Nao refaca tudo — ajuste o que ja foi feito.`)
+    }
   }
 
   parts.push('')
   parts.push(`## Instrucoes`)
-  parts.push(`1. Leia os arquivos relevantes mencionados na spec`)
-  parts.push(`2. Implemente TODAS as mudancas descritas nos Requisitos Funcionais`)
-  parts.push(`3. Siga as convencoes do projeto existente`)
-  parts.push(`4. Crie testes se a spec mencionar`)
-  parts.push(`5. Nao altere arquivos nao relacionados a spec`)
-  parts.push(`6. Use portugues brasileiro para textos de UI`)
-  parts.push(`7. Faca commits atomicos com mensagens descritivas`)
+  if (isRetry) {
+    parts.push(`1. Leia o feedback do usuario (PRIORIDADE MAXIMA)`)
+    parts.push(`2. Leia o log de implementacao anterior para entender o que ja foi feito`)
+    parts.push(`3. Corrija APENAS o que o feedback reporta`)
+    parts.push(`4. Siga as convencoes do projeto existente`)
+    parts.push(`5. Faca um commit descritivo explicando a correcao`)
+  } else {
+    parts.push(`1. Leia os arquivos relevantes mencionados na spec`)
+    parts.push(`2. Implemente TODAS as mudancas descritas nos Requisitos Funcionais`)
+    parts.push(`3. Siga as convencoes do projeto existente`)
+    parts.push(`4. Crie testes se a spec mencionar`)
+    parts.push(`5. Nao altere arquivos nao relacionados a spec`)
+    parts.push(`6. Use portugues brasileiro para textos de UI`)
+    parts.push(`7. Faca commits atomicos com mensagens descritivas`)
+  }
 
   return parts.join('\n')
 }
@@ -155,9 +190,14 @@ export async function runImplementation(
     return
   }
 
-  // 4. Write task workspace files + copy into project for sandbox access
+  // 4. Write feedback (if re-attempt) + task workspace files + copy into project
   let localTaskPath: string | undefined
   if (config.workspaceSlug && config.cardId) {
+    // Save feedback before sync
+    if (config.feedback && config.attempt) {
+      await TaskWorkspace.writeFeedback(config.workspaceSlug, config.cardId, config.feedback, config.attempt - 1)
+    }
+
     // Persist to ~/.cockpit/tasks/ (permanent archive)
     await TaskWorkspace.sync({
       workspaceSlug: config.workspaceSlug,
@@ -168,7 +208,8 @@ export async function runImplementation(
       interviewNotes: config.interviewNotes,
       branch: branchName || undefined,
     })
-    await TaskWorkspace.appendImplementationLog(config.workspaceSlug, config.cardId, `Implementacao iniciada — agent: ${agentName}, branch: ${branchName || 'N/A'}`)
+    const attemptLabel = config.attempt ? ` (tentativa ${config.attempt})` : ''
+    await TaskWorkspace.appendImplementationLog(config.workspaceSlug, config.cardId, `Implementacao iniciada${attemptLabel} — agent: ${agentName}, branch: ${branchName || 'N/A'}`)
 
     // Copy into project dir so agent can read (sandbox-safe)
     localTaskPath = await TaskWorkspace.copyToProject(config.workspaceSlug, config.cardId, projectPath)
