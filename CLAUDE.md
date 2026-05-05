@@ -189,7 +189,7 @@ O Cockpit pode ser operado de **3 formas paralelas** que conversam com o mesmo d
 |---|---|---|
 | **Web UI** (port 5173) | Visão geral, kanban visual, dashboard, AI Chat com contexto rico | `src/` (React + Vite) |
 | **CLI `cockpit`** | Operações rápidas no terminal, scripts, watch live de execução, REPL ai | `cli/` (Bun standalone, zero deps) |
-| **MCP server** (planejado) | Claude Code controla Cockpit pelo protocolo MCP | (não implementado ainda) |
+| **MCP server `cockpit-mcp`** | Claude Code controla Cockpit pelo protocolo MCP (8 tools + 2 resources) | `mcp/` (Bun + `@modelcontextprotocol/sdk`) |
 
 Os 3 modos compartilham 100% do estado (mesmo SQLite, mesmas sessions, mesmas APIs). Não há "modo prioritário" — cada um serve um caso de uso.
 
@@ -250,6 +250,11 @@ bun run cli:install          # symlinka ~/.local/bin/cockpit + ck
 bun run cli                  # roda local sem instalar (cli/src/index.ts)
 bun run cli:build            # bun build --compile produz binário standalone
 cd cli && bunx tsc --noEmit  # type check do CLI
+
+# MCP server (Claude Code integration)
+bun run mcp:install          # registra em ~/.claude.json
+bun run mcp                  # roda standalone (test only — clientes spawnar via JSON-RPC)
+cd mcp && bunx tsc --noEmit  # type check do MCP
 ```
 
 ## Architecture decision records (notas)
@@ -280,6 +285,13 @@ cd cli && bunx tsc --noEmit  # type check do CLI
 - **Novo helper de UI ANSI**: `cli/src/ui/` (zero deps por convenção — cores via `colors.ts`)
 - **Nova chamada ao daemon**: `cli/src/api/client.ts` (request) ou `cli/src/api/store.ts` (mutation via persist envelope)
 - **SSE streaming**: usar `cli/src/api/sse.ts` (`postSSE` ou `getSSE`)
+
+### MCP (`mcp/src/`)
+- **Nova tool**: adicionar entry em `setRequestHandler(ListToolsRequestSchema, ...)` em `mcp/src/index.ts` + handler no `CallToolRequestSchema` switch
+- **Tool naming**: prefix `cockpit_` (snake_case, claro pra LLM): `cockpit_create_card`, `cockpit_search`
+- **Schema**: usar JSON Schema em `inputSchema` — explicar `description` bem (LLM lê pra escolher tool)
+- **Mutation**: `daemonGet` + `daemonPost` ou `patchCardsStore` (mesma lógica do CLI, mas em `mcp/src/api.ts`)
+- **Logs**: SEMPRE em `process.stderr.write` — stdout é reservado pra JSON-RPC
 
 ### Documentação
 - **Roadmap do CLI**: `TODO_CLI.md`

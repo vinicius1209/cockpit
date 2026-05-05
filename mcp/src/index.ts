@@ -1,0 +1,524 @@
+#!/usr/bin/env bun
+// Cockpit MCP server — exposes Cockpit (workspaces/cards/specs) as tools that
+// any MCP-compatible client (Claude Code, Cursor, etc) can call.
+//
+// Communication: stdio (JSON-RPC 2.0). Auto-launched by the client.
+// Backend: HTTP requests to the local daemon (127.0.0.1:4800).
+//
+// Tools exposed:
+//   - cockpit_list_workspaces
+//   - cockpit_list_cards
+//   - cockpit_show_card
+//   - cockpit_create_card
+//   - cockpit_move_card
+//   - cockpit_search
+//   - cockpit_metrics
+//   - cockpit_health
+//
+// Resources:
+//   - cockpit://card/<id>     → markdown completo do card
+//   - cockpit://board/<ws>    → ASCII kanban do workspace
+
+import { Server } from '@modelcontextprotocol/sdk/server/index.js'
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import {
+  CallToolRequestSchema,
+  ListToolsRequestSchema,
+  ListResourcesRequestSchema,
+  ReadResourceRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js'
+import {
+  loadWorkspaces, loadCards, loadColumns, loadProjects,
+  patchCardsStore, daemonGet,
+  resolveCard, resolveWorkspace, shortId, newCardId,
+} from './api'
+
+const VERSION = '0.1.0'
+
+const server = new Server(
+  { name: 'cockpit', version: VERSION },
+  { capabilities: { tools: {}, resources: {} } },
+)
+
+// ── Tools registry ──
+
+server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  tools: [
+    {
+      name: 'cockpit_health',
+      description: 'Check Cockpit daemon status. Returns daemon version and online state.',
+      inputSchema: { type: 'object', properties: {}, required: [] },
+    },
+    {
+      name: 'cockpit_list_workspaces',
+      description: 'List all workspaces with card counts and activity stats.',
+      inputSchema: { type: 'object', properties: {}, required: [] },
+    },
+    {
+      name: 'cockpit_list_cards',
+      description:
+        'List cards filterable by workspace, type, priority and spec status. ' +
+        'Useful for triage queries like "all critical bugs" or "ready to implement in workspace X".',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspace: { type: 'string', description: 'Workspace slug or name (optional)' },
+          type: { type: 'string', enum: ['feature', 'bugfix', 'hotfix', 'discovery', 'chore', 'improvement'] },
+          priority: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
+          spec_status: { type: 'string', enum: ['draft', 'ready', 'in_progress', 'review', 'done'] },
+          column_slug: { type: 'string', description: 'Filter by column (inbox, ready, in-progress, etc)' },
+          limit: { type: 'number', description: 'Max results (default 50)' },
+        },
+      },
+    },
+    {
+      name: 'cockpit_show_card',
+      description:
+        'Get full details of a card including title, description, spec content, interview notes, and metadata. ' +
+        'Accepts short ID (SW78) or full ID. Use this when user asks "what is card X about" or to read spec.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          card_id: { type: 'string', description: 'Card short ID (SW78) or full ID' },
+        },
+        required: ['card_id'],
+      },
+    },
+    {
+      name: 'cockpit_create_card',
+      description:
+        'Create a new card in the active or specified workspace. Returns the new card with short ID. ' +
+        'Use this when user says "create a card for X" or to capture work items.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          title: { type: 'string', description: 'Card title (required)' },
+          type: { type: 'string', enum: ['feature', 'bugfix', 'hotfix', 'discovery', 'chore', 'improvement'], default: 'feature' },
+          priority: { type: 'string', enum: ['critical', 'high', 'medium', 'low'], default: 'medium' },
+          description: { type: 'string', description: 'Markdown description (optional)' },
+          workspace: { type: 'string', description: 'Workspace slug or name (default: first workspace)' },
+          column_slug: { type: 'string', description: 'Initial column (default: inbox)' },
+        },
+        required: ['title'],
+      },
+    },
+    {
+      name: 'cockpit_move_card',
+      description: 'Move a card to a different column (inbox, discovery, spec, ready, in-progress, review, done).',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          card_id: { type: 'string' },
+          column_slug: { type: 'string', description: 'Target column slug' },
+        },
+        required: ['card_id', 'column_slug'],
+      },
+    },
+    {
+      name: 'cockpit_search',
+      description:
+        'Search cross-workspace by substring in titles, descriptions, specs and interview notes. ' +
+        'Returns ranked hits with excerpts. Useful when user asks "find cards about auth" or to avoid duplicate work.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          query: { type: 'string' },
+          in: { type: 'string', enum: ['cards', 'specs', 'all'], default: 'all' },
+          limit: { type: 'number', default: 20 },
+        },
+        required: ['query'],
+      },
+    },
+    {
+      name: 'cockpit_metrics',
+      description:
+        'Get global metrics: total cards, done/wip counts, lead time, agent run success rate, ' +
+        'per-workspace breakdown. Use this for "how am I doing" or progress reports.',
+      inputSchema: { type: 'object', properties: {}, required: [] },
+    },
+  ],
+}))
+
+// ── Tool handlers ──
+
+server.setRequestHandler(CallToolRequestSchema, async (req) => {
+  const name = req.params.name
+  const args = (req.params.arguments || {}) as Record<string, unknown>
+
+  try {
+    switch (name) {
+      case 'cockpit_health':       return ok(await toolHealth())
+      case 'cockpit_list_workspaces': return ok(await toolListWorkspaces())
+      case 'cockpit_list_cards':   return ok(await toolListCards(args as ListCardsArgs))
+      case 'cockpit_show_card':    return ok(await toolShowCard(args as { card_id: string }))
+      case 'cockpit_create_card':  return ok(await toolCreateCard(args as unknown as CreateCardArgs))
+      case 'cockpit_move_card':    return ok(await toolMoveCard(args as { card_id: string; column_slug: string }))
+      case 'cockpit_search':       return ok(await toolSearch(args as { query: string; in?: string; limit?: number }))
+      case 'cockpit_metrics':      return ok(await toolMetrics())
+      default: throw new Error(`unknown tool: ${name}`)
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return {
+      content: [{ type: 'text' as const, text: `Error: ${msg}` }],
+      isError: true,
+    }
+  }
+})
+
+function ok(payload: unknown): { content: Array<{ type: 'text'; text: string }> } {
+  const text = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2)
+  return { content: [{ type: 'text', text }] }
+}
+
+// ── Tool implementations ──
+
+async function toolHealth(): Promise<unknown> {
+  const h = await daemonGet<{ status: string; version: string }>('/health')
+  return { ok: true, daemon_version: h.version, mcp_version: VERSION }
+}
+
+async function toolListWorkspaces(): Promise<unknown> {
+  const [workspaces, cards] = await Promise.all([loadWorkspaces(), loadCards()])
+  return workspaces.map((w) => {
+    const wsCards = cards.filter((c) => c.workspace_id === w.id)
+    return {
+      id: w.id,
+      name: w.name,
+      slug: w.slug,
+      description: w.description,
+      cards_total: wsCards.length,
+      cards_in_progress: wsCards.filter((c) => c.spec_status === 'in_progress').length,
+      cards_review: wsCards.filter((c) => c.spec_status === 'review').length,
+      cards_done: wsCards.filter((c) => c.spec_status === 'done').length,
+    }
+  })
+}
+
+interface ListCardsArgs {
+  workspace?: string
+  type?: string
+  priority?: string
+  spec_status?: string
+  column_slug?: string
+  limit?: number
+}
+
+async function toolListCards(args: ListCardsArgs): Promise<unknown> {
+  const [workspaces, cards, columns] = await Promise.all([
+    loadWorkspaces(), loadCards(), loadColumns(),
+  ])
+
+  let filtered = cards
+  if (args.workspace) {
+    const ws = resolveWorkspace(args.workspace, workspaces)
+    if (!ws) throw new Error(`workspace not found: ${args.workspace}`)
+    filtered = filtered.filter((c) => c.workspace_id === ws.id)
+  }
+  if (args.type) filtered = filtered.filter((c) => c.type === args.type)
+  if (args.priority) filtered = filtered.filter((c) => c.priority === args.priority)
+  if (args.spec_status) filtered = filtered.filter((c) => c.spec_status === args.spec_status)
+  if (args.column_slug) {
+    filtered = filtered.filter((c) => {
+      const col = (columns[c.workspace_id] || []).find((co) => co.id === c.column_id)
+      return col?.slug === args.column_slug
+    })
+  }
+
+  const limit = args.limit ?? 50
+  return filtered
+    .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+    .slice(0, limit)
+    .map((c) => {
+      const ws = workspaces.find((w) => w.id === c.workspace_id)
+      const col = (columns[c.workspace_id] || []).find((co) => co.id === c.column_id)
+      return {
+        id: shortId(c.id),
+        full_id: c.id,
+        title: c.title,
+        type: c.type,
+        priority: c.priority,
+        spec_status: c.spec_status,
+        column: col?.slug,
+        workspace: ws?.slug,
+        updated_at: c.updated_at,
+      }
+    })
+}
+
+async function toolShowCard(args: { card_id: string }): Promise<unknown> {
+  const [workspaces, cards, columns, projects] = await Promise.all([
+    loadWorkspaces(), loadCards(), loadColumns(), loadProjects(),
+  ])
+  const card = resolveCard(args.card_id, cards)
+  if (!card) throw new Error(`card not found: ${args.card_id}`)
+  const ws = workspaces.find((w) => w.id === card.workspace_id)
+  const col = (columns[card.workspace_id] || []).find((co) => co.id === card.column_id)
+  const project = card.project_id ? projects.find((p) => p.id === card.project_id) : null
+
+  return {
+    id: shortId(card.id),
+    full_id: card.id,
+    title: card.title,
+    type: card.type,
+    priority: card.priority,
+    description: card.description,
+    spec_status: card.spec_status,
+    spec_content: card.spec_content,
+    interview_notes: card.interview_notes,
+    workspace: { name: ws?.name, slug: ws?.slug },
+    column: col?.slug,
+    project: project ? { name: project.name, path: project.path } : null,
+    assignee: card.assignee,
+    due_date: card.due_date,
+    created_at: card.created_at,
+    updated_at: card.updated_at,
+  }
+}
+
+interface CreateCardArgs {
+  title: string
+  type?: string
+  priority?: string
+  description?: string
+  workspace?: string
+  column_slug?: string
+}
+
+async function toolCreateCard(args: CreateCardArgs): Promise<unknown> {
+  const [workspaces, columns] = await Promise.all([loadWorkspaces(), loadColumns()])
+  const ws = args.workspace
+    ? resolveWorkspace(args.workspace, workspaces)
+    : workspaces[0]
+  if (!ws) throw new Error('no workspace available — create one first')
+
+  const wsCols = (columns[ws.id] || []).sort((a, b) => a.position - b.position)
+  if (wsCols.length === 0) throw new Error(`workspace "${ws.name}" has no columns`)
+  const col = args.column_slug
+    ? wsCols.find((co) => co.slug === args.column_slug)
+    : wsCols[0]
+  if (!col) throw new Error(`column not found: ${args.column_slug}`)
+
+  const cardId = newCardId()
+  const now = new Date().toISOString()
+  const newCard = {
+    id: cardId,
+    workspace_id: ws.id,
+    column_id: col.id,
+    project_id: null,
+    title: args.title.trim(),
+    description: args.description?.trim() || null,
+    type: args.type || 'feature',
+    priority: args.priority || 'medium',
+    position: 0,
+    assignee: null,
+    due_date: null,
+    spec_status: null,
+    spec_content: null,
+    interview_notes: null,
+    created_at: now,
+    updated_at: now,
+    labels: [],
+  }
+
+  await patchCardsStore<{ cards: typeof newCard[] } & Record<string, unknown>>((s) => ({
+    ...s,
+    cards: [...(s.cards || []), newCard],
+  }))
+
+  return {
+    id: shortId(cardId),
+    full_id: cardId,
+    title: newCard.title,
+    workspace: ws.slug,
+    column: col.slug,
+    type: newCard.type,
+    priority: newCard.priority,
+  }
+}
+
+async function toolMoveCard(args: { card_id: string; column_slug: string }): Promise<unknown> {
+  const [cards, columns] = await Promise.all([loadCards(), loadColumns()])
+  const card = resolveCard(args.card_id, cards)
+  if (!card) throw new Error(`card not found: ${args.card_id}`)
+  const wsCols = (columns[card.workspace_id] || []).sort((a, b) => a.position - b.position)
+  const target = wsCols.find((co) => co.slug === args.column_slug)
+  if (!target) throw new Error(`column not found: ${args.column_slug}. Available: ${wsCols.map((c) => c.slug).join(', ')}`)
+
+  const targetCount = cards.filter((c) => c.column_id === target.id).length
+  await patchCardsStore<{ cards: typeof cards }>((s) => ({
+    ...s,
+    cards: (s.cards || []).map((c) =>
+      c.id === card.id
+        ? { ...c, column_id: target.id, position: targetCount, updated_at: new Date().toISOString() }
+        : c,
+    ),
+  }))
+
+  return { id: shortId(card.id), moved_to: target.slug }
+}
+
+async function toolSearch(args: { query: string; in?: string; limit?: number }): Promise<unknown> {
+  const q = args.query.toLowerCase()
+  const filter = args.in || 'all'
+  const limit = args.limit ?? 20
+  const [workspaces, cards] = await Promise.all([loadWorkspaces(), loadCards()])
+  const wsById = new Map(workspaces.map((w) => [w.id, w]))
+
+  type Hit = {
+    id: string
+    full_id: string
+    title: string
+    type: string
+    priority: string
+    workspace: string
+    field: string
+    excerpt: string
+    score: number
+  }
+
+  const hits: Hit[] = []
+  for (const card of cards) {
+    const ws = wsById.get(card.workspace_id)
+    if (!ws) continue
+    const baseHit = {
+      id: shortId(card.id),
+      full_id: card.id,
+      title: card.title,
+      type: card.type,
+      priority: card.priority,
+      workspace: ws.slug,
+    }
+
+    if ((filter === 'all' || filter === 'cards') && card.title.toLowerCase().includes(q)) {
+      hits.push({ ...baseHit, field: 'title', excerpt: card.title, score: 10 })
+    }
+    if ((filter === 'all' || filter === 'cards') && card.description?.toLowerCase().includes(q)) {
+      hits.push({ ...baseHit, field: 'description', excerpt: extractExcerpt(card.description, q), score: 5 })
+    }
+    if ((filter === 'all' || filter === 'specs') && card.spec_content?.toLowerCase().includes(q)) {
+      hits.push({ ...baseHit, field: 'spec', excerpt: extractExcerpt(card.spec_content, q), score: 7 })
+    }
+    if (filter === 'all' && card.interview_notes?.toLowerCase().includes(q)) {
+      hits.push({ ...baseHit, field: 'interview', excerpt: extractExcerpt(card.interview_notes, q), score: 3 })
+    }
+  }
+
+  return hits.sort((a, b) => b.score - a.score).slice(0, limit)
+}
+
+async function toolMetrics(): Promise<unknown> {
+  return await daemonGet('/api/metrics')
+}
+
+function extractExcerpt(text: string, q: string, ctx = 60): string {
+  const lower = text.toLowerCase()
+  const idx = lower.indexOf(q)
+  if (idx < 0) return text.slice(0, 100)
+  const start = Math.max(0, idx - ctx)
+  const end = Math.min(text.length, idx + q.length + ctx)
+  return (start > 0 ? '…' : '') + text.slice(start, end).replace(/\n+/g, ' ') + (end < text.length ? '…' : '')
+}
+
+// ── Resources ──
+
+server.setRequestHandler(ListResourcesRequestSchema, async () => {
+  const [workspaces, cards] = await Promise.all([loadWorkspaces(), loadCards()])
+  return {
+    resources: [
+      ...cards.slice(0, 50).map((c) => ({
+        uri: `cockpit://card/${shortId(c.id)}`,
+        name: `Card #${shortId(c.id)} — ${c.title}`,
+        description: `${c.type} · ${c.priority} · ${c.spec_status || 'no spec'}`,
+        mimeType: 'text/markdown',
+      })),
+      ...workspaces.map((w) => ({
+        uri: `cockpit://board/${w.slug}`,
+        name: `Board · ${w.name}`,
+        description: w.description || `${w.slug} kanban board`,
+        mimeType: 'text/plain',
+      })),
+    ],
+  }
+})
+
+server.setRequestHandler(ReadResourceRequestSchema, async (req) => {
+  const uri = req.params.uri
+  const cardMatch = uri.match(/^cockpit:\/\/card\/(.+)$/)
+  if (cardMatch) {
+    const cards = await loadCards()
+    const card = resolveCard(cardMatch[1], cards)
+    if (!card) throw new Error(`card not found: ${cardMatch[1]}`)
+    const md = renderCardMarkdown(card)
+    return { contents: [{ uri, mimeType: 'text/markdown', text: md }] }
+  }
+  const boardMatch = uri.match(/^cockpit:\/\/board\/(.+)$/)
+  if (boardMatch) {
+    const [workspaces, cards, columns] = await Promise.all([
+      loadWorkspaces(), loadCards(), loadColumns(),
+    ])
+    const ws = resolveWorkspace(boardMatch[1], workspaces)
+    if (!ws) throw new Error(`workspace not found: ${boardMatch[1]}`)
+    const wsCols = (columns[ws.id] || []).sort((a, b) => a.position - b.position)
+    const wsCards = cards.filter((c) => c.workspace_id === ws.id)
+    const text = renderBoardText(ws.name, wsCols, wsCards)
+    return { contents: [{ uri, mimeType: 'text/plain', text }] }
+  }
+  throw new Error(`unknown resource: ${uri}`)
+})
+
+function renderCardMarkdown(card: import('./api').Card): string {
+  const lines = [
+    `# Card #${shortId(card.id)} — ${card.title}`,
+    '',
+    `**Type:** ${card.type}  `,
+    `**Priority:** ${card.priority}  `,
+    card.assignee ? `**Assignee:** ${card.assignee}  ` : '',
+    card.due_date ? `**Due:** ${card.due_date}  ` : '',
+    `**Spec status:** ${card.spec_status || '—'}  `,
+    `**Created:** ${card.created_at}  `,
+    `**Updated:** ${card.updated_at}  `,
+    '',
+  ]
+  if (card.description?.trim()) {
+    lines.push('## Description', '', card.description, '')
+  }
+  if (card.interview_notes?.trim()) {
+    lines.push('## Interview notes', '', card.interview_notes, '')
+  }
+  if (card.spec_content?.trim()) {
+    lines.push('## Spec', '', card.spec_content, '')
+  }
+  return lines.filter(Boolean).join('\n')
+}
+
+function renderBoardText(
+  wsName: string,
+  cols: import('./api').BoardColumn[],
+  cards: import('./api').Card[],
+): string {
+  const lines = [`Kanban: ${wsName}`, '']
+  for (const col of cols) {
+    const colCards = cards.filter((c) => c.column_id === col.id)
+    lines.push(`## ${col.name} (${colCards.length})`)
+    for (const c of colCards) {
+      lines.push(`  - #${shortId(c.id)} [${c.type}/${c.priority}] ${c.title}`)
+    }
+    lines.push('')
+  }
+  return lines.join('\n')
+}
+
+// ── Boot ──
+
+async function main() {
+  const transport = new StdioServerTransport()
+  await server.connect(transport)
+  // STDOUT is reserved for JSON-RPC. Logs MUST go to stderr.
+  process.stderr.write(`[cockpit-mcp] connected (v${VERSION})\n`)
+}
+
+main().catch((err) => {
+  process.stderr.write(`[cockpit-mcp] fatal: ${err}\n`)
+  process.exit(1)
+})

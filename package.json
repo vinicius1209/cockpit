@@ -15,7 +15,10 @@
     "test:all": "bun run test && bun run test:daemon",
     "cli": "cd cli && bun run src/index.ts",
     "cli:install": "bash bin/install-cli.sh",
-    "cli:build": "cd cli && bun build src/index.ts --compile --outfile=dist/cockpit"
+    "cli:build": "cd cli && bun build src/index.ts --compile --outfile=dist/cockpit",
+    "mcp": "cd mcp && bun run src/index.ts",
+    "mcp:install": "bash bin/install-mcp.sh",
+    "mcp:build": "cd mcp && bun build src/index.ts --compile --outfile=dist/cockpit-mcp"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

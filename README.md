@@ -46,12 +46,22 @@ cockpit ai SW78                 # REPL de chat com card+projeto como contexto
 ```
 Ideal pra power-user que vive no terminal (Warp/iTerm/etc). [Ver `cli/README.md`](./cli/README.md).
 
-### 🔌 MCP Server · em breve
-Cockpit vira MCP server, controla pelo Claude Code:
+### 🔌 MCP Server
+Cockpit é um MCP server. Claude Code (e qualquer cliente compatível) controla via tools:
+
+```bash
+bun run mcp:install                # registra em ~/.claude.json
+# reinicia sessão do Claude Code
 ```
-[Você no Claude Code] "implementa o card SW78 com prioridade alta"
-[Claude Code → MCP cockpit.implement(id='SW78') → SSE → live no chat]
+
 ```
+[Você @ Claude Code] "liste meus workspaces e bugs críticos abertos"
+[Claude] → cockpit_list_workspaces + cockpit_list_cards(priority='critical')
+[Você] "crie um card pra refatorar o login"
+[Claude] → cockpit_create_card(title='...', type='chore') → ✓ #SW82
+```
+
+Tools expostas: `cockpit_health`, `cockpit_list_workspaces`, `cockpit_list_cards`, `cockpit_show_card`, `cockpit_create_card`, `cockpit_move_card`, `cockpit_search`, `cockpit_metrics`. Resources: `cockpit://card/<id>`, `cockpit://board/<workspace>`.
 
 ## Quickstart
 
@@ -124,7 +134,9 @@ cockpit/
 │   ├── src/commands/        # comandos: doctor, ws, board, card, spec, ...
 │   ├── src/api/             # client HTTP do daemon
 │   └── src/ui/              # box, table, kanban, banner (zero deps)
-├── bin/                     # scripts: install-cli.sh
+├── mcp/                     # Cockpit como MCP server (Claude Code)
+│   └── src/                 # tools: list_cards, show_card, create_card, ...
+├── bin/                     # scripts: install-cli.sh, install-mcp.sh
 ├── CLAUDE.md                # design system + arquitetura
 ├── AGENTS.md                # ponto de entrada pra LLMs
 ├── TODO_CLI.md              # roadmap do CLI
@@ -193,7 +205,7 @@ cockpit metrics
 | **Multi-agent** (claude-code, opencode, gemini, aider) | ✅ |
 | **CLI Tier 1-4** (read, write, long-running, misc) | ✅ |
 | **`cockpit spec` lifecycle** | ✅ |
-| **MCP server** | 🚧 planejado |
+| **MCP server** (8 tools + 2 resources) | ✅ |
 | **TUI fullscreen** (`cockpit tui`) | 🚧 planejado |
 | **Auth multi-user** | ❌ não está no roadmap (single-user OSS) |
 
