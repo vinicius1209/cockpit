@@ -5,6 +5,51 @@ import { validateProjectPath } from '../validation'
 export async function handleImplementRoutes(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
 
+  // POST /agents/implement/async — fire-and-forget. Returns { sessionId } as soon
+  // as the session row is created in SQLite; runImplementation continues in the
+  // background. Clients (notably MCP cockpit_implement_async) follow progress via
+  // GET /agents/sessions/<id> or SSE /agents/sessions/<id>/stream.
+  if (path === '/agents/implement/async' && req.method === 'POST') {
+    const body = await req.json() as ImplementConfig
+
+    if (!body.spec || !body.projectPath || !body.cardTitle) {
+      return jsonResponse({ error: 'Missing required fields: spec, projectPath, cardTitle' }, 400)
+    }
+    if (!body.workspaceSlug || !body.cardId) {
+      return jsonResponse({ error: 'workspaceSlug + cardId are required for async mode (session tracking)' }, 400)
+    }
+    const validPath = validateProjectPath(body.projectPath)
+    if (!validPath) {
+      return jsonResponse({ error: 'Invalid projectPath' }, 400)
+    }
+    body.projectPath = validPath
+
+    let resolveSession: (id: string) => void = () => {}
+    const sessionPromise = new Promise<string>((r) => { resolveSession = r })
+
+    // Kick off in background. Don't await. Errors are persisted into the
+    // session row by the runner itself.
+    runImplementation(body, (event: ImplementEvent) => {
+      if (event.phase === 'session-started' && event.sessionId) {
+        resolveSession(event.sessionId)
+      }
+    }).catch((err) => {
+      console.error('[implement/async] runImplementation crashed:', err)
+    })
+
+    // Wait at most 15s for session to be created (it should take <100ms in practice)
+    const sessionId = await Promise.race([
+      sessionPromise,
+      new Promise<null>((r) => setTimeout(() => r(null), 15_000)),
+    ])
+
+    if (!sessionId) {
+      return jsonResponse({ error: 'Timed out waiting for session row creation' }, 504)
+    }
+
+    return jsonResponse({ sessionId, status: 'started' })
+  }
+
   // POST /agents/implement — run implementation with SSE streaming
   if (path === '/agents/implement' && req.method === 'POST') {
     const body = await req.json() as ImplementConfig

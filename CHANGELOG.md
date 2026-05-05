@@ -47,7 +47,8 @@ Primeiro release público. Cockpit deixa de ser "interno" e ganha as três inter
 ### Added — MCP server
 
 - `cockpit-mcp` registra Cockpit como MCP server em `~/.claude.json`
-- 8 tools: `cockpit_health`, `cockpit_list_workspaces`, `cockpit_list_cards`, `cockpit_show_card`, `cockpit_create_card`, `cockpit_move_card`, `cockpit_search`, `cockpit_metrics`
+- 10 tools: `cockpit_health`, `cockpit_list_workspaces`, `cockpit_list_cards`, `cockpit_show_card`, `cockpit_create_card`, `cockpit_move_card`, `cockpit_search`, `cockpit_metrics`, `cockpit_implement_async`, `cockpit_get_session`
+- Endpoint `POST /agents/implement/async` (fire-and-forget) retorna `sessionId` imediatamente; `runImplementation` continua em background. Permite Claude Code disparar implementação e acompanhar via `cockpit_get_session`.
 - 2 resources: `cockpit://card/<id>` (markdown completo), `cockpit://board/<workspace>` (kanban texto)
 - Stdio JSON-RPC 2.0 via `@modelcontextprotocol/sdk`
 - Logs em stderr (stdout reservado pra protocolo)
@@ -88,7 +89,7 @@ Primeiro release público. Cockpit deixa de ser "interno" e ganha as três inter
 
 - Single-user (sem auth no roadmap)
 - macOS-first para serviço (Linux/Windows manuais via systemd/Task Scheduler)
-- MCP não expõe `implement` (long-running precisa de SSE; previsto pra Tier 2)
+- MCP `cockpit_implement_async` é fire-and-forget (Claude Code UI não streama chunks live; use `cockpit watch` no terminal pra acompanhar)
 - Sem TUI fullscreen (`cockpit tui` planejado)
 
 [0.1.0]: https://github.com/anthropics/cockpit/releases/tag/v0.1.0

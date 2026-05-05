@@ -61,7 +61,7 @@ bun run mcp:install                # registra em ~/.claude.json
 [Claude] → cockpit_create_card(title='...', type='chore') → ✓ #SW82
 ```
 
-Tools expostas: `cockpit_health`, `cockpit_list_workspaces`, `cockpit_list_cards`, `cockpit_show_card`, `cockpit_create_card`, `cockpit_move_card`, `cockpit_search`, `cockpit_metrics`. Resources: `cockpit://card/<id>`, `cockpit://board/<workspace>`.
+Tools expostas: `cockpit_health`, `cockpit_list_workspaces`, `cockpit_list_cards`, `cockpit_show_card`, `cockpit_create_card`, `cockpit_move_card`, `cockpit_search`, `cockpit_metrics`, `cockpit_implement_async`, `cockpit_get_session`. Resources: `cockpit://card/<id>`, `cockpit://board/<workspace>`.
 
 ## Quickstart
 
@@ -209,7 +209,7 @@ cockpit metrics
 | **Multi-agent** (claude-code, opencode, gemini, aider) | ✅ |
 | **CLI Tier 1-4** (read, write, long-running, misc) | ✅ |
 | **`cockpit spec` lifecycle** | ✅ |
-| **MCP server** (8 tools + 2 resources) | ✅ |
+| **MCP server** (10 tools + 2 resources, inclui `implement_async`) | ✅ |
 | **Daemon como serviço** (launchd auto-start no macOS) | ✅ |
 | **TUI fullscreen** (`cockpit tui`) | 🚧 planejado |
 | **Auth multi-user** | ❌ não está no roadmap (single-user OSS) |

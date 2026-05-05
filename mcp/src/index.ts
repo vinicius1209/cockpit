@@ -29,8 +29,9 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 import {
   loadWorkspaces, loadCards, loadColumns, loadProjects,
-  patchCardsStore, daemonGet,
+  patchCardsStore, daemonGet, daemonPost,
   resolveCard, resolveWorkspace, shortId, newCardId,
+  type AgentSession,
 } from './api'
 
 const VERSION = '0.1.0'
@@ -136,6 +137,37 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         'per-workspace breakdown. Use this for "how am I doing" or progress reports.',
       inputSchema: { type: 'object', properties: {}, required: [] },
     },
+    {
+      name: 'cockpit_implement_async',
+      description:
+        'Trigger implementation of a card in the background. The card must have a ready spec and a project linked to its workspace. ' +
+        'Returns immediately with sessionId — use cockpit_get_session to poll progress, or open SSE at /agents/sessions/<id>/stream. ' +
+        'Optionally accepts feedback for re-implementation attempts.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          card_id: { type: 'string', description: 'Card short ID (SW78) or full ID' },
+          feedback: { type: 'string', description: 'Optional feedback for re-implementation (when previous attempt missed something)' },
+          no_pr: { type: 'boolean', description: 'Skip auto-PR even if project has auto_pr=true', default: false },
+        },
+        required: ['card_id'],
+      },
+    },
+    {
+      name: 'cockpit_get_session',
+      description:
+        'Get status of an agent session by id. Returns phase (analyzing/implementing/done/error), agent, model, ' +
+        'startedAt, completedAt, exitCode, and the most recent output chunks. Use after cockpit_implement_async ' +
+        'to check progress, or to inspect any past run.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          session_id: { type: 'string', description: 'Session id returned by cockpit_implement_async' },
+          tail_chunks: { type: 'number', description: 'Number of most recent output chunks to include (default 20)', default: 20 },
+        },
+        required: ['session_id'],
+      },
+    },
   ],
 }))
 
@@ -155,6 +187,8 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'cockpit_move_card':    return ok(await toolMoveCard(args as { card_id: string; column_slug: string }))
       case 'cockpit_search':       return ok(await toolSearch(args as { query: string; in?: string; limit?: number }))
       case 'cockpit_metrics':      return ok(await toolMetrics())
+      case 'cockpit_implement_async': return ok(await toolImplementAsync(args as unknown as ImplementAsyncArgs))
+      case 'cockpit_get_session':  return ok(await toolGetSession(args as { session_id: string; tail_chunks?: number }))
       default: throw new Error(`unknown tool: ${name}`)
     }
   } catch (err) {
@@ -410,6 +444,93 @@ async function toolSearch(args: { query: string; in?: string; limit?: number }):
 async function toolMetrics(): Promise<unknown> {
   return await daemonGet('/api/metrics')
 }
+
+interface ImplementAsyncArgs {
+  card_id: string
+  feedback?: string
+  no_pr?: boolean
+}
+
+async function toolImplementAsync(args: ImplementAsyncArgs): Promise<unknown> {
+  const [workspaces, cards, projects] = await Promise.all([
+    loadWorkspaces(), loadCards(), loadProjects(),
+  ])
+  const card = resolveCard(args.card_id, cards)
+  if (!card) throw new Error(`card not found: ${args.card_id}`)
+  if (!card.spec_content) {
+    throw new Error(`card #${shortId(card.id)} has no spec — generate one first (use cockpit web UI or CLI cockpit spec gen)`)
+  }
+  const ws = workspaces.find((w) => w.id === card.workspace_id)
+  if (!ws) throw new Error('workspace not found for card')
+
+  const wsProjects = projects.filter((p) => p.workspace_id === ws.id)
+  const project = card.project_id
+    ? wsProjects.find((p) => p.id === card.project_id)
+    : wsProjects[0]
+  if (!project) {
+    throw new Error(`workspace "${ws.name}" has no project linked. Link one in workspace settings → Projects.`)
+  }
+
+  const body = {
+    cardTitle: card.title,
+    cardType: card.type,
+    cardId: card.id,
+    workspaceSlug: ws.slug,
+    spec: card.spec_content,
+    interviewNotes: card.interview_notes || undefined,
+    projectPath: project.path,
+    createBranch: true,
+    autoPR: !args.no_pr && (project.auto_pr ?? false),
+    feedback: args.feedback,
+    attempt: 1,
+  }
+
+  const res = await daemonPost<{ sessionId: string; status: string }>('/agents/implement/async', body)
+
+  return {
+    session_id: res.sessionId,
+    status: res.status,
+    card: { id: shortId(card.id), title: card.title },
+    workspace: ws.slug,
+    project: project.name,
+    follow_up: {
+      poll: `cockpit_get_session({ session_id: "${res.sessionId}" })`,
+      sse: `${DAEMON_HINT}/agents/sessions/${res.sessionId}/stream`,
+    },
+  }
+}
+
+async function toolGetSession(args: { session_id: string; tail_chunks?: number }): Promise<unknown> {
+  const tail = args.tail_chunks ?? 20
+  const data = await daemonGet<{ session: AgentSession | null }>(`/agents/sessions/${args.session_id}`)
+  if (!data.session) throw new Error(`session not found: ${args.session_id}`)
+  const s = data.session
+  const allChunks = s.chunks || []
+  const tailChunks = tail > 0 ? allChunks.slice(-tail) : []
+  const elapsed = s.completedAt
+    ? (new Date(s.completedAt).getTime() - new Date(s.startedAt).getTime()) / 1000
+    : (Date.now() - new Date(s.startedAt).getTime()) / 1000
+  return {
+    id: s.id,
+    card_id: shortId(s.cardId),
+    full_card_id: s.cardId,
+    workspace_slug: s.workspaceSlug,
+    action: s.action,
+    agent: s.agent,
+    model: s.model,
+    phase: s.phase,
+    is_running: !s.completedAt && s.phase !== 'error',
+    started_at: s.startedAt,
+    completed_at: s.completedAt,
+    elapsed_seconds: Math.round(elapsed),
+    exit_code: s.exitCode,
+    error: s.error,
+    chunk_count: allChunks.length,
+    tail_chunks: tailChunks,
+  }
+}
+
+const DAEMON_HINT = process.env.COCKPIT_DAEMON_URL || 'http://127.0.0.1:4800'
 
 function extractExcerpt(text: string, q: string, ctx = 60): string {
   const lower = text.toLowerCase()

@@ -26,8 +26,9 @@ export async function handleRequest(req: Request): Promise<Response> {
     return handleProjectRoutes(req, url)
   }
 
-  // Implement route (before /agents to avoid prefix conflict)
-  if (path === '/agents/implement' && req.method === 'POST') {
+  // Implement routes (before /agents to avoid prefix conflict)
+  // Handles /agents/implement (SSE) and /agents/implement/async (fire-and-forget).
+  if (path.startsWith('/agents/implement') && req.method === 'POST') {
     return handleImplementRoutes(req, url)
   }
 

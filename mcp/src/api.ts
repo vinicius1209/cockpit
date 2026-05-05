@@ -66,6 +66,24 @@ export interface Project {
   workspace_id: string
   name: string
   path: string
+  auto_pr?: boolean
+}
+
+// Mirror of daemon/src/tasks/session-manager.ts:AgentSession (fields used by MCP)
+export interface AgentSession {
+  id: string
+  workspaceSlug: string
+  cardId: string
+  action: 'spec' | 'implementation' | 'discovery' | 'chat'
+  agent: string
+  model: string | null
+  phase: string
+  startedAt: string
+  completedAt: string | null
+  duration: number | null
+  exitCode: number | null
+  chunks: string[]
+  error: string | null
 }
 
 interface PersistEnvelope<T> {

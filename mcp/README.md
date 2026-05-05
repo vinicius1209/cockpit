@@ -53,6 +53,8 @@ O instalador:
 | `cockpit_move_card` | Move entre colunas | card_id*, column_slug* |
 | `cockpit_search` | Busca substring cross-workspace | query*, in (cards/specs/all), limit |
 | `cockpit_metrics` | KPIs globais | — |
+| `cockpit_implement_async` | Dispara `implement` em background, retorna sessionId | card_id*, feedback, no_pr |
+| `cockpit_get_session` | Status de uma session (phase + últimas chunks) | session_id*, tail_chunks |
 
 ## Resources
 
@@ -73,14 +75,34 @@ Claude Code lista resources automaticamente; você pode pedir "leia o resource c
 "Move o SW79 pra ready"
 "Busque cards sobre 'mentoria' e me dê excerto"
 "Quais foram minhas métricas de implementação esta semana?"
+"Implementa o SW79 — o spec já está ready"
+"Como tá indo a session sess_abc123?"
 ```
+
+## Long-running (cockpit_implement_async)
+
+Disparar implementação pelo Claude Code:
+
+```
+[Você] "implementa o SW79"
+[Claude] → cockpit_implement_async(card_id='SW79')
+[Claude] ✓ session sess_xyz iniciada (claude-code/sonnet)
+         use cockpit_get_session pra acompanhar
+
+[Você] "como tá?"
+[Claude] → cockpit_get_session(session_id='sess_xyz')
+[Claude] phase: implementing · 47s rodando
+         últimas chunks: ...
+```
+
+Pré-requisitos: card precisa ter `spec_content` (`spec_status: ready` é suficiente) e o workspace precisa de pelo menos 1 projeto vinculado. O daemon roda `runImplementation` em background; o MCP retorna o `sessionId` em <1s.
 
 ## Limitações conscientes
 
-- **Sem long-running**: `implement` não está exposto via MCP (precisa de SSE; não fits MCP simples). Use o CLI ou Web UI pra disparar implementação.
+- **Sem stream live no Claude Code**: `cockpit_implement_async` retorna o sessionId imediatamente, mas a UI do Claude Code não streama os chunks ao vivo (MCP tools são request/response). Pra ver live, abra `cockpit watch <id>` no terminal — mesma sessão, SSE real.
 - **Single-user**: assume `127.0.0.1` único usuário. Sem auth.
 - **GitHub only**: auto-PR via gh quando aplicável; outras platforms não suportadas.
-- **Daemon precisa estar rodando**: `bun run dev:daemon` antes do Claude Code
+- **Daemon precisa estar rodando**: `cockpit daemon install` (auto-start) ou `bun run dev:daemon`.
 
 ## Como funciona
 

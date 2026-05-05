@@ -20,7 +20,7 @@ export interface ImplementConfig {
 }
 
 export interface ImplementEvent {
-  phase: 'analyzing' | 'branching' | 'implementing' | 'output' | 'file' | 'creating-pr' | 'done' | 'error' | 'heartbeat'
+  phase: 'session-started' | 'analyzing' | 'branching' | 'implementing' | 'output' | 'file' | 'creating-pr' | 'done' | 'error' | 'heartbeat'
   message?: string
   text?: string
   branch?: string
@@ -31,6 +31,10 @@ export interface ImplementEvent {
   /** When phase=heartbeat: seconds since last real chunk arrived. UI shows this
    *  as a status bar indicator instead of spam lines. */
   silenceSeconds?: number
+  /** When phase=session-started: id of the persisted session row. Allows clients
+   *  (notably MCP cockpit_implement_async) to return the sessionId early and
+   *  follow up via cockpit_get_session / SSE replay. */
+  sessionId?: string
 }
 
 const BRANCH_PREFIX: Record<string, string> = {
@@ -225,6 +229,7 @@ export async function runImplementation(
       feedback: config.feedback || null,
     })
     sessionId = session.id
+    emit({ phase: 'session-started', sessionId })
   }
 
   // 4. Write feedback (if re-attempt) + task workspace files + copy into project
