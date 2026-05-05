@@ -6,6 +6,22 @@ const IS_TEST = typeof process !== 'undefined' && process.env?.NODE_ENV === 'tes
 
 // Track last write timestamp per store to detect stale data
 const lastWriteTs: Record<string, number> = {}
+// Track last persisted content (sem _ts) per store. Usado para deduplicar
+// writes — Zustand persist chama setItem a cada update do state mesmo que
+// o partialized output seja estruturalmente identico, causando spam de POST.
+const lastPersistedContent: Record<string, string> = {}
+
+// Strip _ts from a serialized payload for content comparison
+function stripTs(serialized: string): string {
+  try {
+    const parsed = JSON.parse(serialized)
+    if (parsed && typeof parsed === 'object') {
+      const { _ts: _drop, ...rest } = parsed
+      return JSON.stringify(rest)
+    }
+  } catch { /* ok */ }
+  return serialized
+}
 
 export function createDaemonStorageAdapter(storeName: string): StorageAdapter {
   return {
@@ -50,6 +66,18 @@ export function createDaemonStorageAdapter(storeName: string): StorageAdapter {
         window.localStorage.setItem(name, value)
         return
       }
+
+      // Dedup: se o conteudo (sem _ts) eh identico ao ultimo persistido,
+      // skip o POST. Isto previne dezenas de POSTs durante implementacao
+      // (cada chunk muda processingCards, partialize cria novo object literal,
+      // Zustand persist chama setItem mesmo com conteudo igual).
+      const contentHash = stripTs(value)
+      if (lastPersistedContent[name] === contentHash) {
+        // Atualiza localStorage (com novo _ts) mas pula o daemon
+        window.localStorage.setItem(name, value)
+        return
+      }
+      lastPersistedContent[name] = contentHash
 
       const ts = Date.now()
       lastWriteTs[name] = ts

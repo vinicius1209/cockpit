@@ -7,19 +7,15 @@ import { DAEMON_URL } from '@/shared/lib/constants'
 // `processingCards` store on app boot, and opens an SSE per session for live
 // updates (N3 + N8).
 //
-// Strategy:
-//   1. GET /agents/sessions/running on mount
-//   2. For each session, populate processingCards with its chunks so far
-//   3. Open EventSource at /agents/sessions/:id/stream
-//      - 'snapshot' event arrives first
-//      - 'chunk' events with replayed=true → skip (already in chunks)
-//      - 'chunk' events with replayed=false → addProcessingChunk
-//      - 'done' → completeProcessing
-//      - 'error' → errorProcessing
+// Module-level dedup: keeps track of session IDs we've already opened streams
+// for, so React StrictMode (which runs effects twice in dev) and re-mounts of
+// the App component don't double-subscribe.
+const subscribedSessions = new Set<string>()
+const activeSources = new Map<string, EventSource>()
+
 export function useSessionReconciliation() {
   useEffect(() => {
     let cancelled = false
-    const sources: EventSource[] = []
     const { setProcessing, addProcessingChunk, completeProcessing, errorProcessing } = useCardStore.getState()
 
     daemonClient.listRunningSessions()
@@ -39,48 +35,52 @@ export function useSessionReconciliation() {
             model: s.model || undefined,
           })
 
-          // Open live stream
+          // Dedup: if we already have a stream for this session, skip
+          if (subscribedSessions.has(s.id)) continue
+          subscribedSessions.add(s.id)
+
           const es = new EventSource(`${DAEMON_URL}/agents/sessions/${s.id}/stream`)
-          sources.push(es)
+          activeSources.set(s.id, es)
+
+          const cleanup = () => {
+            es.close()
+            activeSources.delete(s.id)
+            subscribedSessions.delete(s.id)
+          }
 
           es.onmessage = (msg) => {
             try {
               const event = JSON.parse(msg.data)
               if (event.type === 'chunk' && !event.replayed) {
-                // Live chunk — append
                 addProcessingChunk(s.cardId, event.text as string)
               } else if (event.type === 'done') {
                 completeProcessing(s.cardId)
-                es.close()
+                cleanup()
               } else if (event.type === 'error') {
                 errorProcessing(s.cardId, (event.error as string) || 'Erro desconhecido')
-                es.close()
+                cleanup()
               }
-              // snapshot/replay-done/replayed chunks são ignorados — já temos
-              // o state hidratado do listRunningSessions
             } catch {
               // skip malformed
             }
           }
 
-          es.onerror = () => {
-            // Connection lost. Don't error the processing — the daemon may still
-            // be working. Just close and let the user refresh if they want.
-            es.close()
-          }
+          // EventSource auto-retries on connection failure. Em caso de erro,
+          // fechamos imediatamente para evitar loop de reconexao spam.
+          es.onerror = () => cleanup()
         }
 
         if (sessions.length > 0) {
-          console.log(`[reconciliation] ${sessions.length} sessao(oes) reidratada(s) com stream ao vivo`)
+          console.log(`[reconciliation] ${sessions.length} sessao(oes) ativa(s); ${activeSources.size} stream(s) abertos`)
         }
       })
       .catch((err) => {
         if (!cancelled) console.warn('[reconciliation] skip:', err.message)
       })
 
-    return () => {
-      cancelled = true
-      for (const es of sources) es.close()
-    }
+    return () => { cancelled = true }
+    // NOTE: nao fechamos sources aqui no cleanup do effect porque eles vivem
+    // no module scope — fechar derrubaria streams legitimos quando StrictMode
+    // re-monta o componente. Eles fecham sozinhos em done/error/errorEvent.
   }, [])
 }
