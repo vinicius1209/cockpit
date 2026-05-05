@@ -3,11 +3,17 @@ import { initPersistence } from './persistence'
 import { jsonResponse } from './http'
 
 const PORT = Number(process.env.COCKPIT_DAEMON_PORT || 4800)
+// Bind explicito em 127.0.0.1 (IPv4 loopback). Sem isso, Bun.serve em algumas
+// versoes binda APENAS em IPv6 (`::*`), e o navegador resolvendo "localhost"
+// pode tentar IPv4 primeiro (Happy Eyeballs) e receber "connection refused"
+// silenciosamente. Causou requests /health falhando aleatoriamente.
+const HOST = process.env.COCKPIT_DAEMON_HOST || '127.0.0.1'
 
 await initPersistence()
 
 const server = Bun.serve({
   port: PORT,
+  hostname: HOST,
   idleTimeout: 255, // max allowed by Bun (seconds) — needed for long SSE streams during agent execution
   async fetch(req) {
     // CORS for local frontend
@@ -31,7 +37,7 @@ const server = Bun.serve({
   },
 })
 
-console.log(`[cockpit-daemon] Running on http://localhost:${server.port}`)
+console.log(`[cockpit-daemon] Running on http://${HOST}:${server.port}`)
 
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',

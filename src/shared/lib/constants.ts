@@ -1,6 +1,10 @@
 import type { CardType, CardPriority, ColumnAutomation } from '@/entities/card/types'
 
-export const DAEMON_URL = import.meta.env.VITE_DAEMON_URL || 'http://localhost:4800'
+// Use 127.0.0.1 explicito em vez de "localhost" para evitar ambiguidade
+// IPv4/IPv6: alguns navegadores resolvem "localhost" para ::1 (IPv6) e o
+// daemon Bun por padrao binda em IPv4. Ja vimos requests /health falhando
+// aleatoriamente por causa disso.
+export const DAEMON_URL = import.meta.env.VITE_DAEMON_URL || 'http://127.0.0.1:4800'
 
 export const CARD_TYPE_CONFIG: Record<CardType, { label: string; color: string; bgColor: string }> = {
   feature: { label: 'Feature', color: 'text-blue-600', bgColor: 'bg-blue-100 dark:bg-blue-900/30' },
