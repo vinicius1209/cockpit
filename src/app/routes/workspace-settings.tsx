@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { useState, useEffect } from 'react'
@@ -153,78 +152,120 @@ export function WorkspaceSettingsPage() {
   }
 
   const abbreviatePath = (p: string) => p.replace(/^\/Users\/[^/]+\//, '~/')
+  const wsShortId = workspaceId.replace(/[^a-z0-9]/gi, '').slice(-6).toUpperCase()
 
   return (
-    <div className="p-4 lg:p-6 max-w-3xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/workspace/${workspaceId}`)}>
-          <ArrowLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex items-center gap-2 flex-1">
-          <div className="h-3 w-3 rounded-full" style={{ backgroundColor: workspace.color }} />
-          <h1 className="text-lg font-semibold">{workspace.name}</h1>
-          <span className="text-muted-foreground text-sm">/ Configuracoes</span>
+    <div className="p-4 lg:p-6 max-w-4xl mx-auto">
+      {/* ── FLIGHT STRIP HEADER ── */}
+      <div className="border rounded-lg overflow-hidden mb-4">
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-muted/20">
+          <Button variant="ghost" size="icon" className="h-7 w-7 -ml-1" onClick={() => navigate(`/workspace/${workspaceId}`)}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em]">
+            <span className="text-muted-foreground">WORKSPACE</span>
+            <span
+              className="h-2.5 w-2.5 rounded-full ring-1 ring-background"
+              style={{ backgroundColor: workspace.color, boxShadow: `0 0 8px ${workspace.color}40` }}
+            />
+            <span className="font-semibold text-foreground tracking-normal text-sm normal-case">{workspace.name}</span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="rounded-sm bg-muted px-1.5 py-0.5 text-foreground tabular-nums">#{wsShortId}</span>
+          </div>
+
+          <div className="ml-auto flex items-center gap-2">
+            {/* Daemon LED */}
+            <div className={`flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] ${
+              daemonOnline ? 'text-emerald-500' : daemonOnline === false ? 'text-rose-500' : 'text-amber-500'
+            }`}>
+              <span className="relative flex h-2 w-2">
+                {daemonOnline && (
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60" />
+                )}
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                  daemonOnline ? 'bg-emerald-500' : daemonOnline === false ? 'bg-rose-500' : 'bg-amber-500'
+                }`} />
+              </span>
+              <span>DAEMON {daemonOnline ? 'ONLINE' : daemonOnline === false ? 'OFFLINE' : 'CHECK'}</span>
+            </div>
+          </div>
         </div>
-        {/* Daemon status */}
-        <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] ${
-          daemonOnline ? 'bg-green-500/10 text-green-500' : daemonOnline === false ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'
-        }`}>
-          <span className="h-1.5 w-1.5 rounded-full bg-current" />
-          {daemonOnline ? 'Online' : daemonOnline === false ? 'Offline' : '...'}
+
+        {/* Stats row */}
+        <div className="flex items-center gap-4 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground bg-background flex-wrap">
+          <span><span className="text-foreground tabular-nums">{String(projects.length).padStart(2, '0')}</span> proj</span>
+          <span className="text-muted-foreground/30">·</span>
+          <span><span className="text-foreground tabular-nums">{String(labels.length).padStart(2, '0')}</span> labels</span>
+          <span className="text-muted-foreground/30">·</span>
+          <span><span className="text-foreground tabular-nums">{String(columns.length).padStart(2, '0')}</span> colunas</span>
+          {workspace.description && (
+            <>
+              <span className="text-muted-foreground/30">·</span>
+              <span className="normal-case tracking-normal text-muted-foreground/70 truncate">{workspace.description}</span>
+            </>
+          )}
         </div>
       </div>
 
+      {/* ── EXECUTORS TELEMETRY STRIP ── */}
+      {daemonOnline && availableAgents.length > 0 && (
+        <div className="mb-4 border rounded-md px-3 py-2 bg-muted/10">
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em]">
+            <span className="text-muted-foreground">━ EXECUTORS DETECTADOS</span>
+            <span className="ml-auto flex items-center gap-3 flex-wrap">
+              {availableAgents.map((a) => (
+                <span key={a.name} className="flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <span className="text-foreground">{a.name}</span>
+                  {a.version && <span className="text-muted-foreground/60 normal-case tracking-normal">{a.version.split(' ')[0]}</span>}
+                </span>
+              ))}
+            </span>
+          </div>
+        </div>
+      )}
+
       <Tabs defaultValue="geral" className="space-y-4">
-        <TabsList>
+        <TabsList className="font-mono text-[10px] uppercase tracking-[0.14em]">
           <TabsTrigger value="geral">
-            <Settings className="h-3.5 w-3.5 mr-1.5" />
+            <span className="mr-1.5 text-muted-foreground tabular-nums">[1]</span>
+            <Settings className="h-3 w-3 mr-1" />
             Geral
           </TabsTrigger>
           <TabsTrigger value="projetos">
-            <FolderOpen className="h-3.5 w-3.5 mr-1.5" />
+            <span className="mr-1.5 text-muted-foreground tabular-nums">[2]</span>
+            <FolderOpen className="h-3 w-3 mr-1" />
             Projetos
-            {projects.length > 0 && <Badge variant="secondary" className="ml-1.5 text-[10px] px-1.5 py-0">{projects.length}</Badge>}
-          </TabsTrigger>
-          <TabsTrigger value="board">
-            <Columns3 className="h-3.5 w-3.5 mr-1.5" />
-            Board
+            {projects.length > 0 && <Badge variant="secondary" className="ml-1.5 text-[9px] px-1 py-0 tabular-nums">{projects.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="agentes">
-            <Bot className="h-3.5 w-3.5 mr-1.5" />
+            <span className="mr-1.5 text-muted-foreground tabular-nums">[3]</span>
+            <Bot className="h-3 w-3 mr-1" />
             Agentes
+          </TabsTrigger>
+          <TabsTrigger value="board">
+            <span className="mr-1.5 text-muted-foreground tabular-nums">[4]</span>
+            <Columns3 className="h-3 w-3 mr-1" />
+            Board
           </TabsTrigger>
         </TabsList>
 
         {/* ── TAB: Geral ── */}
         <TabsContent value="geral" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Informacoes</CardTitle>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                <span>━ Identificacao</span>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-[1fr_auto] gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="ws-name">Nome</Label>
-                  <Input id="ws-name" value={name} onChange={(e) => setName(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Cor</Label>
-                  <div className="flex gap-1.5 pt-1">
-                    {COLORS.map((c) => (
-                      <button
-                        key={c}
-                        type="button"
-                        className={`h-7 w-7 rounded-full transition-all ${color === c ? 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-110' : 'opacity-70 hover:opacity-100'}`}
-                        style={{ backgroundColor: c }}
-                        onClick={() => setColor(c)}
-                      />
-                    ))}
-                  </div>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="ws-name" className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">Nome</Label>
+                <Input id="ws-name" value={name} onChange={(e) => setName(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="ws-desc">Descricao</Label>
+                <Label htmlFor="ws-desc" className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">Descricao</Label>
                 <Textarea
                   id="ws-desc"
                   value={description}
@@ -233,13 +274,23 @@ export function WorkspaceSettingsPage() {
                   placeholder="Ex: CRM React + Supabase, PJ Fixo 6-8h/dia"
                 />
               </div>
-              <div className="flex items-center justify-between">
-                <Button onClick={handleSave} disabled={!name.trim()}>
+              <div className="space-y-2">
+                <Label className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">Cor</Label>
+                <div className="flex gap-1.5">
+                  {COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={`h-6 w-6 rounded-full transition-all ${color === c ? 'ring-2 ring-primary ring-offset-2 ring-offset-background scale-110' : 'opacity-70 hover:opacity-100'}`}
+                      style={{ backgroundColor: c }}
+                      onClick={() => setColor(c)}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="pt-1">
+                <Button onClick={handleSave} disabled={!name.trim()} size="sm">
                   {saved ? <><CheckCircle2 className="h-4 w-4 mr-1" /> Salvo</> : 'Salvar alteracoes'}
-                </Button>
-                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleDelete}>
-                  <Trash2 className="h-3.5 w-3.5 mr-1" />
-                  Excluir workspace
                 </Button>
               </div>
             </CardContent>
@@ -297,23 +348,37 @@ export function WorkspaceSettingsPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* ── ZONA PERIGOSA ── */}
+          <Card className="border-destructive/30">
+            <CardHeader className="pb-2">
+              <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-destructive">
+                <AlertCircle className="h-3 w-3" />
+                <span>━ Zona perigosa</span>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs text-muted-foreground">
+                  Excluir o workspace remove todos os cards, labels, agentes e projetos vinculados.
+                  Os arquivos em <span className="font-mono">~/.cockpit/tasks/{workspace.slug}/</span> permanecem no disco.
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive border-destructive/40 hover:bg-destructive/10 shrink-0"
+                  onClick={handleDelete}
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                  Excluir workspace
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* ── TAB: Projetos ── */}
         <TabsContent value="projetos" className="space-y-4">
-          {/* Agents detectados */}
-          {daemonOnline && availableAgents.length > 0 && (
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs text-muted-foreground">Agents detectados:</span>
-              {availableAgents.map((a) => (
-                <Badge key={a.name} variant="outline" className="text-[10px]">
-                  <Bot className="h-2.5 w-2.5 mr-0.5" />
-                  {a.name} {a.version?.split(' ')[0]}
-                </Badge>
-              ))}
-            </div>
-          )}
-
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Adicionar projeto</CardTitle>
@@ -344,102 +409,176 @@ export function WorkspaceSettingsPage() {
 
           {projects.length > 0 ? (
             <div className="space-y-3">
-              {projects.map((proj) => {
+              {projects.map((proj, projIdx) => {
                 const scan = scanResults[proj.id]
+                const projNum = String(projIdx + 1).padStart(2, '0')
+                const projTotal = String(projects.length).padStart(2, '0')
+                const scanDate = proj.last_scan_at
+                  ? new Date(proj.last_scan_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                  : null
+
                 return (
-                  <Card key={proj.id}>
-                    <CardContent className="pt-4 pb-3">
-                      <div className="flex items-start gap-3">
-                        <FolderOpen className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">{proj.name}</p>
-                          <p className="text-xs text-muted-foreground truncate">{abbreviatePath(proj.path)}</p>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
+                  <div key={proj.id} className="relative rounded-md border bg-card overflow-hidden">
+                    {/* Accent bar */}
+                    <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-r-sm bg-primary/60" aria-hidden />
+
+                    {/* Header */}
+                    <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/60">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                          <span className="tabular-nums">{projNum}/{projTotal}</span>
+                          <span className="text-muted-foreground/30">·</span>
+                          <span className="text-foreground">{proj.name}</span>
                           {proj.last_scan_at && (
-                            <Badge variant="outline" className="text-[10px]">
-                              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5 text-green-500" />
-                              scanned
-                            </Badge>
-                          )}
-                          {daemonOnline && (
                             <>
-                              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleBootstrapProject(proj.path, proj.id)} disabled={bootstrapping === proj.id} title="Gerar AGENTS.md, CLAUDE.md e commands">
-                                {bootstrapping === proj.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Wand2 className="h-3.5 w-3.5 mr-1" />Setup</>}
-                              </Button>
-                              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleScanProject(proj.path, proj.id)} disabled={scanning === proj.id}>
-                                {scanning === proj.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><Search className="h-3.5 w-3.5 mr-1" />Scan</>}
-                              </Button>
+                              <span className="text-muted-foreground/30">·</span>
+                              <span className="flex items-center gap-1 text-emerald-500">
+                                <CheckCircle2 className="h-2.5 w-2.5" />
+                                scanned
+                              </span>
                             </>
                           )}
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteProject(proj.id)}>
-                            <X className="h-3.5 w-3.5" />
-                          </Button>
                         </div>
+                        <p className="font-mono text-[12px] text-foreground/90 mt-0.5 truncate">
+                          {abbreviatePath(proj.path)}
+                        </p>
                       </div>
-
-                      {scan && (
-                        <>
-                          <Separator className="my-2.5" />
-                          <div className="space-y-1.5 pl-7">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              {scan.stack.map((s) => (
-                                <Badge key={s} variant="secondary" className="text-[10px]"><FileCode className="h-2.5 w-2.5 mr-0.5" />{s}</Badge>
-                              ))}
-                              {scan.git && (
-                                <Badge variant="outline" className="text-[10px]"><GitBranch className="h-2.5 w-2.5 mr-0.5" />{scan.git.branch}</Badge>
-                              )}
-                              {scan.agentConfigs.hasAgentsMd && <Badge variant="outline" className="text-[10px] text-green-600">AGENTS.md</Badge>}
-                              {scan.agentConfigs.hasClaudeDir && <Badge variant="outline" className="text-[10px] text-purple-600">.claude/</Badge>}
-                            </div>
-                            {scan.todos.length > 0 && (
-                              <p className="text-[11px] text-muted-foreground">
-                                <AlertCircle className="h-3 w-3 inline mr-1" />
-                                {scan.todos.length} TODO{scan.todos.length > 1 ? 's' : ''}
-                              </p>
-                            )}
-                          </div>
-                        </>
-                      )}
-
-                      {/* Git Flow & Auto-PR */}
-                      <Separator className="my-2.5" />
-                      <div className="pl-7 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <GitPullRequest className="h-3.5 w-3.5 text-muted-foreground" />
-                            <span className="text-xs">Auto PR apos implementacao</span>
-                          </div>
-                          <Switch
-                            checked={proj.auto_pr ?? false}
-                            onCheckedChange={(checked) => updateProject(proj.id, { auto_pr: checked })}
-                          />
-                        </div>
+                      <div className="flex items-center gap-0.5 shrink-0">
                         {daemonOnline && (
-                          <div className="flex items-center gap-2">
+                          <>
                             <Button
                               variant="ghost"
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() => handleAnalyzeGitFlow(proj.path, proj.id)}
-                              disabled={analyzingGit === proj.id}
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleBootstrapProject(proj.path, proj.id)}
+                              disabled={bootstrapping === proj.id}
+                              title="Setup: gerar AGENTS.md, CLAUDE.md e commands"
                             >
-                              {analyzingGit === proj.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <><GitBranch className="h-3.5 w-3.5 mr-1" />Analisar Git Flow</>}
+                              {bootstrapping === proj.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Wand2 className="h-3.5 w-3.5" />}
                             </Button>
-                            {gitProfiles[proj.id] && (
-                              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                                <Badge variant="outline" className="text-[10px]">base: {gitProfiles[proj.id].baseBranch}</Badge>
-                                <Badge variant="outline" className="text-[10px]">gh: {gitProfiles[proj.id].ghAccount}</Badge>
-                                {gitProfiles[proj.id].hasPrTemplate && (
-                                  <Badge variant="outline" className="text-[10px] text-green-600">PR template</Badge>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleScanProject(proj.path, proj.id)}
+                              disabled={scanning === proj.id}
+                              title="Scan: detectar stack, branch, TODOs"
+                            >
+                              {scanning === proj.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                            </Button>
+                          </>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={() => deleteProject(proj.id)}
+                          title="Remover projeto do workspace"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Telemetry */}
+                    <div className="px-4 py-2.5 space-y-1.5 font-mono text-[11px]">
+                      {scan && (
+                        <>
+                          {scan.stack.length > 0 && (
+                            <TelemetryLine label="Stack">
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {scan.stack.map((s) => (
+                                  <Badge key={s} variant="secondary" className="text-[10px] font-mono px-1.5 py-0">
+                                    <FileCode className="h-2.5 w-2.5 mr-0.5" />{s}
+                                  </Badge>
+                                ))}
+                              </div>
+                            </TelemetryLine>
+                          )}
+                          {scan.git && (
+                            <TelemetryLine label="Branch">
+                              <span className="flex items-center gap-1.5">
+                                <GitBranch className="h-3 w-3 text-muted-foreground" />
+                                <span className="text-foreground">{scan.git.branch}</span>
+                                {scan.todos.length > 0 && (
+                                  <span className="text-amber-500/80 ml-2 normal-case tracking-normal">
+                                    {scan.todos.length} TODO{scan.todos.length > 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </span>
+                            </TelemetryLine>
+                          )}
+                          {(scan.agentConfigs.hasAgentsMd || scan.agentConfigs.hasClaudeDir) && (
+                            <TelemetryLine label="Agents">
+                              <div className="flex items-center gap-1">
+                                {scan.agentConfigs.hasAgentsMd && (
+                                  <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 text-green-600">AGENTS.md</Badge>
+                                )}
+                                {scan.agentConfigs.hasClaudeDir && (
+                                  <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 text-purple-600">.claude/</Badge>
                                 )}
                               </div>
-                            )}
-                          </div>
-                        )}
+                            </TelemetryLine>
+                          )}
+                        </>
+                      )}
+                      {scanDate && (
+                        <TelemetryLine label="Scan">
+                          <span className="text-muted-foreground tabular-nums">{scanDate}</span>
+                        </TelemetryLine>
+                      )}
+                      {/* Persistence paths — onde o cockpit guarda dados deste projeto */}
+                      <TelemetryLine label="Task WS">
+                        <span className="text-muted-foreground/80 truncate" title="Spec/discovery/interview/feedback ficam aqui (no seu home)">
+                          ~/.cockpit/tasks/{workspace.slug}/&lt;card-id&gt;/
+                        </span>
+                      </TelemetryLine>
+                      <TelemetryLine label="Project WS">
+                        <span className="text-muted-foreground/60 truncate" title="Cópia para o agent CLI ler — só criada após disparar Implementar">
+                          {abbreviatePath(proj.path)}/.cockpit/task/ <span className="text-muted-foreground/40">(após implementar)</span>
+                        </span>
+                      </TelemetryLine>
+                    </div>
+
+                    {/* Integration block */}
+                    <div className="border-t border-border/60 px-4 py-2.5 bg-muted/10 space-y-2">
+                      <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                        <span>━ Integracao</span>
                       </div>
-                    </CardContent>
-                  </Card>
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-xs">
+                          <GitPullRequest className="h-3.5 w-3.5 text-muted-foreground" />
+                          Auto PR apos implementacao
+                        </span>
+                        <Switch
+                          checked={proj.auto_pr ?? false}
+                          onCheckedChange={(checked) => updateProject(proj.id, { auto_pr: checked })}
+                        />
+                      </div>
+                      {daemonOnline && (
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 text-[10px]"
+                            onClick={() => handleAnalyzeGitFlow(proj.path, proj.id)}
+                            disabled={analyzingGit === proj.id}
+                          >
+                            {analyzingGit === proj.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><GitBranch className="h-3 w-3 mr-1" />Analisar Git Flow</>}
+                          </Button>
+                          {gitProfiles[proj.id] && (
+                            <div className="flex items-center gap-1 font-mono text-[10px]">
+                              <Badge variant="outline" className="text-[9px] font-mono px-1 py-0">base: {gitProfiles[proj.id].baseBranch}</Badge>
+                              <Badge variant="outline" className="text-[9px] font-mono px-1 py-0">gh: {gitProfiles[proj.id].ghAccount}</Badge>
+                              {gitProfiles[proj.id].hasPrTemplate && (
+                                <Badge variant="outline" className="text-[9px] font-mono px-1 py-0 text-green-600">PR template</Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )
               })}
             </div>
@@ -507,6 +646,15 @@ export function WorkspaceSettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  )
+}
+
+function TelemetryLine({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-3">
+      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground w-20 shrink-0">{label}</span>
+      <div className="flex-1 min-w-0">{children}</div>
     </div>
   )
 }
