@@ -62,7 +62,9 @@ const KNOWN_AGENTS: KnownAgent[] = [
     ],
     defaultModel: 'sonnet',
     buildArgs: (flag, prompt, model) => {
-      const args = [flag, prompt, '--output-format', 'text']
+      // bypassPermissions: necessario em modo -p sem TTY, senao Read/Edit
+      // sao bloqueados silenciosamente e o agent responde "nao tenho permissao".
+      const args = [flag, prompt, '--output-format', 'text', '--permission-mode', 'bypassPermissions']
       if (model) args.push('--model', model)
       return args
     },

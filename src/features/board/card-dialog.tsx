@@ -18,6 +18,7 @@ import { useWorkspaceStore } from '@/entities/workspace/store'
 import { useProjectStore } from '@/entities/card/project-store'
 import { useState, useEffect } from 'react'
 import { Trash2, Bot } from 'lucide-react'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import { AgentChat } from '@/features/agent-runner/agent-chat'
 import { SpecPanel } from '@/features/spec-engine/spec-panel'
 import { InterviewPanel } from '@/features/agent-runner/interview-panel'
@@ -49,6 +50,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
 
   const isEditing = !!card
   const processing = useCardStore((s) => card ? s.processingCards[card.id] : undefined) as ProcessingState | undefined
+  const [confirm, confirmDialog] = useConfirm()
 
   const activeWorkspace = useWorkspaceStore((s) => s.getActiveWorkspace())
   const { getWorkspaceProjects } = useProjectStore()
@@ -125,15 +127,28 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
     onClose()
   }
 
-  const handleDelete = () => {
-    if (card) {
-      deleteCard(card.id)
-      onClose()
-    }
+  const handleDelete = async () => {
+    if (!card) return
+    const ok = await confirm({
+      title: `Excluir card "${card.title}"?`,
+      description: (
+        <>
+          O card sera removido permanentemente, incluindo entrevista, spec e
+          historico de implementacao. Os arquivos em
+          {' '}<span className="font-mono text-foreground">~/.cockpit/tasks/&lt;ws&gt;/{card.id}/</span>
+          {' '}permanecem no disco.
+        </>
+      ),
+      confirmLabel: 'Excluir card',
+    })
+    if (!ok) return
+    deleteCard(card.id)
+    onClose()
   }
 
   return (
     <>
+      {confirmDialog}
       <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
         <DialogContent className={`sm:max-w-4xl ${isEditing ? 'h-[88vh]' : 'h-auto'} flex flex-col p-0 gap-0 overflow-hidden`}>
           {/* ──── FLIGHT STRIP HEADER ──── */}

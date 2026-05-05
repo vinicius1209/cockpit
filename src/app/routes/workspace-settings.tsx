@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Trash2, Plus, X, FolderOpen, Search, Loader2, CheckCircle2, AlertCircle, GitBranch, GitPullRequest, FileCode, Bot, Wand2, Settings, Tag, Columns3 } from 'lucide-react'
 import { AUTOMATION_ACTION_LABELS } from '@/entities/card/types'
@@ -45,6 +46,7 @@ export function WorkspaceSettingsPage() {
   const [bootstrapping, setBootstrapping] = useState<string | null>(null)
   const [analyzingGit, setAnalyzingGit] = useState<string | null>(null)
   const [gitProfiles, setGitProfiles] = useState<Record<string, { baseBranch: string; ghAccount: string; repoOwner: string; repoName: string; hasPrTemplate: boolean }>>({})
+  const [confirm, confirmDialog] = useConfirm()
 
 
   useEffect(() => {
@@ -83,9 +85,43 @@ export function WorkspaceSettingsPage() {
     setTimeout(() => setSaved(false), 2000)
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
+    const ok = await confirm({
+      title: `Excluir workspace "${workspace?.name}"?`,
+      description: (
+        <>
+          Esta acao remove o workspace, todos os cards, colunas, labels, agentes
+          e projetos vinculados. Os arquivos em
+          {' '}<span className="font-mono text-foreground">~/.cockpit/tasks/{workspace?.slug}/</span>
+          {' '}permanecem no disco.
+          <br /><br />
+          Esta acao <strong>nao pode ser desfeita</strong>.
+        </>
+      ),
+      requireText: workspace?.name,
+      confirmLabel: 'Excluir workspace',
+    })
+    if (!ok) return
     deleteWorkspace(workspaceId)
     navigate('/')
+  }
+
+  const handleDeleteProject = async (projectId: string, projectName: string) => {
+    const ok = await confirm({
+      title: `Remover projeto "${projectName}" do workspace?`,
+      description: <>O projeto sera desvinculado deste workspace. Os arquivos no disco <strong>nao</strong> sao tocados.</>,
+      confirmLabel: 'Remover projeto',
+    })
+    if (ok) deleteProject(projectId)
+  }
+
+  const handleDeleteLabel = async (labelId: string, labelName: string) => {
+    const ok = await confirm({
+      title: `Excluir label "${labelName}"?`,
+      description: 'A label sera removida de todos os cards.',
+      confirmLabel: 'Excluir label',
+    })
+    if (ok) deleteLabel(workspaceId, labelId)
   }
 
   const handleAddLabel = () => {
@@ -156,6 +192,7 @@ export function WorkspaceSettingsPage() {
 
   return (
     <div className="p-4 lg:p-6 max-w-4xl mx-auto">
+      {confirmDialog}
       {/* ── FLIGHT STRIP HEADER ── */}
       <div className="border rounded-lg overflow-hidden mb-4">
         <div className="flex items-center gap-2 px-4 py-2.5 border-b bg-muted/20">
@@ -337,7 +374,7 @@ export function WorkspaceSettingsPage() {
                         <span className="h-3 w-3 rounded-full" style={{ backgroundColor: label.color }} />
                         <span className="text-sm">{label.name}</span>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive" onClick={() => deleteLabel(workspaceId, label.id)}>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteLabel(label.id, label.name)}>
                         <X className="h-3 w-3" />
                       </Button>
                     </div>
@@ -472,7 +509,7 @@ export function WorkspaceSettingsPage() {
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          onClick={() => deleteProject(proj.id)}
+                          onClick={() => handleDeleteProject(proj.id, proj.name)}
                           title="Remover projeto do workspace"
                         >
                           <X className="h-3.5 w-3.5" />

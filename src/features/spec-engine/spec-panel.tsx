@@ -260,13 +260,8 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
 
         <span className="h-5 w-px bg-border/60 mx-1" />
 
-        {/* Generate / Template */}
-        {isGenerating ? (
-          <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={handleCancel}>
-            <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
-            Cancelar
-          </Button>
-        ) : (
+        {/* Generate / Template — ABORT lives inside the overlay during generation */}
+        {!isGenerating && (
           <>
             <Button
               variant="outline"
@@ -353,38 +348,31 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
       </div>
 
       {/* Content: Generating / Preview / Editor */}
-      <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
-        <div className="p-4 flex-1 flex flex-col">
-          {isGenerating ? (
-            /* Live preview during generation */
-            <div className="flex-1 overflow-y-auto">
-              {content.trim() ? (
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <MessageResponse>{content}</MessageResponse>
-                  <span className="inline-block w-2 h-5 bg-primary/60 animate-pulse ml-0.5 -mb-1" />
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full gap-3">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                  <p className="text-sm text-muted-foreground">Gerando especificacao...</p>
-                  <p className="text-xs text-muted-foreground">O agent esta analisando o card e o codigo do projeto</p>
-                </div>
-              )}
-            </div>
-          ) : viewMode === 'preview' && content.trim() ? (
-            <div className="prose prose-sm dark:prose-invert max-w-none flex-1 overflow-y-auto">
-              <MessageResponse>{content}</MessageResponse>
-            </div>
-          ) : (
-            <Textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Escreva a spec aqui ou use o botao 'Gerar com AI'..."
-              className="flex-1 resize-none font-mono text-sm"
-              disabled={isGenerating}
-            />
-          )}
-        </div>
+      <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
+        {isGenerating ? (
+          <SpecGenerationOverlay
+            content={content}
+            agentName={specWriter?.name || null}
+            modelName={specWriter?.model || null}
+            onAbort={handleCancel}
+          />
+        ) : (
+          <div className="p-4 flex-1 flex flex-col overflow-y-auto">
+            {viewMode === 'preview' && content.trim() ? (
+              <div className="prose prose-sm dark:prose-invert max-w-none flex-1">
+                <MessageResponse>{content}</MessageResponse>
+              </div>
+            ) : (
+              <Textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Escreva a spec aqui ou use o botao 'Gerar com AI'..."
+                className="flex-1 resize-none font-mono text-sm"
+                disabled={isGenerating}
+              />
+            )}
+          </div>
+        )}
       </div>
     </div>
   )
