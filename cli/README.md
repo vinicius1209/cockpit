@@ -87,6 +87,17 @@ cockpit implement SW79 --watch
 cockpit implement SW79 --feedback "ainda quebra no Safari mobile" --watch
 ```
 
+### Disparar e receber notify quando terminar
+
+```bash
+# Implementa em background, alarme te avisa
+cockpit implement SW79 &
+cockpit alarm SW79
+# (ao terminar) → notify nativo do OS aparece + bell + ● #SW79 ✓ concluida
+```
+
+Cross-platform: macOS via `osascript` (zero deps), Linux via `notify-send` (precisa libnotify), Windows fallback pra terminal bell. Sons configuráveis no macOS (`--sound Glass`/`Ping`/`Pop`/`Submarine`/`Basso`); `--silent` desliga.
+
 ### Multiplex de várias sessions ao mesmo tempo
 
 ```bash
@@ -186,6 +197,8 @@ cockpit log SW79 --json | jq       # processar com jq
 | `cockpit implement <id> [opts]` | dispara implementação (`--watch --feedback "..." --no-pr`) |
 | `cockpit watch <id> [--action ...]` | tail live de session em curso ou histórica |
 | `cockpit watch --all` | multiplex SSE de todas sessions running (timeline cronológica) |
+| `cockpit alarm <id>` | notify desktop quando session terminar (`--silent --sound Glass`) |
+| `cockpit alarm --all` | notify ao fim de cada session running |
 | `cockpit log <id> [--last N] [--json]` | histórico de attempts em tabela |
 | `cockpit ai <id>` | REPL de chat com card+projeto como contexto |
 

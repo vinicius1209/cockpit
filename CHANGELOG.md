@@ -40,6 +40,7 @@ Primeiro release público. Cockpit deixa de ser "interno" e ganha as três inter
   - **Tier 3 — long-running**: `implement --watch`, `watch`, `log`, `ai` (REPL)
   - **Tier 4 — misc**: `search`, `spec show/gen/edit/ready/reset/save-vault`
 - **`cockpit watch --all`**: multiplex SSE de todas sessions running em uma timeline cronológica única (label por card colorido `[#SW79·spec]`, 6 cores rotativas)
+- **`cockpit alarm <id>` / `--all`**: notify nativo do OS quando session terminar. macOS via `osascript` (zero deps, sons configuráveis), Linux via `notify-send`, Windows fallback bell.
 - ANSI cockpit-style (boxes, dividers, sections, mono LEDs) — `cli/src/ui/`
 - `ai <id>` REPL com contexto card+projeto carregado em system prompt
 - `implement --watch` faz tail live no terminal (mesmo SSE da Web)

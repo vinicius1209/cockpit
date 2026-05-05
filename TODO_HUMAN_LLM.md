@@ -229,3 +229,63 @@ Items marcados com `[x]` ja foram feitos.
 > **17 restantes** sao Race Conditions (RC1-RC16) no file I/O + 1 EH3 (banner offline).
 > As RC sao inerentes ao modelo single-process + file-based. Resolver requer: mutex/lock
 > por arquivo ou migrar para SQLite. Backlog para quando escala justificar.
+
+---
+
+## Multi-session orchestration — research direction (2026-05-05)
+
+Pergunta levantada apos `cockpit watch --all` + `cockpit_implement_async` (MCP Tier 2):
+**quando N sessions rodam em paralelo (mesmas ou diferentes engines: claude-code,
+opencode, gemini-cli), elas se ignoram. Como evitar conflitos?**
+
+Estado atual:
+- **Zero coordenacao**. Cada session spawna o agent CLI com a spec do card.
+- Isolamento "fraco": cada `implement` cria branch `<type>/<title>-<short_id>` (`pr-creator.ts`).
+  Isso protege contra commits cruzados, mas:
+  - 2 sessions no MESMO card → mesma branch → race condition no working tree
+  - 2 sessions em cards diferentes mesmo projeto → working tree compartilhado, edits stomped
+  - Reaper de orfas (30min) e o unico safety net runtime
+
+### Tres direcoes possiveis (ordem custo→correcao):
+
+**Opcao A — Project-level lock (cheap, ~1d, cobre 80%)**
+- Em `runImplementation`: `daemon/src/tasks/project-lock.ts` com `flock`-style sobre
+  `<projectPath>/.cockpit/.lock` ou tabela SQLite `project_locks(path UNIQUE, session_id, acquired_at)`
+- Disparar 2a session no mesmo project: ou enfileira (default) ou retorna 409 (`--no-wait`)
+- Trade: serializa workflow de 1 projeto, mas e single-user — provavelmente ok
+- Bug que resolve: edits stomped, branches criadas em working tree sujo
+
+**Opcao B — Git worktrees per-session (correct, ~3-5d)**
+- Cada session ganha `<projectPath>.cockpit-worktree/<session_id>/` via `git worktree add`
+- Agent CLI roda nesse path isolado; merge/PR ao terminar
+- True isolation: 2 sessions no mesmo project, branches diferentes → zero conflito
+- Trade: disco (full clone), IDE pode confundir, cleanup pos-merge
+- Pre-req: project precisa ser git repo (hoje ja e, mas talvez nao bare/shallow safe)
+- Bug que resolve: tudo de A + cards diferentes simultaneos no mesmo projeto
+
+**Opcao C — Coordination prompt (unreliable, ~half-day, NAO recomendado)**
+- Injetar no system prompt: "outras sessions ativas: SW80 em src/auth.tsx, SW82 em src/billing/"
+- LLM "deveria" evitar overlap. Na pratica: ignoram com frequencia, especialmente em refactors.
+- Faz sentido COMO COMPLEMENTO de A ou B (heads-up), nunca como protecao primaria.
+
+### Multi-session UI (separate concern):
+
+Mesmo com isolation resolvido, falta visualizacao:
+- Web UI: aba/painel "Live Agents" globalizado (existe widget no dashboard, mas e por workspace)
+- File-level live diff stream: cada session emite `appendFile(...)` events; UI desenha mapa
+  "agente X tocando arquivo Y" — heatmap de conflito potencial
+- Linha do tempo unificada: cada chunk `cockpit watch --all` mas no browser com syntax highlight
+
+Hoje: temos `appendFile` no session-manager. Falta surface UI.
+
+### Recomendacao
+1. **Curto prazo**: implementar **Opcao A** (project-lock no daemon).
+   Resolve a categoria mais comum de problema (working tree stomping) com baixo custo.
+   ~1d. Acompanha de erro claro: "project locked by session X (started 12s ago)".
+2. **Medio prazo**: experimentar **Opcao B** num worktree opt-in (`--worktree` flag).
+   Feature gate ate validar tradeoffs (disco, IDE).
+3. **UI multi-session**: priorizar painel global "Live Agents Cross-Workspace" + file
+   heatmap. Reusa SSE existente, sem mudanca no daemon.
+
+Saiu do escopo do v0.1.0. Listar como **F9 — multi-session orchestration** quando
+fizer sentido (provavelmente quando primeiro conflito real der dor).

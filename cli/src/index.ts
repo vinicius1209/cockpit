@@ -197,6 +197,18 @@ async function main(): Promise<void> {
         })
       }
 
+      case 'alarm':
+      case 'notify': {
+        const { alarm } = await import('./commands/alarm')
+        const ref = (flags.all || sub === '--all' || sub === 'all') ? undefined : sub
+        return alarm(ref, {
+          all: !!flags.all || sub === '--all' || sub === 'all',
+          silent: !!flags.silent,
+          sound: flags.sound as string | undefined,
+          action: flags.action as 'spec' | 'implementation' | 'discovery' | 'chat' | undefined,
+        })
+      }
+
       case 'ai': {
         const { ai } = await import('./commands/ai')
         if (!sub) return errorExit('uso: cockpit ai <id>')

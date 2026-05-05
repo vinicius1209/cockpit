@@ -46,6 +46,8 @@ const COMMANDS: Array<{ cmd: string; desc: string; group: string }> = [
   { cmd: 'cockpit implement <id>',       desc: 'dispara implementacao (--watch --feedback --no-pr)',         group: 'run' },
   { cmd: 'cockpit watch <id>',           desc: 'tail live de session (--action spec|implementation|chat)',  group: 'run' },
   { cmd: 'cockpit watch --all',          desc: 'multiplex SSE — todas sessions running em uma timeline',     group: 'run' },
+  { cmd: 'cockpit alarm <id>',           desc: 'notify do OS quando session terminar (--silent --sound)',    group: 'run' },
+  { cmd: 'cockpit alarm --all',          desc: 'notify ao fim de cada session running',                      group: 'run' },
   { cmd: 'cockpit log <id>',             desc: 'historico de sessions (--last N --json)',                    group: 'run' },
   { cmd: 'cockpit ai <id>',              desc: 'AI chat interativo no terminal (REPL)',                      group: 'run' },
 
