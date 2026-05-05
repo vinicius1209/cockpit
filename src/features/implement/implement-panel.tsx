@@ -45,6 +45,8 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
   const [feedbackText, setFeedbackText] = useState('')
   const [showFeedback, setShowFeedback] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+  // Tracking para evitar dispatchar phase divider duplicado em StrictMode/duplo render
+  const lastPhaseRef = useRef<ImplPhase>('idle')
 
   const activeWorkspace = useWorkspaceStore((s) => s.getActiveWorkspace())
   const projects = getWorkspaceProjects(workspaceId)
@@ -65,17 +67,21 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
       // Always set history flag if session exists
       setHistory('has-sessions')
 
+      const output = s.output || []
+
       if (s.phase === 'done' && s.summary) {
         setPhase('done')
         setSummary(s.summary)
         setBranch(s.branch)
-        setOutputLines(s.output || [])
+        setOutputLines(output)
+        setTerminalLines(reconstructTerminalLines(output))
         setFiles(s.files || [])
         if (s.attempt) setAttempt(s.attempt)
       } else if (s.phase === 'error') {
         setError(s.error || 'Erro na ultima execucao')
         setPhase('error')
-        setOutputLines(s.output || [])
+        setOutputLines(output)
+        setTerminalLines(reconstructTerminalLines(output))
         setBranch(s.branch)
       }
       // If phase is implementing/analyzing (daemon still running or crashed), show as idle with history
@@ -113,6 +119,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
     if (feedback) setAttempt(currentAttempt)
 
     setPhase('analyzing')
+    lastPhaseRef.current = 'idle'  // reset tracking — primeiro divider sera 'analyzing'
     setOutputLines([])
     setTerminalLines([])
     setSilenceSeconds(0)
@@ -190,24 +197,25 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
 
             if (event.phase === 'analyzing' || event.phase === 'branching' || event.phase === 'implementing' || event.phase === 'creating-pr') {
               const newPhase = event.phase as ImplPhase
-              // Quando phase muda, insere um divider visual no terminal
-              setPhase((prev) => {
-                if (prev !== newPhase) {
-                  const labels: Record<string, string> = {
-                    analyzing: 'ANALISANDO',
-                    branching: 'CRIANDO BRANCH',
-                    implementing: 'AGENT EXECUTANDO',
-                    'creating-pr': 'CRIANDO PR',
-                  }
-                  setTerminalLines((lines) => [...lines, {
-                    id: `phase-${Date.now()}`,
-                    kind: 'phase',
-                    text: labels[newPhase] || newPhase.toUpperCase(),
-                    ts: Date.now(),
-                  }])
+              // setPhase com callback eh OK porque so atualiza scalar.
+              // Mas o divider do terminal precisa ser side-effect FORA do
+              // setState callback (em StrictMode rodaria 2x). Usamos ref.
+              if (lastPhaseRef.current !== newPhase) {
+                const labels: Record<string, string> = {
+                  analyzing: 'ANALISANDO',
+                  branching: 'CRIANDO BRANCH',
+                  implementing: 'AGENT EXECUTANDO',
+                  'creating-pr': 'CRIANDO PR',
                 }
-                return newPhase
-              })
+                lastPhaseRef.current = newPhase
+                setTerminalLines((lines) => [...lines, {
+                  id: `phase-${newPhase}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  kind: 'phase',
+                  text: labels[newPhase] || newPhase.toUpperCase(),
+                  ts: Date.now(),
+                }])
+              }
+              setPhase(newPhase)
             }
             if (event.branch) setBranch(event.branch)
 
@@ -244,7 +252,8 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
                   }
                 }
                 return [...prev, {
-                  id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                  // ID com mais entropia (mais Math.random + index) — Date.now() colide em renders sincronos
+                  id: `line-${Date.now()}-${prev.length}-${Math.random().toString(36).slice(2, 8)}`,
                   kind,
                   text: incoming,
                   ts: Date.now(),
@@ -698,4 +707,80 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
       )}
     </div>
   )
+}
+
+// ── Reconstroi terminal lines a partir do output persistido na sessao ──
+//
+// O daemon grava cada chunk como string em sessions.output[]. Ao reabrir o
+// card, classificamos cada linha por heuristica para preservar as cores
+// semanticas do terminal (log/tool/output). Adiciona um divider HISTORICO
+// no inicio para deixar claro que e conteudo restaurado.
+function reconstructTerminalLines(output: string[]): TerminalLine[] {
+  if (output.length === 0) return []
+
+  // Padroes que identificam mensagens de log do daemon
+  const LOG_PATTERNS = [
+    /^Analisando /,
+    /^Criando branch /,
+    /^Branch .+ (criada|ja existe|fazendo checkout)/,
+    /^Continuando trabalho /,
+    /^Task files copiados /,
+    /^Executando claude-code/,
+    /^claude-code concluido/,
+    /^Projeto sem git/,
+  ]
+
+  // Phase divider banners derivados dos events de phase change. Heuristica:
+  // sequencias conhecidas de mensagens log. Mantem ordem de inserir conforme
+  // as linhas vao sendo processadas — o divider correspondente eh inserido
+  // ANTES da primeira linha daquela phase.
+  const lines: TerminalLine[] = [
+    {
+      id: 'restored-divider',
+      kind: 'phase',
+      text: 'HISTORICO RESTAURADO',
+    },
+  ]
+
+  let lastPhaseDivider = ''
+  const phaseHints: Array<[RegExp, string]> = [
+    [/^Analisando /, 'ANALISANDO'],
+    [/^(Criando branch|Branch .+ (criada|ja existe|fazendo checkout)|Continuando trabalho)/, 'CRIANDO BRANCH'],
+    [/^(Task files copiados|Executando claude-code)/, 'AGENT EXECUTANDO'],
+  ]
+
+  output.forEach((text, i) => {
+    // Detecta phase divider implicito
+    for (const [pattern, divider] of phaseHints) {
+      if (pattern.test(text) && lastPhaseDivider !== divider) {
+        lines.push({
+          id: `restored-phase-${i}`,
+          kind: 'phase',
+          text: divider,
+        })
+        lastPhaseDivider = divider
+        break
+      }
+    }
+
+    // Classifica a linha
+    let kind: TerminalLine['kind'] = 'output'
+    let displayText = text
+
+    if (text.startsWith('▶ ')) {
+      kind = 'tool'
+      displayText = text.slice(2) // remove '▶ ' prefix (sera adicionado pelo render)
+    } else if (LOG_PATTERNS.some((p) => p.test(text))) {
+      kind = 'log'
+    }
+
+    lines.push({
+      id: `restored-${i}-${text.slice(0, 8)}`,
+      kind,
+      text: displayText,
+      // Sem ts: nao deve ter glow animation (e historico, nao novo)
+    })
+  })
+
+  return lines
 }

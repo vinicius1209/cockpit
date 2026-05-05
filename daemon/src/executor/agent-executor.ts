@@ -237,12 +237,15 @@ const DEBUG_STREAM = process.env.COCKPIT_DEBUG_STREAM === '1'
 
 // Stateful parser — precisa lembrar se ja vimos stream_event nesta sessao
 // para suprimir o `assistant` final (que duplica o texto agregado dos deltas).
+// Tambem acumula input_json_deltas dos tool_use blocks para mostrar args reais.
 export interface ClaudeStreamParserState {
   sawStreamEvent: boolean
+  // Map: index do content_block → tool_use info acumulado
+  pendingTools: Map<number, { name: string; inputBuffer: string }>
 }
 
 export function createClaudeStreamParserState(): ClaudeStreamParserState {
-  return { sawStreamEvent: false }
+  return { sawStreamEvent: false, pendingTools: new Map() }
 }
 
 function parseClaudeStreamLine(
@@ -268,23 +271,47 @@ function parseClaudeStreamLine(
   if (type === 'stream_event') {
     const event = evt.event as Record<string, unknown> | undefined
     const eventType = event?.type as string | undefined
+    const blockIdx = event?.index as number | undefined
 
-    // Tool use start — visibilidade do que o agent esta fazendo
+    // Tool use start — apenas registra; input vem em deltas posteriores
     if (eventType === 'content_block_start') {
       const block = event?.content_block as Record<string, unknown> | undefined
       if (block?.type === 'tool_use' && typeof block.name === 'string') {
         state.sawStreamEvent = true
-        return { meta: `▶ ${block.name}${block.input ? ` ${truncate(JSON.stringify(block.input), 60)}` : ''}` }
+        if (typeof blockIdx === 'number') {
+          state.pendingTools.set(blockIdx, { name: block.name as string, inputBuffer: '' })
+        }
+        // Nao emitimos meta aqui — esperamos o stop com input completo
+        return null
       }
     }
 
+    // input_json_delta acumula partial JSON do input do tool
     if (eventType === 'content_block_delta') {
       const delta = event?.delta as Record<string, unknown> | undefined
       if (delta?.type === 'text_delta' && typeof delta.text === 'string') {
         state.sawStreamEvent = true
         return { text: delta.text }
       }
+      if (delta?.type === 'input_json_delta' && typeof delta.partial_json === 'string') {
+        if (typeof blockIdx === 'number' && state.pendingTools.has(blockIdx)) {
+          const t = state.pendingTools.get(blockIdx)!
+          t.inputBuffer += delta.partial_json
+        }
+        return null
+      }
     }
+
+    // content_block_stop — emitimos o tool com input completo
+    if (eventType === 'content_block_stop') {
+      if (typeof blockIdx === 'number' && state.pendingTools.has(blockIdx)) {
+        const t = state.pendingTools.get(blockIdx)!
+        state.pendingTools.delete(blockIdx)
+        const summary = summarizeToolInput(t.name, t.inputBuffer)
+        return { meta: summary ? `▶ ${t.name} ${summary}` : `▶ ${t.name}` }
+      }
+    }
+
     return null
   }
 
@@ -311,6 +338,39 @@ function parseClaudeStreamLine(
 
 function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
+}
+
+// Extrai a info mais relevante do input do tool para exibir ao usuario.
+// - Read/Write/Edit: file_path
+// - Bash: command (truncado)
+// - Glob/Grep: pattern
+// - WebFetch: url
+// - TodoWrite: count de todos
+// - Outros: vazio (mostra so o nome do tool)
+function summarizeToolInput(toolName: string, partialJson: string): string {
+  if (!partialJson.trim() || partialJson.trim() === '{}') return ''
+  let input: Record<string, unknown>
+  try {
+    input = JSON.parse(partialJson)
+  } catch {
+    // Partial JSON malformed — possivel se stream foi cortado.
+    // Tenta extrair file_path/command via regex como fallback
+    const m = partialJson.match(/"(?:file_path|path|command|pattern|url)"\s*:\s*"([^"]+)"/)
+    return m ? m[1] : ''
+  }
+
+  if (typeof input.file_path === 'string') return truncate(input.file_path.replace(/^\/Users\/[^/]+\//, '~/'), 70)
+  if (typeof input.path === 'string') return truncate(input.path.replace(/^\/Users\/[^/]+\//, '~/'), 70)
+  if (typeof input.command === 'string') return truncate(input.command, 70)
+  if (typeof input.pattern === 'string') return truncate(input.pattern, 70)
+  if (typeof input.url === 'string') return truncate(input.url, 70)
+  if (toolName === 'TodoWrite' && Array.isArray(input.todos)) return `${input.todos.length} todo(s)`
+
+  // Fallback: primeiro field string nao-vazio
+  for (const [k, v] of Object.entries(input)) {
+    if (typeof v === 'string' && v) return truncate(`${k}=${v}`, 70)
+  }
+  return ''
 }
 
 function validateModel(agentDef: KnownAgent, model?: string): string | null {

@@ -164,21 +164,40 @@ export async function runImplementation(
     emit({ phase: 'analyzing', message: 'Projeto sem git, executando sem branch' })
   }
 
-  // 2. Create branch
+  // 2. Create or reuse branch
   let branchName: string | null = null
   if (createBranch && gitInfo.hasGit) {
     branchName = generateBranchName(config.cardType, config.cardTitle)
-    emit({ phase: 'branching', message: `Criando branch ${branchName}...`, branch: branchName })
+    const isRetry = (config.attempt || 1) > 1
+
+    // Detecta se branch ja existe ANTES de tentar criar — emite mensagem
+    // apropriada (evita "Criando branch..." quando estamos so retomando)
+    let branchAlreadyExists = false
+    try {
+      await runCmd('git', ['rev-parse', '--verify', `refs/heads/${branchName}`], projectPath)
+      branchAlreadyExists = true
+    } catch {
+      branchAlreadyExists = false
+    }
+
+    if (branchAlreadyExists) {
+      emit({
+        phase: 'branching',
+        message: isRetry
+          ? `Continuando trabalho em ${branchName} (tentativa ${config.attempt})`
+          : `Branch ${branchName} ja existe — fazendo checkout`,
+        branch: branchName,
+      })
+    } else {
+      emit({ phase: 'branching', message: `Criando branch ${branchName}...`, branch: branchName })
+    }
 
     try {
-      // Try to create new branch, if exists checkout existing
-      try {
+      if (branchAlreadyExists) {
+        await runCmd('git', ['checkout', branchName], projectPath)
+      } else {
         await runCmd('git', ['checkout', '-b', branchName], projectPath)
         emit({ phase: 'branching', message: `Branch ${branchName} criada`, branch: branchName })
-      } catch {
-        // Branch already exists, checkout it
-        await runCmd('git', ['checkout', branchName], projectPath)
-        emit({ phase: 'branching', message: `Branch ${branchName} (existente)`, branch: branchName })
       }
     } catch (err) {
       emit({ phase: 'error', message: `Erro ao criar/trocar branch: ${err instanceof Error ? err.message : 'unknown'}` })
