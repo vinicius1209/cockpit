@@ -224,7 +224,7 @@ cockpit metrics
 
 ## Licença
 
-Em breve (open source planejado).
+[MIT](./LICENSE) © 2026 Vinicius Machado
 
 ---
 
