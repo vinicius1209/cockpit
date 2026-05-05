@@ -177,6 +177,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           card_id: { type: 'string', description: 'Card short ID (SW78) or full ID' },
           feedback: { type: 'string', description: 'Optional feedback for re-implementation (when previous attempt missed something)' },
           no_pr: { type: 'boolean', description: 'Skip auto-PR even if project has auto_pr=true', default: false },
+          isolation: {
+            type: 'string',
+            enum: ['lock', 'worktree'],
+            description: 'lock (default) serializa por projeto. worktree cria git worktree separado pra esta session — paralelismo real no mesmo projeto, com custo (disco + node_modules nao compartilhado + portas conflitam). Use worktree quando o usuario quer rodar 2+ implements no mesmo projeto AO MESMO TEMPO.',
+            default: 'lock',
+          },
         },
         required: ['card_id'],
       },
@@ -522,6 +528,7 @@ interface ImplementAsyncArgs {
   card_id: string
   feedback?: string
   no_pr?: boolean
+  isolation?: 'lock' | 'worktree'
 }
 
 async function toolImplementAsync(args: ImplementAsyncArgs): Promise<unknown> {
@@ -556,6 +563,7 @@ async function toolImplementAsync(args: ImplementAsyncArgs): Promise<unknown> {
     autoPR: !args.no_pr && (project.auto_pr ?? false),
     feedback: args.feedback,
     attempt: 1,
+    isolation: args.isolation || 'lock',
   }
 
   let res: { sessionId: string; status: string }

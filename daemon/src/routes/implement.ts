@@ -46,12 +46,13 @@ export async function handleImplementRoutes(req: Request, url: URL): Promise<Res
     }
     body.projectPath = validPath
 
-    // F9-A — pre-check do lock. Se outro implement esta rodando no mesmo
-    // path, retorna 409 ANTES de criar a session zumbi. UX clara via
-    // payload `held_by` rico.
-    const existingLock = await peekActiveProjectLock(body.projectPath)
-    if (existingLock) {
-      return jsonResponse(lockErrorBody(new ProjectLockedError(body.projectPath, existingLock)), 409)
+    // F9-A — pre-check do lock soh em modo lock (default). Em isolation=worktree
+    // dois implements no mesmo projeto sao OK (worktrees separados).
+    if ((body.isolation || 'lock') === 'lock') {
+      const existingLock = await peekActiveProjectLock(body.projectPath)
+      if (existingLock) {
+        return jsonResponse(lockErrorBody(new ProjectLockedError(body.projectPath, existingLock)), 409)
+      }
     }
 
     let resolveSession: (id: string) => void = () => {}
@@ -111,12 +112,12 @@ export async function handleImplementRoutes(req: Request, url: URL): Promise<Res
     }
     body.projectPath = validPath
 
-    // F9-A — mesma pre-check que o async endpoint. Retorna 409 ANTES de
-    // abrir o SSE pra que o cliente CLI/Web receba o erro estruturado em
-    // JSON normal (mais facil de parsear que SSE event de erro).
-    const existingLock = await peekActiveProjectLock(body.projectPath)
-    if (existingLock) {
-      return jsonResponse(lockErrorBody(new ProjectLockedError(body.projectPath, existingLock)), 409)
+    // F9-A — mesma pre-check que o async endpoint, soh em modo lock.
+    if ((body.isolation || 'lock') === 'lock') {
+      const existingLock = await peekActiveProjectLock(body.projectPath)
+      if (existingLock) {
+        return jsonResponse(lockErrorBody(new ProjectLockedError(body.projectPath, existingLock)), 409)
+      }
     }
 
     const stream = new ReadableStream({

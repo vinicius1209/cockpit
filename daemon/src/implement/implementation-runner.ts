@@ -3,6 +3,7 @@ import { TaskWorkspace } from '../tasks/task-workspace'
 import { createPR } from '../git/pr-creator'
 import { createSession, updateSession, appendOutput, appendFile, type SessionFile } from '../tasks/session-manager'
 import { peekActiveProjectLock, acquireProjectLock, releaseProjectLock, ProjectLockedError } from '../tasks/project-lock'
+import { createWorktree, removeWorktree, type WorktreeInfo } from '../git/worktree-manager'
 
 export interface ImplementConfig {
   cardTitle: string
@@ -18,6 +19,10 @@ export interface ImplementConfig {
   autoPR?: boolean
   feedback?: string
   attempt?: number
+  /** F9-B — modo de isolamento. 'lock' (default) usa project-lock + working
+   *  tree compartilhado. 'worktree' cria git worktree separado por session,
+   *  permitindo paralelismo real no mesmo projeto. */
+  isolation?: 'lock' | 'worktree'
 }
 
 export interface ImplementEvent {
@@ -159,35 +164,43 @@ export async function runImplementation(
   config: ImplementConfig,
   emit: (event: ImplementEvent) => void,
 ): Promise<void> {
-  const { projectPath, createBranch } = config
+  const { createBranch } = config
+  // F9-B — projectPath original NUNCA muda (validacao, lock check, fontes).
+  // Quando isolation=worktree, o agent roda em activeProjectPath (worktree).
+  // Locks e analises continuam usando origProjectPath.
+  const origProjectPath = config.projectPath
+  let activeProjectPath = origProjectPath
+  let worktree: WorktreeInfo | null = null
 
-  // 0. F9-A — pre-check do project lock. Se outro implement esta rodando
-  // no mesmo path, throw imediato. HTTP routes convertem em 409 com payload
-  // rico ANTES de criar a session (evita session zumbi).
-  const activeLock = await peekActiveProjectLock(projectPath)
-  if (activeLock) {
-    throw new ProjectLockedError(projectPath, activeLock)
+  // 0. F9-A — pre-check do project lock. Em modo worktree o lock e por path
+  // do worktree (que ainda nao existe), entao soh checamos o lock no modo
+  // lock (default).
+  if ((config.isolation || 'lock') === 'lock') {
+    const activeLock = await peekActiveProjectLock(origProjectPath)
+    if (activeLock) {
+      throw new ProjectLockedError(origProjectPath, activeLock)
+    }
   }
 
-  // 1. Analyze git
+  // 1. Analyze git (sempre no origProjectPath)
   emit({ phase: 'analyzing', message: 'Analisando projeto...' })
-  const gitInfo = await analyzeGitFlow(projectPath)
+  const gitInfo = await analyzeGitFlow(origProjectPath)
 
   if (!gitInfo.hasGit) {
     emit({ phase: 'analyzing', message: 'Projeto sem git, executando sem branch' })
   }
 
+  const isWorktreeMode = config.isolation === 'worktree' && createBranch && gitInfo.hasGit
+
   // 2. Create or reuse branch
   let branchName: string | null = null
+  let branchAlreadyExists = false
   if (createBranch && gitInfo.hasGit) {
     branchName = generateBranchName(config.cardType, config.cardTitle)
     const isRetry = (config.attempt || 1) > 1
 
-    // Detecta se branch ja existe ANTES de tentar criar — emite mensagem
-    // apropriada (evita "Criando branch..." quando estamos so retomando)
-    let branchAlreadyExists = false
     try {
-      await runCmd('git', ['rev-parse', '--verify', `refs/heads/${branchName}`], projectPath)
+      await runCmd('git', ['rev-parse', '--verify', `refs/heads/${branchName}`], origProjectPath)
       branchAlreadyExists = true
     } catch {
       branchAlreadyExists = false
@@ -205,16 +218,21 @@ export async function runImplementation(
       emit({ phase: 'branching', message: `Criando branch ${branchName}...`, branch: branchName })
     }
 
-    try {
-      if (branchAlreadyExists) {
-        await runCmd('git', ['checkout', branchName], projectPath)
-      } else {
-        await runCmd('git', ['checkout', '-b', branchName], projectPath)
-        emit({ phase: 'branching', message: `Branch ${branchName} criada`, branch: branchName })
+    // Em modo worktree, a branch sera criada/checkout via 'git worktree add'
+    // dentro do worktree (linha mais abaixo). Aqui no working tree principal,
+    // nao tocamos pra evitar dirty state.
+    if (!isWorktreeMode) {
+      try {
+        if (branchAlreadyExists) {
+          await runCmd('git', ['checkout', branchName], origProjectPath)
+        } else {
+          await runCmd('git', ['checkout', '-b', branchName], origProjectPath)
+          emit({ phase: 'branching', message: `Branch ${branchName} criada`, branch: branchName })
+        }
+      } catch (err) {
+        emit({ phase: 'error', message: `Erro ao criar/trocar branch: ${err instanceof Error ? err.message : 'unknown'}` })
+        return
       }
-    } catch (err) {
-      emit({ phase: 'error', message: `Erro ao criar/trocar branch: ${err instanceof Error ? err.message : 'unknown'}` })
-      return
     }
   }
 
@@ -240,21 +258,46 @@ export async function runImplementation(
     sessionId = session.id
     emit({ phase: 'session-started', sessionId })
 
-    // F9-A — adquire lock do projeto agora que temos sessionId. Race com
-    // outra session que tenha sido disparada entre o peek (linha ~165) e
-    // este ponto sera detectada aqui (acquireProjectLock throws). Marca a
-    // session como error e propaga.
-    try {
-      await acquireProjectLock(projectPath, sessionId)
-    } catch (lockErr) {
-      if (lockErr instanceof ProjectLockedError) {
+    // F9-B — modo worktree: cria worktree isolado. NAO adquire project lock
+    // (cada worktree e working tree proprio, paralelismo eh seguro).
+    if (isWorktreeMode && branchName) {
+      try {
+        worktree = await createWorktree(
+          origProjectPath,
+          sessionId,
+          branchName,
+          gitInfo.currentBranch || 'main',
+        )
+        activeProjectPath = worktree.path
+        emit({
+          phase: 'branching',
+          message: `Worktree criado em ${worktree.path.replace(/^\/Users\/[^/]+\//, '~/')}`,
+          branch: branchName,
+        })
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'erro ao criar worktree'
         await updateSession(wsSlug!, cId!, sessionId, {
           phase: 'error',
-          error: lockErr.message,
+          error: msg,
           completedAt: new Date().toISOString(),
         }).catch(() => {})
+        emit({ phase: 'error', message: `Worktree falhou: ${msg}` })
+        return
       }
-      throw lockErr
+    } else {
+      // F9-A — modo lock: adquire lock no path original.
+      try {
+        await acquireProjectLock(origProjectPath, sessionId)
+      } catch (lockErr) {
+        if (lockErr instanceof ProjectLockedError) {
+          await updateSession(wsSlug!, cId!, sessionId, {
+            phase: 'error',
+            error: lockErr.message,
+            completedAt: new Date().toISOString(),
+          }).catch(() => {})
+        }
+        throw lockErr
+      }
     }
   }
 
@@ -279,8 +322,9 @@ export async function runImplementation(
     const attemptLabel = config.attempt ? ` (tentativa ${config.attempt})` : ''
     await TaskWorkspace.appendImplementationLog(config.workspaceSlug, config.cardId, `Implementacao iniciada${attemptLabel} — agent: ${agentName}, branch: ${branchName || 'N/A'}`)
 
-    // Copy into project dir so agent can read (sandbox-safe)
-    localTaskPath = await TaskWorkspace.copyToProject(config.workspaceSlug, config.cardId, projectPath)
+    // Copy into project dir so agent can read (sandbox-safe).
+    // Em modo worktree, copia pro worktree (nao no working tree principal).
+    localTaskPath = await TaskWorkspace.copyToProject(config.workspaceSlug, config.cardId, activeProjectPath)
     emit({ phase: 'implementing', message: `Task files copiados para ${localTaskPath}` })
   }
 
@@ -302,9 +346,9 @@ export async function runImplementation(
 
     const pollGitDiff = async () => {
       try {
-        const diff = await runCmd('git', ['diff', '--name-status', 'HEAD'], projectPath)
+        const diff = await runCmd('git', ['diff', '--name-status', 'HEAD'], activeProjectPath)
         // Also check untracked files
-        const untracked = await runCmd('git', ['ls-files', '--others', '--exclude-standard'], projectPath)
+        const untracked = await runCmd('git', ['ls-files', '--others', '--exclude-standard'], activeProjectPath)
 
         const lines = diff.trim().split('\n').filter(Boolean)
         for (const line of lines) {
@@ -355,7 +399,7 @@ export async function runImplementation(
       {
         agent: agentName,
         prompt,
-        projectPath,
+        projectPath: activeProjectPath,
         model: config.model,
       },
       (chunk) => {
@@ -391,8 +435,8 @@ export async function runImplementation(
 
     if (gitInfo.hasGit) {
       try {
-        const finalDiff = await runCmd('git', ['diff', '--name-status', 'HEAD'], projectPath)
-        const untracked = await runCmd('git', ['ls-files', '--others', '--exclude-standard'], projectPath)
+        const finalDiff = await runCmd('git', ['diff', '--name-status', 'HEAD'], activeProjectPath)
+        const untracked = await runCmd('git', ['ls-files', '--others', '--exclude-standard'], activeProjectPath)
 
         for (const line of finalDiff.trim().split('\n').filter(Boolean)) {
           const status = line.split('\t')[0]
@@ -412,7 +456,7 @@ export async function runImplementation(
       emit({ phase: 'creating-pr', message: 'Criando Pull Request...' })
       try {
         const pr = await createPR({
-          projectPath,
+          projectPath: activeProjectPath,
           branch: branchName,
           cardTitle: config.cardTitle,
           cardType: config.cardType,
@@ -467,7 +511,17 @@ export async function runImplementation(
     if (heartbeatInterval) clearInterval(heartbeatInterval)
     stopWatcher?.()
     // F9-A — libera o lock do projeto. Idempotente; nao falha se ja foi
-    // liberado ou se nunca foi adquirido (sessionId null no early-exit path).
-    if (sessionId) releaseProjectLock(projectPath, sessionId)
+    // liberado ou se nunca foi adquirido (worktree mode pula acquire).
+    if (sessionId && !isWorktreeMode) releaseProjectLock(origProjectPath, sessionId)
+    // F9-B — remove o worktree. forceRemove=false preserva dirty state pra
+    // inspecao manual (warning no log do daemon). Path do worktree fica
+    // disponivel via session.summary se branch tinha edits nao commitados.
+    if (worktree && sessionId) {
+      try {
+        await removeWorktree(origProjectPath, sessionId, { forceRemove: false })
+      } catch (err) {
+        console.warn(`[runImplementation] worktree cleanup falhou (${sessionId}):`, err)
+      }
+    }
   }
 }

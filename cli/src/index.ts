@@ -177,11 +177,16 @@ async function main(): Promise<void> {
 
       case 'implement': {
         const { implement } = await import('./commands/implement')
-        if (!sub) return errorExit('uso: cockpit implement <id> [--watch] [--feedback "..."]')
+        if (!sub) return errorExit('uso: cockpit implement <id> [--watch] [--feedback "..."] [--isolation worktree]')
+        const iso = flags.isolation as string | undefined
+        if (iso && iso !== 'lock' && iso !== 'worktree') {
+          return errorExit(`--isolation invalido: "${iso}". Use lock ou worktree.`)
+        }
         return implement(sub, {
           feedback: flags.feedback as string | undefined,
           watch: !!flags.watch,
           noPr: !!flags['no-pr'],
+          isolation: (iso as 'lock' | 'worktree' | undefined) ?? (flags.worktree ? 'worktree' : undefined),
         })
       }
 

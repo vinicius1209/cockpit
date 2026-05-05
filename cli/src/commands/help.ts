@@ -45,7 +45,7 @@ const COMMANDS: Array<{ cmd: string; desc: string; group: string }> = [
   { cmd: 'cockpit spec save-vault <id>', desc: 'copia spec para Docs Vault',                                  group: 'spec' },
 
   // Long-running
-  { cmd: 'cockpit implement <id>',       desc: 'dispara implementacao (--watch --feedback --no-pr)',         group: 'run' },
+  { cmd: 'cockpit implement <id>',       desc: 'dispara implementacao (--watch --feedback --no-pr --isolation worktree)', group: 'run' },
   { cmd: 'cockpit watch <id>',           desc: 'tail live de session (--action spec|implementation|chat)',  group: 'run' },
   { cmd: 'cockpit watch --all',          desc: 'multiplex SSE — todas sessions running em uma timeline',     group: 'run' },
   { cmd: 'cockpit alarm <id>',           desc: 'notify do OS quando session terminar (--silent --sound)',    group: 'run' },

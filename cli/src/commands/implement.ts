@@ -9,6 +9,8 @@ interface ImplementOpts {
   feedback?: string
   watch?: boolean
   noPr?: boolean
+  /** F9-B — 'lock' (default, serializa por projeto) ou 'worktree' (isolamento real). */
+  isolation?: 'lock' | 'worktree'
 }
 
 interface ImplementEvent {
@@ -63,6 +65,7 @@ export async function implement(ref: string, opts: ImplementOpts = {}): Promise<
   console.log(`  ${c.bold(card.title)}`)
   console.log(`  ${c.dim('ws:')} ${ws.name} ${c.dim('· proj:')} ${project.name}`)
   console.log(`  ${c.dim('agent:')} claude-code/sonnet`)
+  console.log(`  ${c.dim('isolation:')} ${opts.isolation === 'worktree' ? c.amber('worktree') + c.dim(' (paralelo real)') : c.dim('lock (default — serializa por projeto)')}`)
   if (opts.feedback) console.log(`  ${c.amber('feedback:')} ${opts.feedback}`)
   console.log()
 
@@ -104,6 +107,7 @@ export async function implement(ref: string, opts: ImplementOpts = {}): Promise<
         autoPR: !opts.noPr && (project.auto_pr ?? false),
         feedback: opts.feedback,
         attempt: 1,
+        isolation: opts.isolation || 'lock',
       },
       (rawEvent) => {
         const event = rawEvent as unknown as ImplementEvent
