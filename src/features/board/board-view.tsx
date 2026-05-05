@@ -32,7 +32,7 @@ export function BoardView() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedCard, setSelectedCard] = useState<Card | null>(null)
   const [defaultColumnId, setDefaultColumnId] = useState<string | undefined>()
-  const [filters, setFilters] = useState<BoardFilters>({ types: [], priorities: [], labelIds: [] })
+  const [filters, setFilters] = useState<BoardFilters>({ types: [], priorities: [], labelIds: [], includeArchived: false })
   const lastDragRef = useRef<{ cardId: string; ts: number } | null>(null)
 
   const sensors = useSensors(
@@ -58,6 +58,11 @@ export function BoardView() {
     [cards, activeWorkspaceId],
   )
 
+  const archivedCount = useMemo(
+    () => workspaceCards.filter((c) => !!c.archived_at).length,
+    [workspaceCards],
+  )
+
   const filterCards = useCallback(
     (columnCards: Card[]) => {
       if (!hasFilters) return columnCards
@@ -69,6 +74,20 @@ export function BoardView() {
       })
     },
     [filters, hasFilters],
+  )
+
+  /** Cards de uma coluna respeitando includeArchived. getColumnCards exclui archived
+   *  por padrao; aqui adicionamos de volta quando o toggle esta on. */
+  const columnCardsFor = useCallback(
+    (columnId: string): Card[] => {
+      const active = getColumnCards(activeWorkspaceId, columnId)
+      if (!filters.includeArchived) return active
+      const archived = workspaceCards
+        .filter((c) => c.column_id === columnId && !!c.archived_at)
+        .sort((a, b) => a.position - b.position)
+      return [...active, ...archived]
+    },
+    [activeWorkspaceId, getColumnCards, workspaceCards, filters.includeArchived],
   )
 
   const filteredTotal = useMemo(() => {
@@ -153,6 +172,7 @@ export function BoardView() {
         totalCards={workspaceCards.length}
         filteredCards={filteredTotal}
         labels={workspaceLabels}
+        archivedCount={archivedCount}
       />
       <DndContext
         sensors={sensors}
@@ -164,7 +184,7 @@ export function BoardView() {
         <div className="flex-1 overflow-x-auto overflow-y-hidden">
           <div className="flex gap-4 p-4 h-full">
             {columns.map((column, idx) => {
-              const columnCards = filterCards(getColumnCards(activeWorkspaceId, column.id))
+              const columnCards = filterCards(columnCardsFor(column.id))
               return (
                 <BoardColumn
                   key={column.id}

@@ -12,6 +12,8 @@ interface ListFilters {
   priority?: string
   status?: string  // spec_status
   asJson?: boolean
+  includeArchived?: boolean
+  onlyArchived?: boolean
 }
 
 export async function cardList(filters: ListFilters = {}): Promise<void> {
@@ -26,6 +28,13 @@ export async function cardList(filters: ListFilters = {}): Promise<void> {
   if (filters.type) filtered = filtered.filter((c) => c.type === filters.type)
   if (filters.priority) filtered = filtered.filter((c) => c.priority === filters.priority)
   if (filters.status) filtered = filtered.filter((c) => c.spec_status === filters.status)
+  // F10 — archived: por padrao escondidos. --include-archived mostra junto.
+  // --only-archived mostra apenas descartados.
+  if (filters.onlyArchived) {
+    filtered = filtered.filter((c) => !!c.archived_at)
+  } else if (!filters.includeArchived) {
+    filtered = filtered.filter((c) => !c.archived_at)
+  }
 
   if (filters.asJson) {
     console.log(JSON.stringify(filtered, null, 2))
@@ -56,11 +65,12 @@ export async function cardList(filters: ListFilters = {}): Promise<void> {
       const ws = workspaces.find((w) => w.id === card.workspace_id)
       const col = (columns[card.workspace_id] || []).find((co) => co.id === card.column_id)
       const live = liveCardIds.has(card.id) ? c.amber(' LIVE') : ''
+      const archivedTag = card.archived_at ? c.amber(' [DESCARTADO]') : ''
       return {
         id: c.dim('#' + shortId(card.id)),
         type: typeColor(card.type)(card.type.slice(0, 4).toUpperCase()),
         prio: prioColor(card.priority)(card.priority.slice(0, 4)),
-        title: truncate(card.title, 50) + live,
+        title: truncate(card.title, 50) + live + archivedTag,
         status: card.spec_status ? c.dim(card.spec_status) : c.dim('—'),
         col: c.dim(col?.slug || '—'),
         ws: target ? '' : c.dim('#' + (ws?.slug || '?')),
@@ -350,6 +360,41 @@ interface EditOpts {
   priority?: string
   assignee?: string
   due?: string
+}
+
+// F10 — descarta (archive) ou reativa um card. archive eh reversivel,
+// preserva spec/entrevista/sessions. Use cardDelete soh pra remover de vez.
+export async function cardArchive(ref: string): Promise<void> {
+  const { cards } = await loadAll()
+  const card = resolveCard(ref, cards)
+  if (!card) {
+    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    process.exit(1)
+  }
+  if (card.archived_at) {
+    console.log(c.amber('⚠ #' + shortId(card.id) + ' ja esta descartado'))
+    console.log(c.dim('  cockpit card unarchive ' + shortId(card.id) + '  ← pra reativar'))
+    return
+  }
+  await updateCard(card.id, { archived_at: new Date().toISOString() } as never)
+  console.log(`${c.amber('●')} #${shortId(card.id)} descartado ${c.dim('· some do board, fica no historico')}`)
+  console.log(c.dim(`  reativar: cockpit card unarchive ${shortId(card.id)}`))
+}
+
+export async function cardUnarchive(ref: string): Promise<void> {
+  const { cards } = await loadAll()
+  // Aceita tanto cards ativos quanto archived nessa busca
+  const card = resolveCard(ref, cards)
+  if (!card) {
+    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    process.exit(1)
+  }
+  if (!card.archived_at) {
+    console.log(c.dim('  #' + shortId(card.id) + ' ja esta ativo (nao foi descartado)'))
+    return
+  }
+  await updateCard(card.id, { archived_at: null } as never)
+  console.log(`${c.emerald('✓')} #${shortId(card.id)} reativado ${c.dim('· volta pro board')}`)
 }
 
 export async function cardEdit(ref: string, opts: EditOpts): Promise<void> {

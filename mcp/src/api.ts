@@ -94,6 +94,7 @@ export interface Card {
   interview_notes: string | null
   created_at: string
   updated_at: string
+  archived_at: string | null
   labels?: Array<{ label_id: string }>
 }
 

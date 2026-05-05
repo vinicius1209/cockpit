@@ -17,7 +17,7 @@ import { useAgentStore } from '@/entities/agent/store'
 import { useWorkspaceStore } from '@/entities/workspace/store'
 import { useProjectStore } from '@/entities/card/project-store'
 import { useState, useEffect } from 'react'
-import { Trash2, Bot } from 'lucide-react'
+import { Trash2, Bot, Archive as ArchiveIcon } from 'lucide-react'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { AgentChat } from '@/features/agent-runner/agent-chat'
 import { SpecPanel } from '@/features/spec-engine/spec-panel'
@@ -38,7 +38,7 @@ interface CardDialogProps {
 }
 
 export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }: CardDialogProps) {
-  const { addCard, updateCard, deleteCard } = useCardStore.getState()
+  const { addCard, updateCard, deleteCard, archiveCard, unarchiveCard } = useCardStore.getState()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [type, setType] = useState<CardType>('feature')
@@ -129,6 +129,9 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
 
   const handleDelete = async () => {
     if (!card) return
+    // F10 — se card tem conteudo (spec/entrevista), exige digitar o titulo
+    // pra confirmar (defesa contra delete acidental de trabalho ja feito).
+    const hasContent = !!(card.spec_content || card.interview_notes || card.description)
     const ok = await confirm({
       title: `Excluir card "${card.title}"?`,
       description: (
@@ -137,12 +140,35 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
           historico de implementacao. Os arquivos em
           {' '}<span className="font-mono text-foreground">~/.cockpit/tasks/&lt;ws&gt;/{card.id}/</span>
           {' '}permanecem no disco.
+          {hasContent && (
+            <>
+              <br /><br />
+              <span className="text-amber-500">Este card tem conteudo (spec/entrevista/descricao). Considere{' '}
+              <strong className="text-foreground">Descartar</strong> em vez de Excluir — preserva tudo no historico.</span>
+            </>
+          )}
         </>
       ),
       confirmLabel: 'Excluir card',
+      requireText: hasContent ? card.title.slice(0, 40) : undefined,
     })
     if (!ok) return
     deleteCard(card.id)
+    onClose()
+  }
+
+  const handleArchive = async () => {
+    if (!card) return
+    const ok = await confirm({
+      title: card.archived_at ? `Reativar card "${card.title}"?` : `Descartar card "${card.title}"?`,
+      description: card.archived_at
+        ? 'O card volta a aparecer no board.'
+        : 'O card some do board mas permanece no historico (busca, metricas, sessions). Voce pode reativar a qualquer momento. Use Excluir apenas se foi criado por engano.',
+      confirmLabel: card.archived_at ? 'Reativar' : 'Descartar',
+    })
+    if (!ok) return
+    if (card.archived_at) unarchiveCard(card.id)
+    else archiveCard(card.id)
     onClose()
   }
 
@@ -219,10 +245,23 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
           {/* ──── FOOTER ──── */}
           <div className="flex items-center justify-between border-t px-4 py-3 shrink-0">
             {isEditing ? (
-              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleDelete}>
-                <Trash2 className="h-3.5 w-3.5 mr-1" />
-                Excluir
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleDelete}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1" />
+                  Excluir
+                </Button>
+                <span className="h-4 w-px bg-border/60 mx-1" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-amber-500 hover:text-amber-400"
+                  onClick={handleArchive}
+                  title={card?.archived_at ? 'Reativar (volta pro board)' : 'Descartar (some do board, fica no historico)'}
+                >
+                  <ArchiveIcon className="h-3.5 w-3.5 mr-1" />
+                  {card?.archived_at ? 'Reativar' : 'Descartar'}
+                </Button>
+              </div>
             ) : <div />}
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={onClose}>

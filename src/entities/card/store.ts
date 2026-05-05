@@ -28,6 +28,8 @@ interface CardState {
   addCard: (data: CardInsert) => string
   updateCard: (id: string, data: Partial<Card>) => void
   deleteCard: (id: string) => void
+  archiveCard: (id: string) => void
+  unarchiveCard: (id: string) => void
   moveCard: (cardId: string, toColumnId: string, newPosition: number) => void
   reorderCards: (columnId: string, cardIds: string[]) => void
   getColumnCards: (workspaceId: string, columnId: string) => Card[]
@@ -68,6 +70,7 @@ export const useCardStore = create<CardState>()(
           ...data,
           id,
           labels: [],
+          archived_at: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }
@@ -85,6 +88,22 @@ export const useCardStore = create<CardState>()(
 
       deleteCard: (id) => {
         set((state) => ({ cards: state.cards.filter((c) => c.id !== id) }))
+      },
+
+      archiveCard: (id) => {
+        set((state) => ({
+          cards: state.cards.map((c) =>
+            c.id === id ? { ...c, archived_at: new Date().toISOString(), updated_at: new Date().toISOString() } : c,
+          ),
+        }))
+      },
+
+      unarchiveCard: (id) => {
+        set((state) => ({
+          cards: state.cards.map((c) =>
+            c.id === id ? { ...c, archived_at: null, updated_at: new Date().toISOString() } : c,
+          ),
+        }))
       },
 
       moveCard: (cardId, toColumnId, newPosition) => {
@@ -109,8 +128,13 @@ export const useCardStore = create<CardState>()(
       },
 
       getColumnCards: (workspaceId, columnId) => {
+        // F10 — esconde archived por padrao (board nao polui). UI tem toggle pra mostrar.
         return get()
-          .cards.filter((c) => c.workspace_id === workspaceId && c.column_id === columnId)
+          .cards.filter((c) =>
+            c.workspace_id === workspaceId
+            && c.column_id === columnId
+            && !c.archived_at,
+          )
           .sort((a, b) => a.position - b.position)
       },
 

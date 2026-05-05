@@ -32,7 +32,9 @@ const COMMANDS: Array<{ cmd: string; desc: string; group: string }> = [
   { cmd: 'cockpit card new "<title>"',    desc: 'cria card (--type --prio --ws --col --desc)',                group: 'card' },
   { cmd: 'cockpit card move <id> <col>', desc: 'move card de coluna',                                        group: 'card' },
   { cmd: 'cockpit card edit <id>',       desc: 'edita campos (--title --type --prio --assignee --due)',      group: 'card' },
-  { cmd: 'cockpit card delete <id>',     desc: 'exclui card (--force)',                                      group: 'card' },
+  { cmd: 'cockpit card delete <id>',     desc: 'exclui card permanente (--force)',                           group: 'card' },
+  { cmd: 'cockpit card archive <id>',    desc: 'descarta card (mantem historico, alias: discard)',           group: 'card' },
+  { cmd: 'cockpit card unarchive <id>',  desc: 'reativa card descartado (alias: restore)',                   group: 'card' },
 
   // Spec lifecycle
   { cmd: 'cockpit spec show <id>',       desc: 'imprime markdown da spec',                                    group: 'spec' },

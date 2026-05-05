@@ -58,6 +58,7 @@ export function BoardCard({ card, onClick }: BoardCardProps) {
       className={`group relative cursor-pointer rounded-md border bg-card p-2.5 transition-all hover:border-primary/40 hover:shadow-[0_0_0_1px_var(--color-primary)]/20
         ${isDragging ? 'opacity-50 shadow-lg ring-1 ring-primary' : ''}
         ${processing ? 'border-amber-500/60 shadow-[0_0_18px_-4px_rgba(245,158,11,0.4)]' : ''}
+        ${card.archived_at ? 'opacity-50 grayscale-[0.4] border-dashed' : ''}
       `}
     >
       {/* Left accent bar — color from card type */}

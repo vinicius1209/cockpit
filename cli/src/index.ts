@@ -120,7 +120,7 @@ async function main(): Promise<void> {
 
       case 'card':
       case 'cards': {
-        const { cardList, cardShow, cardNew, cardMove, cardDelete, cardEdit } = await import('./commands/card')
+        const { cardList, cardShow, cardNew, cardMove, cardDelete, cardEdit, cardArchive, cardUnarchive } = await import('./commands/card')
         if (!sub || sub === 'list') {
           return cardList({
             ws: flags.ws as string | undefined,
@@ -128,7 +128,17 @@ async function main(): Promise<void> {
             priority: flags.priority as string | undefined,
             status: flags.status as string | undefined,
             asJson: !!flags.json,
+            includeArchived: !!flags['include-archived'],
+            onlyArchived: !!flags['only-archived'] || !!flags.archived,
           })
+        }
+        if (sub === 'archive' || sub === 'discard') {
+          if (!rest[0]) return errorExit('uso: cockpit card archive <id>')
+          return cardArchive(rest[0])
+        }
+        if (sub === 'unarchive' || sub === 'restore') {
+          if (!rest[0]) return errorExit('uso: cockpit card unarchive <id>')
+          return cardUnarchive(rest[0])
         }
         if (sub === 'show') {
           if (!rest[0]) return errorExit('uso: cockpit card show <id>')

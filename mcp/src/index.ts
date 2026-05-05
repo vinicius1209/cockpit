@@ -69,6 +69,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           priority: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
           spec_status: { type: 'string', enum: ['draft', 'ready', 'in_progress', 'review', 'done'] },
           column_slug: { type: 'string', description: 'Filter by column (inbox, ready, in-progress, etc)' },
+          include_archived: { type: 'boolean', description: 'Inclui cards descartados (default false — arquivados nao aparecem)', default: false },
+          only_archived: { type: 'boolean', description: 'Mostra APENAS descartados', default: false },
           limit: { type: 'number', description: 'Max results (default 50)' },
         },
       },
@@ -139,6 +141,31 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       inputSchema: { type: 'object', properties: {}, required: [] },
     },
     {
+      name: 'cockpit_archive_card',
+      description:
+        'Descarta um card (archive). NAO eh delete — mantem spec, entrevista, sessions e todo historico no DB. ' +
+        'Some do board mas pode ser reativado. Use isso quando o usuario decide nao fazer ou abandonou um card. ' +
+        'Para restaurar, use cockpit_unarchive_card.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          card_id: { type: 'string', description: 'Card short ID (SW78) ou full ID' },
+        },
+        required: ['card_id'],
+      },
+    },
+    {
+      name: 'cockpit_unarchive_card',
+      description: 'Reativa um card descartado — volta a aparecer no board.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          card_id: { type: 'string' },
+        },
+        required: ['card_id'],
+      },
+    },
+    {
       name: 'cockpit_implement_async',
       description:
         'Trigger implementation of a card in the background. The card must have a ready spec and a project linked to its workspace. ' +
@@ -186,6 +213,8 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'cockpit_show_card':    return ok(await toolShowCard(args as { card_id: string }))
       case 'cockpit_create_card':  return ok(await toolCreateCard(args as unknown as CreateCardArgs))
       case 'cockpit_move_card':    return ok(await toolMoveCard(args as { card_id: string; column_slug: string }))
+      case 'cockpit_archive_card':   return ok(await toolArchiveCard(args as { card_id: string }))
+      case 'cockpit_unarchive_card': return ok(await toolUnarchiveCard(args as { card_id: string }))
       case 'cockpit_search':       return ok(await toolSearch(args as { query: string; in?: string; limit?: number }))
       case 'cockpit_metrics':      return ok(await toolMetrics())
       case 'cockpit_implement_async': return ok(await toolImplementAsync(args as unknown as ImplementAsyncArgs))
@@ -236,6 +265,8 @@ interface ListCardsArgs {
   priority?: string
   spec_status?: string
   column_slug?: string
+  include_archived?: boolean
+  only_archived?: boolean
   limit?: number
 }
 
@@ -258,6 +289,12 @@ async function toolListCards(args: ListCardsArgs): Promise<unknown> {
       const col = (columns[c.workspace_id] || []).find((co) => co.id === c.column_id)
       return col?.slug === args.column_slug
     })
+  }
+  // F10 archived: por default, escondidos. only_archived sobrescreve include_archived.
+  if (args.only_archived) {
+    filtered = filtered.filter((c) => !!c.archived_at)
+  } else if (!args.include_archived) {
+    filtered = filtered.filter((c) => !c.archived_at)
   }
 
   const limit = args.limit ?? 50
@@ -353,6 +390,7 @@ async function toolCreateCard(args: CreateCardArgs): Promise<unknown> {
     interview_notes: null,
     created_at: now,
     updated_at: now,
+    archived_at: null as string | null,
     labels: [],
   }
 
@@ -370,6 +408,40 @@ async function toolCreateCard(args: CreateCardArgs): Promise<unknown> {
     type: newCard.type,
     priority: newCard.priority,
   }
+}
+
+async function toolArchiveCard(args: { card_id: string }): Promise<unknown> {
+  const cards = await loadCards()
+  const card = resolveCard(args.card_id, cards)
+  if (!card) throw new Error(`card not found: ${args.card_id}`)
+  if (card.archived_at) {
+    return { id: shortId(card.id), already_archived: true, archived_at: card.archived_at }
+  }
+  const now = new Date().toISOString()
+  await patchCardsStore<{ cards: typeof cards }>((s) => ({
+    ...s,
+    cards: (s.cards || []).map((c) =>
+      c.id === card.id ? { ...c, archived_at: now, updated_at: now } : c,
+    ),
+  }))
+  return { id: shortId(card.id), title: card.title, archived_at: now, status: 'archived' }
+}
+
+async function toolUnarchiveCard(args: { card_id: string }): Promise<unknown> {
+  const cards = await loadCards()
+  const card = resolveCard(args.card_id, cards)
+  if (!card) throw new Error(`card not found: ${args.card_id}`)
+  if (!card.archived_at) {
+    return { id: shortId(card.id), already_active: true }
+  }
+  const now = new Date().toISOString()
+  await patchCardsStore<{ cards: typeof cards }>((s) => ({
+    ...s,
+    cards: (s.cards || []).map((c) =>
+      c.id === card.id ? { ...c, archived_at: null, updated_at: now } : c,
+    ),
+  }))
+  return { id: shortId(card.id), title: card.title, status: 'active' }
 }
 
 async function toolMoveCard(args: { card_id: string; column_slug: string }): Promise<unknown> {

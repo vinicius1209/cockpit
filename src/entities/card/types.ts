@@ -70,6 +70,9 @@ export interface Card {
   labels: CardLabel[]
   created_at: string
   updated_at: string
+  /** F10 — quando setado, card foi descartado. Mantido no DB pra historico/busca,
+   *  filtrado fora do board por padrao. ISO timestamp. null = ativo. */
+  archived_at: string | null
 }
 
 export interface Label {
@@ -85,5 +88,5 @@ export interface CardLabel {
   label?: Label
 }
 
-export type CardInsert = Omit<Card, 'id' | 'created_at' | 'updated_at' | 'labels'>
+export type CardInsert = Omit<Card, 'id' | 'created_at' | 'updated_at' | 'labels' | 'archived_at'>
 export type CardUpdate = Partial<CardInsert>
