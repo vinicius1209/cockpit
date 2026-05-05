@@ -2,6 +2,23 @@
 
 Todas as mudanças notáveis do Cockpit. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [Unreleased]
+
+### Added — F9-A: project lock (multi-session orchestration)
+
+Quando duas implementações tentam rodar no mesmo projeto, a segunda recebe `409 project_locked` antes de criar uma session zumbi. Resolve a categoria mais comum de conflito: working tree compartilhado com edits stomped.
+
+- Migration v4: tabela `project_locks(path PK, session_id, kind, acquired_at)`
+- `daemon/src/tasks/project-lock.ts`: `acquireProjectLock`, `releaseProjectLock`, `peekActiveProjectLock`, `reapOrphanLocks`
+- Pre-check em `/agents/implement` e `/agents/implement/async` retorna 409 com payload rico (`held_by` com session_id, card, workspace, agent, age_seconds + `hints`)
+- Auto-cleanup de locks órfãos: peek limpa lazy quando session já terminou; reaper periódico (5min) limpa em batch; boot cleanup limpa survivors de daemon crash
+- CLI: `cockpit implement` detecta 409 e renderiza UX rica (project, card, agent, idade, opções)
+- MCP: `cockpit_implement_async` lança erro estruturado com options pra LLM ("aguarde, peça pra abortar, dispare em outro projeto")
+- Lock NÃO afeta: spec gen, discovery, chat, watch, log, metrics — só implementations que tocam working tree
+- Lock por path: 2 implementations em projetos diferentes rodam paralelo. Apenas o mesmo path bloqueia.
+
+Próximo passo (F9-B): `--isolation worktree` opt-in pra paralelismo real no mesmo projeto via `git worktree`.
+
 ## [0.1.0] — 2026-05-05
 
 Primeiro release público. Cockpit deixa de ser "interno" e ganha as três interfaces (Web/CLI/MCP) com persistência consistente, streaming live e auto-start no macOS.

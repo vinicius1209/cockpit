@@ -2,6 +2,7 @@ import { handleRequest } from './routes/router'
 import { initPersistence } from './persistence'
 import { jsonResponse } from './http'
 import { reapStaleSessions } from './tasks/session-manager'
+import { reapOrphanLocks } from './tasks/project-lock'
 
 const PORT = Number(process.env.COCKPIT_DAEMON_PORT || 4800)
 // Bind explicito em 127.0.0.1 (IPv4 loopback). Sem isso, Bun.serve em algumas
@@ -51,10 +52,22 @@ const reaperTimer = setInterval(async () => {
     if (reaped > 0) {
       console.log(`[reaper] ${reaped} sessao(oes) stale marcada(s) como error`)
     }
+    // Locks orfaos (cuja session ja terminou) — depende do reaper de sessions
+    // ter rodado primeiro pra marcar as zumbis como error.
+    await reapOrphanLocks()
   } catch (err) {
     console.warn('[reaper] failed:', err)
   }
 }, REAPER_INTERVAL_MS)
+
+// Boot cleanup: locks orfaos de runs anteriores que crasharam sem release.
+// Executa antes de aceitar requests novas pra evitar 409 falso-positivo.
+try {
+  const orphans = await reapOrphanLocks()
+  if (orphans > 0) console.log(`[boot] cleaned ${orphans} orphan project lock(s)`)
+} catch (err) {
+  console.warn('[boot] orphan lock cleanup failed:', err)
+}
 
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',

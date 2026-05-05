@@ -175,6 +175,27 @@ function runMigrations(): void {
     v = 3
     console.log('[db] Migration v3: sessions.updated_at')
   }
+
+  if (v < 4) {
+    // v4: project_locks — F9-A multi-session orchestration.
+    // Garante que apenas 1 implementacao roda por projeto (por path) por vez,
+    // evitando working tree stomping. Cleanup de orfaos (cuja session ja
+    // terminou) acontece no boot e periodicamente (mesmo padrao do reaper).
+    //  - kind: 'implement' por enquanto; futuro pode ter 'discovery', 'spec' etc
+    //  - acquired_at: ISO timestamp; usado em mensagens de erro
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS project_locks (
+        path TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        kind TEXT NOT NULL DEFAULT 'implement',
+        acquired_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_project_locks_session ON project_locks(session_id);
+      PRAGMA user_version = 4;
+    `)
+    v = 4
+    console.log('[db] Migration v4: project_locks')
+  }
 }
 
 // ── Legacy JSON Import ──

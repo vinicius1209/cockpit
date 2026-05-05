@@ -8,6 +8,31 @@ export async function daemonGet<T>(path: string): Promise<T> {
   return res.json() as Promise<T>
 }
 
+// F9-A — payload retornado pelo daemon quando o lock estah retido.
+// O MCP tool `cockpit_implement_async` formata isso como texto rico
+// pra o LLM entender a opcao de aguardar/abortar.
+export interface LockHeldBy {
+  session_id: string
+  card_id?: string
+  workspace_slug?: string
+  agent?: string
+  acquired_at: string
+  age_seconds?: number
+}
+
+export class ProjectLockedError extends Error {
+  readonly projectPath: string
+  readonly heldBy: LockHeldBy
+  readonly hints: string[]
+  constructor(projectPath: string, heldBy: LockHeldBy, hints: string[] = []) {
+    super(`project locked: ${projectPath}`)
+    this.name = 'ProjectLockedError'
+    this.projectPath = projectPath
+    this.heldBy = heldBy
+    this.hints = hints
+  }
+}
+
 export async function daemonPost<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${DAEMON_URL}${path}`, {
     method: 'POST',
@@ -15,6 +40,17 @@ export async function daemonPost<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   })
   if (!res.ok) {
+    if (res.status === 409) {
+      const data = await res.json().catch(() => null) as {
+        error?: string
+        project_path?: string
+        held_by?: LockHeldBy
+        hints?: string[]
+      } | null
+      if (data?.error === 'project_locked' && data.held_by && data.project_path) {
+        throw new ProjectLockedError(data.project_path, data.held_by, data.hints || [])
+      }
+    }
     const text = await res.text().catch(() => res.statusText)
     throw new Error(`daemon ${res.status}: ${text.slice(0, 200)}`)
   }

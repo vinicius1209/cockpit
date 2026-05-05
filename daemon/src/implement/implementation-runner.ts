@@ -2,6 +2,7 @@ import { executeAgentWithCallbacks, detectInstalledAgents } from '../executor/ag
 import { TaskWorkspace } from '../tasks/task-workspace'
 import { createPR } from '../git/pr-creator'
 import { createSession, updateSession, appendOutput, appendFile, type SessionFile } from '../tasks/session-manager'
+import { peekActiveProjectLock, acquireProjectLock, releaseProjectLock, ProjectLockedError } from '../tasks/project-lock'
 
 export interface ImplementConfig {
   cardTitle: string
@@ -160,6 +161,14 @@ export async function runImplementation(
 ): Promise<void> {
   const { projectPath, createBranch } = config
 
+  // 0. F9-A — pre-check do project lock. Se outro implement esta rodando
+  // no mesmo path, throw imediato. HTTP routes convertem em 409 com payload
+  // rico ANTES de criar a session (evita session zumbi).
+  const activeLock = await peekActiveProjectLock(projectPath)
+  if (activeLock) {
+    throw new ProjectLockedError(projectPath, activeLock)
+  }
+
   // 1. Analyze git
   emit({ phase: 'analyzing', message: 'Analisando projeto...' })
   const gitInfo = await analyzeGitFlow(projectPath)
@@ -230,6 +239,23 @@ export async function runImplementation(
     })
     sessionId = session.id
     emit({ phase: 'session-started', sessionId })
+
+    // F9-A — adquire lock do projeto agora que temos sessionId. Race com
+    // outra session que tenha sido disparada entre o peek (linha ~165) e
+    // este ponto sera detectada aqui (acquireProjectLock throws). Marca a
+    // session como error e propaga.
+    try {
+      await acquireProjectLock(projectPath, sessionId)
+    } catch (lockErr) {
+      if (lockErr instanceof ProjectLockedError) {
+        await updateSession(wsSlug!, cId!, sessionId, {
+          phase: 'error',
+          error: lockErr.message,
+          completedAt: new Date().toISOString(),
+        }).catch(() => {})
+      }
+      throw lockErr
+    }
   }
 
   // 4. Write feedback (if re-attempt) + task workspace files + copy into project
@@ -440,5 +466,8 @@ export async function runImplementation(
     // Guaranteed cleanup of intervals regardless of success/error path
     if (heartbeatInterval) clearInterval(heartbeatInterval)
     stopWatcher?.()
+    // F9-A — libera o lock do projeto. Idempotente; nao falha se ja foi
+    // liberado ou se nunca foi adquirido (sessionId null no early-exit path).
+    if (sessionId) releaseProjectLock(projectPath, sessionId)
   }
 }

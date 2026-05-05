@@ -31,6 +31,7 @@ import {
   loadWorkspaces, loadCards, loadColumns, loadProjects,
   patchCardsStore, daemonGet, daemonPost,
   resolveCard, resolveWorkspace, shortId, newCardId,
+  ProjectLockedError,
   type AgentSession,
 } from './api'
 
@@ -485,7 +486,34 @@ async function toolImplementAsync(args: ImplementAsyncArgs): Promise<unknown> {
     attempt: 1,
   }
 
-  const res = await daemonPost<{ sessionId: string; status: string }>('/agents/implement/async', body)
+  let res: { sessionId: string; status: string }
+  try {
+    res = await daemonPost<{ sessionId: string; status: string }>('/agents/implement/async', body)
+  } catch (err) {
+    if (err instanceof ProjectLockedError) {
+      // F9-A — surface payload estruturado pra o LLM saber que ha outra
+      // session rodando no mesmo projeto e oferecer ao usuario opcoes claras.
+      const ageMin = err.heldBy.age_seconds ? Math.floor(err.heldBy.age_seconds / 60) : 0
+      const ageStr = err.heldBy.age_seconds && err.heldBy.age_seconds < 60
+        ? `${err.heldBy.age_seconds}s`
+        : `${ageMin}m${(err.heldBy.age_seconds || 0) % 60}s`
+      throw new Error(
+        `project_locked — outra implementacao ja roda neste projeto.\n` +
+        `held_by:\n` +
+        `  session: ${err.heldBy.session_id}\n` +
+        (err.heldBy.card_id ? `  card: #${shortId(err.heldBy.card_id)}\n` : '') +
+        (err.heldBy.workspace_slug ? `  workspace: ${err.heldBy.workspace_slug}\n` : '') +
+        (err.heldBy.agent ? `  agent: ${err.heldBy.agent}\n` : '') +
+        `  rodando ha: ${ageStr}\n` +
+        `\nopcoes pro usuario:\n` +
+        `  - aguarde a session atual terminar (chame cockpit_get_session com o session_id acima pra ver progresso)\n` +
+        `  - peca pro usuario abortar pelo Web UI ou cockpit log\n` +
+        `  - dispare em outro projeto, ou aguarde\n` +
+        `  - modo --isolation worktree (paralelo real) chega no F9-B`
+      )
+    }
+    throw err
+  }
 
   return {
     session_id: res.sessionId,

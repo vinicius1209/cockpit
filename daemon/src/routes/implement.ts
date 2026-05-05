@@ -1,6 +1,28 @@
 import { jsonResponse } from '../http'
 import { runImplementation, type ImplementConfig, type ImplementEvent } from '../implement/implementation-runner'
 import { validateProjectPath } from '../validation'
+import { peekActiveProjectLock, ProjectLockedError } from '../tasks/project-lock'
+
+function lockErrorBody(err: ProjectLockedError) {
+  return {
+    error: 'project_locked',
+    message: 'Outra implementacao ja esta rodando neste projeto',
+    project_path: err.path,
+    held_by: {
+      session_id: err.heldBy.sessionId,
+      card_id: err.heldBy.cardId,
+      workspace_slug: err.heldBy.workspaceSlug,
+      agent: err.heldBy.agent,
+      acquired_at: err.heldBy.acquiredAt,
+      age_seconds: err.heldBy.ageSeconds,
+    },
+    hints: [
+      'aguarde a session atual terminar (cockpit watch ' + (err.heldBy.cardId || '<id>') + ')',
+      'ou aborte a session via Web UI / cockpit log',
+      'modo worktree (isolamento real) chega no F9-B',
+    ],
+  }
+}
 
 export async function handleImplementRoutes(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
@@ -24,8 +46,20 @@ export async function handleImplementRoutes(req: Request, url: URL): Promise<Res
     }
     body.projectPath = validPath
 
+    // F9-A — pre-check do lock. Se outro implement esta rodando no mesmo
+    // path, retorna 409 ANTES de criar a session zumbi. UX clara via
+    // payload `held_by` rico.
+    const existingLock = await peekActiveProjectLock(body.projectPath)
+    if (existingLock) {
+      return jsonResponse(lockErrorBody(new ProjectLockedError(body.projectPath, existingLock)), 409)
+    }
+
     let resolveSession: (id: string) => void = () => {}
-    const sessionPromise = new Promise<string>((r) => { resolveSession = r })
+    let rejectSession: (err: Error) => void = () => {}
+    const sessionPromise = new Promise<string>((res, rej) => {
+      resolveSession = res
+      rejectSession = rej
+    })
 
     // Kick off in background. Don't await. Errors are persisted into the
     // session row by the runner itself.
@@ -34,14 +68,28 @@ export async function handleImplementRoutes(req: Request, url: URL): Promise<Res
         resolveSession(event.sessionId)
       }
     }).catch((err) => {
+      // ProjectLockedError pode acontecer numa race entre peek e acquire —
+      // surface via reject pra route convertir em 409.
+      if (err instanceof ProjectLockedError) {
+        rejectSession(err)
+        return
+      }
       console.error('[implement/async] runImplementation crashed:', err)
     })
 
     // Wait at most 15s for session to be created (it should take <100ms in practice)
-    const sessionId = await Promise.race([
-      sessionPromise,
-      new Promise<null>((r) => setTimeout(() => r(null), 15_000)),
-    ])
+    let sessionId: string | null = null
+    try {
+      sessionId = await Promise.race([
+        sessionPromise,
+        new Promise<null>((r) => setTimeout(() => r(null), 15_000)),
+      ])
+    } catch (err) {
+      if (err instanceof ProjectLockedError) {
+        return jsonResponse(lockErrorBody(err), 409)
+      }
+      throw err
+    }
 
     if (!sessionId) {
       return jsonResponse({ error: 'Timed out waiting for session row creation' }, 504)
@@ -62,6 +110,14 @@ export async function handleImplementRoutes(req: Request, url: URL): Promise<Res
       return jsonResponse({ error: 'Invalid projectPath' }, 400)
     }
     body.projectPath = validPath
+
+    // F9-A — mesma pre-check que o async endpoint. Retorna 409 ANTES de
+    // abrir o SSE pra que o cliente CLI/Web receba o erro estruturado em
+    // JSON normal (mais facil de parsear que SSE event de erro).
+    const existingLock = await peekActiveProjectLock(body.projectPath)
+    if (existingLock) {
+      return jsonResponse(lockErrorBody(new ProjectLockedError(body.projectPath, existingLock)), 409)
+    }
 
     const stream = new ReadableStream({
       async start(controller) {

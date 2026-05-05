@@ -220,6 +220,7 @@ CLI cockpit (Bun standalone)       ──HTTP──▶
 - **Frontend stores**: `src/entities/{card,workspace,agent,docs}/store.ts` —
   Zustand com adapter customizado que persiste no daemon (`createDaemonStorageAdapter`).
 - **Daemon**: `daemon/src/index.ts` (Bun.serve), rotas em `daemon/src/routes/`.
+- **Project lock (F9-A)**: `daemon/src/tasks/project-lock.ts` impede 2 implementacoes simultaneas no mesmo path. Pre-check nas rotas implement retorna 409 com payload `held_by` rico antes de criar session. Locks orfaos sao limpos lazy (peek) + batch (reaper 5min) + boot. Lock NAO afeta spec/discovery/chat/watch — so implementations.
 - **Agent execution**: `daemon/src/executor/agent-executor.ts` — abstrai
   CLI agents (claude-code, opencode, gemini-cli) com `KNOWN_AGENTS` registry.
   - **claude-code precisa de `--permission-mode bypassPermissions`** em modo

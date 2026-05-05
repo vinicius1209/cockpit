@@ -15,6 +15,30 @@ interface SseOpts {
   onError?: (err: Error) => void
 }
 
+// F9-A — erro estruturado quando daemon retorna 409 (project_locked).
+// CLI e MCP detectam via instanceof e renderizam UX rica em vez de "HTTP 409".
+export interface LockHeldBy {
+  session_id: string
+  card_id?: string
+  workspace_slug?: string
+  agent?: string
+  acquired_at: string
+  age_seconds?: number
+}
+
+export class ProjectLockedError extends Error {
+  readonly projectPath: string
+  readonly heldBy: LockHeldBy
+  readonly hints: string[]
+  constructor(projectPath: string, heldBy: LockHeldBy, hints: string[] = []) {
+    super(`project locked: ${projectPath}`)
+    this.name = 'ProjectLockedError'
+    this.projectPath = projectPath
+    this.heldBy = heldBy
+    this.hints = hints
+  }
+}
+
 // GET endpoint with SSE response. Parses `data: {json}\n\n` blocks.
 // Comments (`: heartbeat\n\n`) are silently skipped.
 export async function getSSE(path: string, onEvent: SseHandler, opts: SseOpts = {}): Promise<void> {
@@ -42,6 +66,18 @@ export async function postSSE(
     signal: opts.signal,
   })
   if (!res.ok || !res.body) {
+    // F9-A — 409 vem como JSON normal (nao SSE) com payload estruturado.
+    if (res.status === 409) {
+      const data = await res.json().catch(() => null) as {
+        error?: string
+        project_path?: string
+        held_by?: LockHeldBy
+        hints?: string[]
+      } | null
+      if (data?.error === 'project_locked' && data.held_by && data.project_path) {
+        throw new ProjectLockedError(data.project_path, data.held_by, data.hints || [])
+      }
+    }
     const errText = await res.text().catch(() => '')
     throw new Error(`SSE failed: HTTP ${res.status} ${errText.slice(0, 200)}`)
   }

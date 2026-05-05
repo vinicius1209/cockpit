@@ -2,7 +2,7 @@ import { loadAll } from '../api/store'
 import { resolveCard, shortId } from '../api/resolve'
 import { c, sym } from '../ui/colors'
 import { divider } from '../ui/box'
-import { postSSE } from '../api/sse'
+import { postSSE, ProjectLockedError } from '../api/sse'
 import { createStreamRenderer, renderChunk, classifyLine, flushOutputBuffer } from '../ui/stream-render'
 
 interface ImplementOpts {
@@ -145,6 +145,10 @@ export async function implement(ref: string, opts: ImplementOpts = {}): Promise<
     )
   } catch (err) {
     if (!ctrl.signal.aborted) {
+      if (err instanceof ProjectLockedError) {
+        renderLockError(err)
+        process.exit(1)
+      }
       console.error(c.rose('✕ erro: ') + (err as Error).message)
       process.exit(1)
     }
@@ -193,4 +197,33 @@ function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60)
   const s = seconds % 60
   return `${m}m${s.toString().padStart(2, '0')}s`
+}
+
+function renderLockError(err: ProjectLockedError): void {
+  const heldBy = err.heldBy
+  const ageMin = heldBy.age_seconds ? Math.floor(heldBy.age_seconds / 60) : 0
+  const ageStr = heldBy.age_seconds && heldBy.age_seconds < 60
+    ? `${heldBy.age_seconds}s`
+    : `${ageMin}m${(heldBy.age_seconds || 0) % 60}s`
+
+  console.log()
+  console.log(c.rose('━━━━━━━━━━ PROJECT LOCKED ━━━━━━━━━━'))
+  console.log()
+  console.log(`  ${c.rose(sym.cross)} outra implementacao ja roda neste projeto`)
+  console.log()
+  console.log(`  ${c.dim('project   :')} ${err.projectPath}`)
+  if (heldBy.card_id) console.log(`  ${c.dim('card      :')} ${c.bold('#' + shortId(heldBy.card_id))}`)
+  if (heldBy.workspace_slug) console.log(`  ${c.dim('workspace :')} ${heldBy.workspace_slug}`)
+  if (heldBy.agent) console.log(`  ${c.dim('agent     :')} ${heldBy.agent}`)
+  console.log(`  ${c.dim('session   :')} ${heldBy.session_id}`)
+  console.log(`  ${c.dim('rodando ha:')} ${c.amber(ageStr)}`)
+  console.log()
+  console.log(c.dim('  ━ opcoes:'))
+  if (heldBy.card_id) {
+    console.log(`    ${c.bold('cockpit watch ' + shortId(heldBy.card_id))}      ${c.dim('# acompanhar a session em curso')}`)
+  }
+  console.log(`    ${c.bold('cockpit log ' + (heldBy.card_id ? shortId(heldBy.card_id) : '<id>'))}            ${c.dim('# inspecionar/abortar pelo Web UI')}`)
+  console.log(`    ${c.dim('# ou aguardar — assim que terminar, dispare de novo')}`)
+  console.log(`    ${c.dim('# isolation worktree (paralelo real) chega no F9-B')}`)
+  console.log()
 }
