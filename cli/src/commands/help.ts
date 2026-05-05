@@ -5,6 +5,7 @@ import { banner } from '../ui/banner'
 const COMMANDS: Array<{ cmd: string; desc: string; group: string }> = [
   // Status & info
   { cmd: 'cockpit',                       desc: 'status overview global',                                     group: 'status' },
+  { cmd: 'cockpit tui',                   desc: 'TUI fullscreen — board kanban interativo + sessions live',   group: 'status' },
   { cmd: 'cockpit doctor',                desc: 'health check (daemon, agents, projetos, gh)',                group: 'status' },
   { cmd: 'cockpit metrics',               desc: 'dashboards de uso (cards, runs, velocity)',                  group: 'status' },
   { cmd: 'cockpit help [cmd]',            desc: 'ajuda',                                                      group: 'status' },

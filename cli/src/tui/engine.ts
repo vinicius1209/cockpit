@@ -1,0 +1,236 @@
+// Engine TUI minimalista, zero deps. Alternate screen buffer + raw mode +
+// event loop. Renderiza Screens que sao funcoes puras (state → string).
+//
+// Filosofia: nada de framework — apenas escape sequences ANSI e stdin raw.
+// Bun nao tem 'readline' nativo (Node.tty); usamos process.stdin diretamente.
+
+import { parseKey, type Key } from './keys'
+
+// ── Escape sequences ──
+const ESC = '\x1b'
+const CSI = `${ESC}[`
+export const ANSI = {
+  enterAltScreen: `${CSI}?1049h`,
+  exitAltScreen: `${CSI}?1049l`,
+  hideCursor: `${CSI}?25l`,
+  showCursor: `${CSI}?25h`,
+  clear: `${CSI}2J`,
+  home: `${CSI}H`,
+  enableMouse: `${CSI}?1000h`,   // basic mouse — opcional
+  disableMouse: `${CSI}?1000l`,
+  reset: `${CSI}0m`,
+  // Cursor positioning: 1-indexed
+  moveTo: (row: number, col: number) => `${CSI}${row};${col}H`,
+  saveCursor: `${ESC}7`,
+  restoreCursor: `${ESC}8`,
+  clearLine: `${CSI}2K`,
+}
+
+// ── Frame buffer ──
+// Acumula linhas pra escrever de uma vez (reduz flicker em terminais lentos).
+export class FrameBuffer {
+  private rows: string[] = []
+  private cols: number
+  // private rowsCount: number  // reserved for clipping
+
+  constructor(rows: number, cols: number) {
+    this.cols = cols
+    // void rows  // reserved for clipping in future
+    void rows
+    this.rows = []
+  }
+
+  push(line: string): void {
+    this.rows.push(line)
+  }
+
+  pad(): void {
+    // Garantee blank lines pra preencher resto do terminal — evita lixo da
+    // tela anterior ficar visivel. Cada linha clearLine + newline.
+    while (this.rows.length < (process.stdout.rows || 24) - 1) {
+      this.rows.push('')
+    }
+  }
+
+  toString(): string {
+    return this.rows.map((r) => `${ANSI.clearLine}${r}`).join('\n')
+  }
+
+  width(): number { return this.cols }
+}
+
+// ── Engine ──
+
+export interface Screen {
+  /** Renderiza a tela inteira. Retorna o frame completo (sem move-cursor —
+   *  o engine faz isso). */
+  render(width: number, height: number): string
+  /** Recebe key events. Retorna 'consumed' (engine continua), 'quit', ou um
+   *  string com nome de outra screen pra fazer push. */
+  onKey(key: Key): KeyResult | Promise<KeyResult>
+  /** Opcional — chamado quando a tela ganha foco (push/return). */
+  onEnter?(): void | Promise<void>
+  /** Opcional — chamado quando a tela perde foco (push/pop). */
+  onLeave?(): void | Promise<void>
+  /** Opcional — chamado periodicamente pelo engine pra refresh. */
+  tick?(): void | Promise<void>
+  /** Identificador pra debug. */
+  name: string
+}
+
+export type KeyResult =
+  | { kind: 'consumed' }
+  | { kind: 'quit' }
+  | { kind: 'push'; screen: Screen }
+  | { kind: 'pop' }
+  | { kind: 'replace'; screen: Screen }
+
+export class TuiEngine {
+  private stack: Screen[] = []
+  private quit = false
+  private dirty = true
+  private tickInterval: ReturnType<typeof setInterval> | null = null
+  private resizeListener: (() => void) | null = null
+  private signalListener: (() => void) | null = null
+
+  constructor(private root: Screen) {}
+
+  async start(): Promise<void> {
+    if (!process.stdin.isTTY || !process.stdout.isTTY) {
+      console.error('TUI requer um TTY (stdout/stdin)')
+      process.exit(1)
+    }
+
+    // Setup terminal
+    process.stdout.write(ANSI.enterAltScreen + ANSI.hideCursor + ANSI.clear + ANSI.home)
+    process.stdin.setRawMode(true)
+    process.stdin.resume()
+    process.stdin.setEncoding('utf8')
+
+    this.stack.push(this.root)
+    if (this.root.onEnter) await this.root.onEnter()
+
+    this.resizeListener = () => { this.dirty = true; this.draw() }
+    process.stdout.on('resize', this.resizeListener)
+
+    this.signalListener = () => { this.quit = true }
+    process.on('SIGINT', this.signalListener)
+    process.on('SIGTERM', this.signalListener)
+
+    // Tick a cada 500ms — chamada nas screens pra refreshes leves (ex:
+    // re-render counter de chunks ao vivo). Cada screen gerencia se tem
+    // tick e se re-renderiza.
+    this.tickInterval = setInterval(async () => {
+      const top = this.stack[this.stack.length - 1]
+      if (top?.tick) {
+        try { await top.tick() } catch { /* ignore */ }
+        this.dirty = true
+        this.draw()
+      }
+    }, 500)
+
+    this.draw()
+
+    // Event loop — process.stdin chunks
+    for await (const chunk of process.stdin as unknown as AsyncIterable<string>) {
+      if (this.quit) break
+      const keys = parseKey(chunk)
+      for (const key of keys) {
+        // Ctrl+C força quit imediato
+        if (key.ctrl && key.name === 'c') {
+          this.quit = true
+          break
+        }
+        const top = this.stack[this.stack.length - 1]
+        if (!top) { this.quit = true; break }
+        try {
+          const result = await top.onKey(key)
+          await this.handleResult(result)
+        } catch (err) {
+          // Render error overlay e segue
+          process.stdout.write(ANSI.moveTo(1, 1) + `\x1b[91merror in screen ${top.name}: ${(err as Error).message}\x1b[0m\n`)
+        }
+      }
+      if (this.quit) break
+      this.draw()
+    }
+
+    await this.cleanup()
+  }
+
+  private async handleResult(result: KeyResult): Promise<void> {
+    switch (result.kind) {
+      case 'consumed':
+        this.dirty = true
+        return
+      case 'quit':
+        this.quit = true
+        return
+      case 'push': {
+        const top = this.stack[this.stack.length - 1]
+        if (top?.onLeave) await top.onLeave()
+        this.stack.push(result.screen)
+        if (result.screen.onEnter) await result.screen.onEnter()
+        this.dirty = true
+        return
+      }
+      case 'pop': {
+        if (this.stack.length <= 1) {
+          this.quit = true
+          return
+        }
+        const popped = this.stack.pop()!
+        if (popped.onLeave) await popped.onLeave()
+        const newTop = this.stack[this.stack.length - 1]
+        if (newTop?.onEnter) await newTop.onEnter()
+        this.dirty = true
+        return
+      }
+      case 'replace': {
+        const top = this.stack.pop()!
+        if (top.onLeave) await top.onLeave()
+        this.stack.push(result.screen)
+        if (result.screen.onEnter) await result.screen.onEnter()
+        this.dirty = true
+        return
+      }
+    }
+  }
+
+  private draw(): void {
+    if (!this.dirty || this.quit) return
+    const cols = process.stdout.columns || 80
+    const rows = process.stdout.rows || 24
+    const top = this.stack[this.stack.length - 1]
+    if (!top) return
+    const frame = top.render(cols, rows)
+    process.stdout.write(ANSI.home + frame)
+    this.dirty = false
+  }
+
+  /** Sinaliza que a tela mudou — proximo tick redesenha. Util pra screens
+   *  que recebem callbacks async (SSE etc). */
+  markDirty(): void {
+    this.dirty = true
+    this.draw()
+  }
+
+  private async cleanup(): Promise<void> {
+    if (this.tickInterval) clearInterval(this.tickInterval)
+    if (this.resizeListener) process.stdout.off('resize', this.resizeListener)
+    if (this.signalListener) {
+      process.off('SIGINT', this.signalListener)
+      process.off('SIGTERM', this.signalListener)
+    }
+    // Pop all screens (run onLeave handlers)
+    while (this.stack.length > 0) {
+      const s = this.stack.pop()!
+      if (s.onLeave) {
+        try { await s.onLeave() } catch { /* ignore */ }
+      }
+    }
+    process.stdout.write(ANSI.showCursor + ANSI.exitAltScreen + ANSI.reset)
+    process.stdin.setRawMode(false)
+    process.stdin.pause()
+  }
+}

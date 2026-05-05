@@ -68,6 +68,11 @@ async function main(): Promise<void> {
         return
       }
 
+      case 'tui': {
+        const { tui } = await import('./commands/tui')
+        return tui()
+      }
+
       case 'daemon': {
         const {
           daemonStatus, daemonInstall, daemonUninstall,
