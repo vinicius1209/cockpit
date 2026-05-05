@@ -33,32 +33,28 @@ export function BoardColumn({ column, cards, onCardClick, onAddCard, index, tota
       role="region"
       aria-label={`Coluna ${column.name}`}
     >
-      {/* ── Column header ── */}
-      <header className="px-3 pt-2.5 pb-2 border-b border-border/60 space-y-1">
-        <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
-          <span className="tabular-nums">{numStr}/{totalStr}</span>
-          <span className="text-muted-foreground/30">·</span>
-          <span className="truncate">{column.slug}</span>
-          {enabledAutomations.length > 0 && (
-            <span
-              className="ml-auto flex items-center gap-0.5 text-amber-500/80"
-              title={`${enabledAutomations.length} automacao(oes) ativa(s)`}
-            >
-              <Zap className="h-2.5 w-2.5" fill="currentColor" />
-              <span className="tabular-nums">{enabledAutomations.length}</span>
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
+      {/* ── Column header — uma linha so com mono prefix + bullet color + name + count ── */}
+      <header className="flex items-center gap-2 px-3 py-2.5 border-b border-border/60">
+        <span className="font-mono text-[10px] tabular-nums text-muted-foreground/70 shrink-0">
+          {numStr}/{totalStr}
+        </span>
+        <span
+          className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-background"
+          style={{ backgroundColor: column.color ?? '#6b7280', boxShadow: `0 0 8px ${column.color ?? '#6b7280'}40` }}
+        />
+        <h3 className="text-sm font-semibold flex-1 truncate">{column.name}</h3>
+        {enabledAutomations.length > 0 && (
           <span
-            className="h-2.5 w-2.5 rounded-full shrink-0 ring-1 ring-background"
-            style={{ backgroundColor: column.color ?? '#6b7280', boxShadow: `0 0 8px ${column.color ?? '#6b7280'}40` }}
-          />
-          <h3 className="text-sm font-semibold flex-1 truncate">{column.name}</h3>
-          <span className="font-mono text-xs text-muted-foreground tabular-nums">
-            {String(cards.length).padStart(2, '0')}
+            className="flex items-center gap-0.5 font-mono text-[10px] text-amber-500/80"
+            title={`${enabledAutomations.length} automacao(oes) ativa(s)`}
+          >
+            <Zap className="h-2.5 w-2.5" fill="currentColor" />
+            <span className="tabular-nums">{enabledAutomations.length}</span>
           </span>
-        </div>
+        )}
+        <span className="font-mono text-xs text-muted-foreground tabular-nums shrink-0">
+          {String(cards.length).padStart(2, '0')}
+        </span>
       </header>
 
       {/* ── Cards ── */}

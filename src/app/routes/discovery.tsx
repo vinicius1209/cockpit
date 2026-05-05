@@ -26,6 +26,7 @@ import { CARD_TYPE_CONFIG, CARD_PRIORITY_CONFIG, DAEMON_URL } from '@/shared/lib
 import type { CardType, CardPriority } from '@/entities/card/types'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { CockpitPageHeader } from '@/widgets/cockpit-page-header'
 import {
   Search,
   Loader2,
@@ -332,44 +333,35 @@ export function DiscoveryPage() {
   }
 
   return (
-    <div className="p-4 lg:p-6 space-y-6 max-w-5xl mx-auto">
+    <div className="p-4 lg:p-6 space-y-4 max-w-5xl mx-auto">
 
-      {/* ── Header ── */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Auto-Discovery</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            Escaneie projetos e descubra problemas automaticamente
-          </p>
-        </div>
+      <CockpitPageHeader
+        systemLabel="RADAR · AUTO-DISCOVERY"
+        title="Auto-Discovery"
+        subtitle="Escaneie projetos e descubra problemas automaticamente"
+        stats={[
+          { label: 'PROJETOS', value: String(projects.length).padStart(2, '0') },
+          { label: 'EXECUTORS', value: String(agents.length).padStart(2, '0') },
+          { label: 'JOBS', value: String(jobHistory.length).padStart(2, '0') },
+        ]}
+      />
 
-        {/* Daemon status pill */}
-        <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs ${
-            daemonOnline ? 'bg-green-500/10 text-green-500' : daemonOnline === false ? 'bg-red-500/10 text-red-500' : 'bg-yellow-500/10 text-yellow-500'
-          }`}>
-            <CircleDot className="h-3 w-3" />
-            {daemonOnline ? 'Daemon online' : daemonOnline === false ? 'Daemon offline' : 'Conectando...'}
-          </div>
-        </div>
-      </div>
-
-      {/* ── How it works (shown before first scan) ── */}
+      {/* ── Pipeline: Selecione → Escaneie → Importe ── */}
       {!result && !isRunning && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="flex items-stretch gap-0 border rounded-lg overflow-hidden">
           {[
-            { step: '1', icon: FolderOpen, title: 'Selecione', desc: 'Escolha o projeto para escanear' },
-            { step: '2', icon: Radar, title: 'Escaneie', desc: 'Scanner analisa codigo, git e deps' },
-            { step: '3', icon: Import, title: 'Importe', desc: 'Envie descobertas direto pro board' },
-          ].map((item) => (
-            <div key={item.step} className="flex items-start gap-3 rounded-lg border border-dashed p-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary text-xs font-bold">
-                {item.step}
+            { step: 1, icon: FolderOpen, title: 'Selecione', desc: 'Projeto a escanear' },
+            { step: 2, icon: Radar, title: 'Escaneie', desc: 'Scanner + agent (opcional)' },
+            { step: 3, icon: Import, title: 'Importe', desc: 'Cards diretos pro board' },
+          ].map((item, i, arr) => (
+            <div key={item.step} className="flex-1 px-3 py-2.5 border-r last:border-r-0 border-border/60">
+              <div className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground mb-1">
+                <span className="tabular-nums">[{item.step}]</span>
+                <item.icon className="h-3 w-3" />
+                <span className="text-foreground">{item.title}</span>
+                {i < arr.length - 1 && <ArrowRight className="h-3 w-3 ml-auto text-muted-foreground/40" />}
               </div>
-              <div>
-                <p className="text-sm font-medium">{item.title}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">{item.desc}</p>
-              </div>
+              <p className="text-[11px] text-muted-foreground">{item.desc}</p>
             </div>
           ))}
         </div>

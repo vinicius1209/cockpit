@@ -4,12 +4,6 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from '@/components/ui/select'
-import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -23,17 +17,14 @@ import { runAgent } from '@/features/agent-runner/agent-service'
 import type { Card, SpecStatus } from '@/entities/card/types'
 import { MessageResponse } from '@/components/ai-elements/message'
 import { createDocFromSpec } from '@/features/docs-vault/auto-doc'
+import { SpecGenerationOverlay } from './spec-generation-overlay'
 import { toast } from 'sonner'
-import { Sparkles, Save, Loader2, Eye, Pencil, BookOpen, Info, Settings } from 'lucide-react'
+import { Sparkles, Save, Eye, Pencil, BookOpen, Settings } from 'lucide-react'
 
-// Spec status definitions with explicit semantics so the user understands what each means.
-const SPEC_STATUSES: { value: SpecStatus; label: string; color: string; hint: string }[] = [
-  { value: 'draft',       label: 'Rascunho',     color: 'text-amber-500',  hint: 'Em escrita / em revisao' },
-  { value: 'ready',       label: 'Pronta',       color: 'text-blue-500',   hint: 'Aprovada para implementar' },
-  { value: 'in_progress', label: 'Implementando',color: 'text-violet-500', hint: 'Implementacao em andamento' },
-  { value: 'review',      label: 'Em review',    color: 'text-pink-500',   hint: 'PR aberto, aguardando review' },
-  { value: 'done',        label: 'Concluida',    color: 'text-emerald-500',hint: 'Mergeada e finalizada' },
-]
+// Note: spec status (draft/ready/in_progress/review/done) is now displayed
+// in the pipeline tabs and in the sidebar Telemetria block. The transition
+// draft → ready is exposed as a CTA in the toolbar; later transitions are
+// managed by the Implement panel automatically.
 
 const SPEC_TEMPLATE = `## Titulo
 {title}
@@ -211,55 +202,14 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
   }
 
   const navigate = useNavigate()
-  const currentStatusMeta = SPEC_STATUSES.find((s) => s.value === currentStatus)
 
   return (
     <div className="flex flex-col h-full">
-      {/* Toolbar — compact: status + ações principais */}
+      {/* Toolbar — geração + ações de spec. O status (draft/ready/etc) ja eh
+          mostrado na pipeline tab e na sidebar Detalhes/Telemetria, entao nao
+          precisa de Select aqui. Para transitar draft → ready, usa-se o CTA
+          "Marcar como pronta" abaixo. */}
       <div className="flex items-center gap-2 px-3 py-2 border-b flex-wrap">
-        {/* Status — discreet select with semantic */}
-        <TooltipProvider delayDuration={300}>
-          <div className="flex items-center gap-1.5">
-            <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Status</span>
-            <Select value={currentStatus || 'draft'} onValueChange={(v) => handleStatusChange(v as SpecStatus)}>
-              <SelectTrigger className="h-7 text-[11px] w-auto gap-1.5">
-                <span className={`flex items-center gap-1.5 ${currentStatusMeta?.color || 'text-muted-foreground'}`}>
-                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                  {currentStatusMeta?.label || 'Rascunho'}
-                </span>
-              </SelectTrigger>
-              <SelectContent>
-                {SPEC_STATUSES.map((s) => (
-                  <SelectItem key={s.value} value={s.value} className="text-xs">
-                    <div className="flex flex-col">
-                      <span className={s.color}>{s.label}</span>
-                      <span className="text-[10px] text-muted-foreground">{s.hint}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button className="text-muted-foreground/60 hover:text-foreground transition-colors">
-                  <Info className="h-3 w-3" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" className="max-w-xs text-[11px]">
-                <p className="mb-1 font-medium">Status da spec</p>
-                <p className="text-muted-foreground">
-                  Marca o estagio do trabalho. <strong>Rascunho</strong> = em escrita;
-                  {' '}<strong>Pronta</strong> = aprovada para implementar;
-                  {' '}<strong>Implementando/Review/Concluida</strong> sao gerenciados automaticamente
-                  pelo painel Implementar.
-                </p>
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </TooltipProvider>
-
-        <span className="h-5 w-px bg-border/60 mx-1" />
-
         {/* Generate / Template — ABORT lives inside the overlay during generation */}
         {!isGenerating && (
           <>
@@ -301,6 +251,29 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
             <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleUseTemplate}>
               Template
             </Button>
+
+            {/* Semantic CTA: transitar de Rascunho → Pronta quando spec ja tem conteudo */}
+            {content.trim() && currentStatus === 'draft' && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs text-blue-500 hover:text-blue-600 hover:bg-blue-500/10"
+                onClick={() => {
+                  handleStatusChange('ready')
+                  toast.success('Spec marcada como Pronta', { description: 'Disponivel para implementacao' })
+                }}
+                title="Aprovar a spec para implementacao (transita Rascunho → Pronta)"
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-500 mr-1.5" />
+                Marcar como pronta
+              </Button>
+            )}
+            {currentStatus === 'ready' && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-blue-500 font-mono uppercase tracking-[0.14em]">
+                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                Pronta
+              </span>
+            )}
           </>
         )}
 
