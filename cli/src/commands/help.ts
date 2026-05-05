@@ -9,6 +9,15 @@ const COMMANDS: Array<{ cmd: string; desc: string; group: string }> = [
   { cmd: 'cockpit metrics',               desc: 'dashboards de uso (cards, runs, velocity)',                  group: 'status' },
   { cmd: 'cockpit help [cmd]',            desc: 'ajuda',                                                      group: 'status' },
 
+  // Daemon lifecycle (launchd no macOS)
+  { cmd: 'cockpit daemon status',         desc: 'health + estado do launchagent',                             group: 'daemon' },
+  { cmd: 'cockpit daemon install',        desc: 'instala launchagent (auto-start no login)',                  group: 'daemon' },
+  { cmd: 'cockpit daemon uninstall',      desc: 'remove launchagent',                                         group: 'daemon' },
+  { cmd: 'cockpit daemon start',          desc: 'sobe daemon agora',                                          group: 'daemon' },
+  { cmd: 'cockpit daemon stop',           desc: 'para daemon (volta no proximo login)',                       group: 'daemon' },
+  { cmd: 'cockpit daemon restart',        desc: 'stop + start',                                               group: 'daemon' },
+  { cmd: 'cockpit daemon logs',           desc: 'tail dos logs (--follow --lines N --err)',                   group: 'daemon' },
+
   // Workspaces
   { cmd: 'cockpit ws',                    desc: 'lista workspaces',                                           group: 'ws' },
   { cmd: 'cockpit ws use <name>',         desc: 'set workspace ativo (CLI)',                                  group: 'ws' },
@@ -48,6 +57,7 @@ const COMMANDS: Array<{ cmd: string; desc: string; group: string }> = [
 
 const GROUP_LABELS: Record<string, string> = {
   status: 'Status & info',
+  daemon: 'Daemon (macOS launchd)',
   ws: 'Workspaces',
   card: 'Board & cards',
   spec: 'Spec lifecycle',

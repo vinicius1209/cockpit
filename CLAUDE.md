@@ -229,6 +229,27 @@ CLI cockpit (Bun standalone)       ──HTTP──▶
 - **Streaming**: SSE no formato `{type: 'chunk'|'done'|'error', text|fullText}`.
   Reader compartilhado em `agent-service.ts:readDaemonSSE()`.
 
+## Daemon lifecycle (macOS launchd)
+
+O daemon e o unico processo que precisa ficar rodando — Web/CLI/MCP sao clientes dele. Pra nao depender de subir manualmente toda vez:
+
+```bash
+cockpit daemon install     # escreve ~/Library/LaunchAgents/dev.cockpit.daemon.plist + load -w
+cockpit daemon status      # health + estado do launchagent + paths
+cockpit daemon logs -f     # tail (stdout: ~/.cockpit/logs/daemon.log)
+cockpit daemon stop        # unload (volta no proximo login)
+cockpit daemon restart     # unload + load
+cockpit daemon uninstall   # unload -w + remove plist
+```
+
+Detalhes:
+- Label: `dev.cockpit.daemon` · Plist: `~/Library/LaunchAgents/dev.cockpit.daemon.plist`
+- Logs: `~/.cockpit/logs/{daemon,daemon.err}.log`
+- `KeepAlive: true` + `ThrottleInterval: 10` — respawn automatico se crashar
+- `RunAtLoad: true` + `load -w` — sobe em todo login
+
+Em Linux/Windows nao ha launchd; o comando emite instrucao pra usar systemd/Task Scheduler. Pra dev iterativo continua valendo `bun run dev:daemon` (foreground).
+
 ## Comandos úteis
 
 ```bash
@@ -239,7 +260,8 @@ bun run lint
 bun run build                # tsc -b && vite build
 
 # Daemon (Bun + SQLite, port 4800)
-bun run dev:daemon
+bun run dev:daemon           # foreground (dev/debug)
+cockpit daemon install       # background via launchd (prod-style)
 cd daemon && bun test        # 79 tests
 
 # Tudo de uma vez

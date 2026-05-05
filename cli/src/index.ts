@@ -68,6 +68,27 @@ async function main(): Promise<void> {
         return
       }
 
+      case 'daemon': {
+        const {
+          daemonStatus, daemonInstall, daemonUninstall,
+          daemonStart, daemonStop, daemonRestart, daemonLogs,
+        } = await import('./commands/daemon')
+        if (!sub || sub === 'status') return daemonStatus({ asJson: !!flags.json })
+        if (sub === 'install') return daemonInstall()
+        if (sub === 'uninstall' || sub === 'remove') return daemonUninstall()
+        if (sub === 'start') return daemonStart()
+        if (sub === 'stop') return daemonStop()
+        if (sub === 'restart') return daemonRestart()
+        if (sub === 'logs') {
+          return daemonLogs({
+            follow: !!flags.follow || !!flags.f,
+            lines: flags.lines ? Number(flags.lines) : (flags.n ? Number(flags.n) : undefined),
+            err: !!flags.err || !!flags.stderr,
+          })
+        }
+        return errorExit(`subcomando daemon nao reconhecido: ${sub}`)
+      }
+
       case 'ws':
       case 'workspace':
       case 'workspaces': {

@@ -18,7 +18,9 @@
     "cli:build": "cd cli && bun build src/index.ts --compile --outfile=dist/cockpit",
     "mcp": "cd mcp && bun run src/index.ts",
     "mcp:install": "bash bin/install-mcp.sh",
-    "mcp:build": "cd mcp && bun build src/index.ts --compile --outfile=dist/cockpit-mcp"
+    "mcp:build": "cd mcp && bun build src/index.ts --compile --outfile=dist/cockpit-mcp",
+    "daemon:install": "cd cli && bun run src/index.ts daemon install",
+    "daemon:status": "cd cli && bun run src/index.ts daemon status"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

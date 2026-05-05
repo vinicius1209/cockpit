@@ -116,6 +116,20 @@ cockpit log SW79 --json | jq       # processar com jq
 | `cockpit metrics [--json]` | KPIs + sparklines + velocity |
 | `cockpit help [cmd]` | ajuda |
 
+### Daemon (macOS launchd)
+
+| Comando | Descrição |
+|---|---|
+| `cockpit daemon status [--json]` | health + estado do launchagent + paths |
+| `cockpit daemon install` | escreve `~/Library/LaunchAgents/dev.cockpit.daemon.plist` e carrega |
+| `cockpit daemon uninstall` | unload + remove plist |
+| `cockpit daemon start` | sobe agora (idempotente) |
+| `cockpit daemon stop` | para (volta no proximo login — KeepAlive) |
+| `cockpit daemon restart` | stop + start |
+| `cockpit daemon logs [-f] [--lines N] [--err]` | tail dos logs |
+
+> Apos `install`, o daemon roda como background service e sobe automaticamente em todo login. Logs em `~/.cockpit/logs/`.
+
 ### Workspaces
 
 | Comando | Descrição |

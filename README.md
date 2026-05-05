@@ -79,6 +79,10 @@ bun run dev                                # roda em 127.0.0.1:5173
 # 4. CLI (opcional, recomendado)
 bun run cli:install                        # symlinka `cockpit` em ~/.local/bin
 cockpit doctor                             # verifica daemon + agents instalados
+
+# 5. Daemon como serviço (macOS, opcional)
+cockpit daemon install                     # auto-start no login via launchd
+cockpit daemon status                      # checa estado
 ```
 
 Pré-requisitos:
@@ -206,6 +210,7 @@ cockpit metrics
 | **CLI Tier 1-4** (read, write, long-running, misc) | ✅ |
 | **`cockpit spec` lifecycle** | ✅ |
 | **MCP server** (8 tools + 2 resources) | ✅ |
+| **Daemon como serviço** (launchd auto-start no macOS) | ✅ |
 | **TUI fullscreen** (`cockpit tui`) | 🚧 planejado |
 | **Auth multi-user** | ❌ não está no roadmap (single-user OSS) |
 
