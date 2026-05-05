@@ -37,7 +37,7 @@ export async function implement(ref: string, opts: ImplementOpts = {}): Promise<
   }
   if (!card.spec_content) {
     console.error(c.rose('✕ card sem spec — gere uma antes'))
-    console.log(c.dim('  use: cockpit spec gen #' + shortId(card.id)))
+    console.log(c.dim('  use: cockpit spec gen ' + shortId(card.id)))
     process.exit(1)
   }
 
@@ -67,7 +67,7 @@ export async function implement(ref: string, opts: ImplementOpts = {}): Promise<
   console.log()
 
   if (!opts.watch) {
-    console.log(c.dim('  ━ background mode. para tail: ') + c.bold('cockpit watch #' + shortId(card.id)))
+    console.log(c.dim('  ━ background mode. para tail: ') + c.bold('cockpit watch ' + shortId(card.id)))
   }
   console.log()
 
@@ -184,7 +184,7 @@ export async function implement(ref: string, opts: ImplementOpts = {}): Promise<
     }
   } else {
     console.log(`  ${sym.err} falhou em ${formatDuration(elapsed)}`)
-    console.log(c.dim(`  use ${c.bold('cockpit log #' + shortId(card.id))} para historico`))
+    console.log(c.dim(`  use ${c.bold('cockpit log ' + shortId(card.id))} para historico`))
   }
 }
 

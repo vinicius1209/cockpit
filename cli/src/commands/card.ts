@@ -79,7 +79,7 @@ export async function cardList(filters: ListFilters = {}): Promise<void> {
 
   console.log(table(rows, cols))
   console.log()
-  console.log(c.dim(`  ${filtered.length} cards · use cockpit card show <#ID>`))
+  console.log(c.dim(`  ${filtered.length} cards · use ${c.bold('cockpit card show ' + (filtered[0] ? shortId(filtered[0].id) : 'SW78'))}`))
 }
 
 export async function cardShow(ref: string): Promise<void> {
@@ -156,7 +156,7 @@ export async function cardShow(ref: string): Promise<void> {
     const preview = card.spec_content.split('\n').slice(0, 6).join('\n')
     console.log(preview.split('\n').map((l) => '  ' + l).join('\n'))
     if (card.spec_content.split('\n').length > 6) {
-      console.log(c.dim('  …(use cockpit spec show #' + shortId(card.id) + ' para ver tudo)'))
+      console.log(c.dim('  …(use cockpit spec show ' + shortId(card.id) + ' para ver tudo)'))
     }
     console.log()
   }
@@ -174,10 +174,11 @@ export async function cardShow(ref: string): Promise<void> {
   }
 
   // Hints
+  const id = shortId(card.id)
   console.log(c.dim('  ━ acoes:'))
-  console.log(c.dim('    cockpit watch #' + shortId(card.id) + '       acompanha live'))
-  console.log(c.dim('    cockpit log #' + shortId(card.id) + '         ultimo log'))
-  console.log(c.dim('    cockpit implement #' + shortId(card.id) + '   re-implementar'))
+  console.log(c.dim(`    cockpit watch ${id}       acompanha live`))
+  console.log(c.dim(`    cockpit log ${id}         ultimo log`))
+  console.log(c.dim(`    cockpit implement ${id}   re-implementar`))
 }
 
 // ── helpers ──

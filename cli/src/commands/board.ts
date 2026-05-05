@@ -35,5 +35,5 @@ export async function board(ref?: string): Promise<void> {
   console.log(kanban({ columns: wsCols, cards: wsCards, liveCardIds }))
   console.log()
   console.log(c.dim(`  ${wsCards.length} cards · ${liveCardIds.size > 0 ? c.amber(liveCardIds.size + ' LIVE') : 'idle'}`))
-  console.log(c.dim(`  cockpit card show <#ID> para abrir`))
+  console.log(c.dim(`  cockpit card show <ID> para abrir (sem o # — zsh trata como comentario)`))
 }

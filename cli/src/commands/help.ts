@@ -19,17 +19,17 @@ const COMMANDS: Array<{ cmd: string; desc: string; group: string }> = [
   // Board & cards
   { cmd: 'cockpit board [ws]',            desc: 'ASCII kanban',                                               group: 'card' },
   { cmd: 'cockpit card list',             desc: 'lista cards (--ws --type --priority --status --json)',       group: 'card' },
-  { cmd: 'cockpit card show <#id>',       desc: 'ficha completa do card',                                     group: 'card' },
+  { cmd: 'cockpit card show <id>',       desc: 'ficha completa do card',                                     group: 'card' },
   { cmd: 'cockpit card new "<title>"',    desc: 'cria card (--type --prio --ws --col --desc)',                group: 'card' },
-  { cmd: 'cockpit card move <#id> <col>', desc: 'move card de coluna',                                        group: 'card' },
-  { cmd: 'cockpit card edit <#id>',       desc: 'edita campos (--title --type --prio --assignee --due)',      group: 'card' },
-  { cmd: 'cockpit card delete <#id>',     desc: 'exclui card (--force)',                                      group: 'card' },
+  { cmd: 'cockpit card move <id> <col>', desc: 'move card de coluna',                                        group: 'card' },
+  { cmd: 'cockpit card edit <id>',       desc: 'edita campos (--title --type --prio --assignee --due)',      group: 'card' },
+  { cmd: 'cockpit card delete <id>',     desc: 'exclui card (--force)',                                      group: 'card' },
 
   // Long-running
-  { cmd: 'cockpit implement <#id>',       desc: 'dispara implementacao (--watch --feedback --no-pr)',         group: 'run' },
-  { cmd: 'cockpit watch <#id>',           desc: 'tail live de session (--action spec|implementation|chat)',  group: 'run' },
-  { cmd: 'cockpit log <#id>',             desc: 'historico de sessions (--last N --json)',                    group: 'run' },
-  { cmd: 'cockpit ai <#id>',              desc: 'AI chat interativo no terminal (REPL)',                      group: 'run' },
+  { cmd: 'cockpit implement <id>',       desc: 'dispara implementacao (--watch --feedback --no-pr)',         group: 'run' },
+  { cmd: 'cockpit watch <id>',           desc: 'tail live de session (--action spec|implementation|chat)',  group: 'run' },
+  { cmd: 'cockpit log <id>',             desc: 'historico de sessions (--last N --json)',                    group: 'run' },
+  { cmd: 'cockpit ai <id>',              desc: 'AI chat interativo no terminal (REPL)',                      group: 'run' },
 
   // Misc
   { cmd: 'cockpit agent list',            desc: 'lista CLI agents detectados',                                group: 'misc' },

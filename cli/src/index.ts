@@ -110,7 +110,7 @@ async function main(): Promise<void> {
           })
         }
         if (sub === 'show') {
-          if (!rest[0]) return errorExit('uso: cockpit card show <#id>')
+          if (!rest[0]) return errorExit('uso: cockpit card show <id>')
           return cardShow(rest[0])
         }
         if (sub === 'new') {
@@ -124,15 +124,15 @@ async function main(): Promise<void> {
           })
         }
         if (sub === 'move' || sub === 'mv') {
-          if (!rest[0] || !rest[1]) return errorExit('uso: cockpit card move <#id> <column-slug>')
+          if (!rest[0] || !rest[1]) return errorExit('uso: cockpit card move <id> <column-slug>')
           return cardMove(rest[0], rest[1])
         }
         if (sub === 'delete' || sub === 'rm') {
-          if (!rest[0]) return errorExit('uso: cockpit card delete <#id> [--force]')
+          if (!rest[0]) return errorExit('uso: cockpit card delete <id> [--force]')
           return cardDelete(rest[0], !!flags.force)
         }
         if (sub === 'edit') {
-          if (!rest[0]) return errorExit('uso: cockpit card edit <#id> [--title ...]')
+          if (!rest[0]) return errorExit('uso: cockpit card edit <id> [--title ...]')
           return cardEdit(rest[0], {
             title: flags.title as string | undefined,
             type: flags.type as string | undefined,
@@ -146,7 +146,7 @@ async function main(): Promise<void> {
 
       case 'implement': {
         const { implement } = await import('./commands/implement')
-        if (!sub) return errorExit('uso: cockpit implement <#id> [--watch] [--feedback "..."]')
+        if (!sub) return errorExit('uso: cockpit implement <id> [--watch] [--feedback "..."]')
         return implement(sub, {
           feedback: flags.feedback as string | undefined,
           watch: !!flags.watch,
@@ -156,7 +156,7 @@ async function main(): Promise<void> {
 
       case 'watch': {
         const { watch } = await import('./commands/watch')
-        if (!sub) return errorExit('uso: cockpit watch <#id> [--action spec|implementation|chat]')
+        if (!sub) return errorExit('uso: cockpit watch <id> [--action spec|implementation|chat]')
         return watch(sub, {
           action: flags.action as 'spec' | 'implementation' | 'discovery' | 'chat' | undefined,
         })
@@ -164,7 +164,7 @@ async function main(): Promise<void> {
 
       case 'log': {
         const { log } = await import('./commands/log')
-        if (!sub) return errorExit('uso: cockpit log <#id>')
+        if (!sub) return errorExit('uso: cockpit log <id>')
         return log(sub, {
           last: flags.last ? Number(flags.last) : undefined,
           asJson: !!flags.json,
@@ -173,7 +173,7 @@ async function main(): Promise<void> {
 
       case 'ai': {
         const { ai } = await import('./commands/ai')
-        if (!sub) return errorExit('uso: cockpit ai <#id>')
+        if (!sub) return errorExit('uso: cockpit ai <id>')
         return ai(sub)
       }
 
@@ -228,6 +228,12 @@ async function main(): Promise<void> {
 
 function errorExit(msg: string): never {
   console.error(c.rose('✕ ') + msg)
+  // Hint comum: zsh com interactive_comments trata `#` como inicio de
+  // comentario, fazendo o argumento sumir antes de chegar no CLI.
+  if (msg.includes('<id>') || msg.includes('<column-slug>')) {
+    console.error(c.dim('  dica: nao use # antes do id (#SW78). zsh/bash tratam como comentario.'))
+    console.error(c.dim('         use apenas: ') + c.bold('cockpit card show SW78'))
+  }
   process.exit(1)
 }
 
