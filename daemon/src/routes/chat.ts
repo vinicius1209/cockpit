@@ -2,6 +2,7 @@ import { jsonResponse } from '../http'
 import { executeAgentWithCallbacks, detectInstalledAgents } from '../executor/agent-executor'
 import { getSecret } from '../persistence/secrets-store'
 import { createAgentSession, appendChunk, finishAgentSession, type SessionAction } from '../tasks/session-manager'
+import { publish as publishSession } from '../tasks/session-broker'
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -111,7 +112,11 @@ export async function handleChatRoutes(req: Request, url: URL): Promise<Response
             },
             (chunk) => {
               send({ type: 'chunk', text: chunk })
-              if (session) appendChunk(session.id, chunk).catch(() => {})
+              if (session) {
+                appendChunk(session.id, chunk).catch(() => {})
+                // Live publish para subscribers SSE em outras abas/depois-do-reload
+                publishSession(session.id, { type: 'chunk', text: chunk })
+              }
             },
           )
 
@@ -120,12 +125,14 @@ export async function handleChatRoutes(req: Request, url: URL): Promise<Response
               phase: 'done',
               exitCode: result.exitCode,
             })
+            publishSession(session.id, { type: 'done', exitCode: result.exitCode })
           }
           send({ type: 'done', exitCode: result.exitCode, fullText: result.output, sessionId: session?.id })
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'Erro desconhecido'
           if (session) {
             await finishAgentSession(session.id, { phase: 'error', error: msg }).catch(() => {})
+            publishSession(session.id, { type: 'error', error: msg })
           }
           send({ type: 'error', message: msg, sessionId: session?.id })
         } finally {
