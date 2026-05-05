@@ -235,14 +235,24 @@ async function writePromptToStdin(stdin: unknown, prompt: string): Promise<void>
 // devolve null. Se quiser sinais semanticos (tool_use), retorna prefixados.
 const DEBUG_STREAM = process.env.COCKPIT_DEBUG_STREAM === '1'
 
-function parseClaudeStreamLine(line: string): { text?: string; meta?: string } | null {
+// Stateful parser — precisa lembrar se ja vimos stream_event nesta sessao
+// para suprimir o `assistant` final (que duplica o texto agregado dos deltas).
+export interface ClaudeStreamParserState {
+  sawStreamEvent: boolean
+}
+
+export function createClaudeStreamParserState(): ClaudeStreamParserState {
+  return { sawStreamEvent: false }
+}
+
+function parseClaudeStreamLine(
+  line: string,
+  state: ClaudeStreamParserState,
+): { text?: string; meta?: string } | null {
   let evt: Record<string, unknown>
   try {
     evt = JSON.parse(line)
   } catch {
-    // Linha nao-JSON. Em modo stream-json isso normalmente eh banner, prompt
-    // do CLI esperando confirmacao, ou erro. Logamos pra debug mas NAO
-    // emitimos como chunk (evita poluir o output do usuario com lixo tipo "_").
     if (DEBUG_STREAM && line.trim()) console.log('[claude-stream] non-json:', JSON.stringify(line.slice(0, 200)))
     return null
   }
@@ -254,21 +264,35 @@ function parseClaudeStreamLine(line: string): { text?: string; meta?: string } |
 
   const type = evt.type as string | undefined
 
-  // Stream event with delta — true streaming
+  // Stream event — true streaming (deltas)
   if (type === 'stream_event') {
     const event = evt.event as Record<string, unknown> | undefined
     const eventType = event?.type as string | undefined
+
+    // Tool use start — visibilidade do que o agent esta fazendo
+    if (eventType === 'content_block_start') {
+      const block = event?.content_block as Record<string, unknown> | undefined
+      if (block?.type === 'tool_use' && typeof block.name === 'string') {
+        state.sawStreamEvent = true
+        return { meta: `▶ ${block.name}${block.input ? ` ${truncate(JSON.stringify(block.input), 60)}` : ''}` }
+      }
+    }
+
     if (eventType === 'content_block_delta') {
       const delta = event?.delta as Record<string, unknown> | undefined
       if (delta?.type === 'text_delta' && typeof delta.text === 'string') {
+        state.sawStreamEvent = true
         return { text: delta.text }
       }
     }
     return null
   }
 
-  // Assistant turn — fallback se nao houver stream_event
+  // Assistant turn — APENAS como fallback quando partial messages nao funcionou.
+  // Se ja vimos stream_event, ignoramos para evitar duplicacao do texto agregado.
   if (type === 'assistant') {
+    if (state.sawStreamEvent) return null
+
     const msg = evt.message as Record<string, unknown> | undefined
     const content = msg?.content as Array<Record<string, unknown>> | undefined
     if (content) {
@@ -281,23 +305,12 @@ function parseClaudeStreamLine(line: string): { text?: string; meta?: string } |
     return null
   }
 
-  // Tool use — sinaliza ao usuario
-  if (type === 'tool_use' || (type === 'stream_event' && (evt.event as Record<string, unknown>)?.type === 'tool_use')) {
-    const name = evt.name || (evt.event as Record<string, unknown>)?.name
-    return { meta: `[tool: ${name || 'unknown'}]` }
-  }
-
-  // Final result
-  if (type === 'result') {
-    const text = evt.result
-    if (typeof text === 'string' && text) {
-      // result eh o texto completo - nao re-emitimos como chunk pra evitar duplicacao
-      return null
-    }
-  }
-
-  // System/init messages — ignorar silenciosamente
+  // System/init/result messages — ignorar silenciosamente
   return null
+}
+
+function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
 function validateModel(agentDef: KnownAgent, model?: string): string | null {
@@ -407,6 +420,7 @@ export async function executeAgentWithCallbacks(
     const reader = proc.stdout.getReader()
     const decoder = new TextDecoder()
     const streamFormat: StreamFormat = agentDef.streamFormat || 'plain-lines'
+    const parserState = createClaudeStreamParserState()
     let fullText = ''      // texto extraido (apenas content, nao envelopes JSON)
     let lineBuffer = ''    // acumula bytes ate \n para parser por linha
 
@@ -424,7 +438,7 @@ export async function executeAgentWithCallbacks(
         if (!line) continue
 
         if (streamFormat === 'claude-stream-json') {
-          const parsed = parseClaudeStreamLine(line)
+          const parsed = parseClaudeStreamLine(line, parserState)
           if (parsed?.text) {
             fullText += parsed.text
             onChunk(parsed.text)
@@ -441,8 +455,9 @@ export async function executeAgentWithCallbacks(
     // Processa qualquer linha residual no buffer
     if (lineBuffer.trim()) {
       if (streamFormat === 'claude-stream-json') {
-        const parsed = parseClaudeStreamLine(lineBuffer.trim())
+        const parsed = parseClaudeStreamLine(lineBuffer.trim(), parserState)
         if (parsed?.text) { fullText += parsed.text; onChunk(parsed.text) }
+        else if (parsed?.meta) { onChunk(parsed.meta) }
       } else {
         fullText += lineBuffer
         onChunk(lineBuffer.trim())

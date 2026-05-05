@@ -1,11 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import {
-  Conversation,
-  ConversationContent,
-  ConversationScrollButton,
-} from '@/components/ai-elements/conversation'
 import { useCardStore } from '@/entities/card/store'
 import { useWorkspaceStore } from '@/entities/workspace/store'
 import { useProjectStore } from '@/entities/card/project-store'
@@ -16,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Rocket, Square, Loader2, CheckCircle2, CircleDot, FileText, FilePlus, FileX, GitBranch, GitPullRequest, AlertCircle, History, RotateCcw, ExternalLink, MessageSquareWarning, XCircle } from 'lucide-react'
 import { DAEMON_URL } from '@/shared/lib/constants'
 import { toast } from 'sonner'
+import { AgentTerminal, type TerminalLine } from './agent-terminal'
 
 interface ImplementPanelProps {
   card: Card
@@ -35,6 +31,8 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
 
   const [phase, setPhase] = useState<ImplPhase>('idle')
   const [outputLines, setOutputLines] = useState<string[]>([])
+  const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([])
+  const [silenceSeconds, setSilenceSeconds] = useState(0)
   const [files, setFiles] = useState<TrackedFile[]>([])
   const [branch, setBranch] = useState<string | null>(null)
   const [elapsed, setElapsed] = useState(0)
@@ -112,6 +110,8 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
 
     setPhase('analyzing')
     setOutputLines([])
+    setTerminalLines([])
+    setSilenceSeconds(0)
     setFiles([])
     setBranch(null)
     setError(null)
@@ -188,13 +188,46 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
               setPhase(event.phase as ImplPhase)
             }
             if (event.branch) setBranch(event.branch)
-            if (event.message) {
-              setOutputLines((prev) => [...prev, event.message!])
-              addProcessingChunk(card.id, event.message)
+
+            // Heartbeat: nao polui o terminal — atualiza so o status bar
+            if (event.phase === 'heartbeat') {
+              setSilenceSeconds(event.silenceSeconds || 0)
+              continue
             }
-            if (event.text) {
-              setOutputLines((prev) => [...prev, event.text!])
-              addProcessingChunk(card.id, event.text)
+
+            // Real chunks/messages — reset silence + append to terminal
+            const incoming = event.message || event.text
+            if (incoming) {
+              setSilenceSeconds(0)
+              setOutputLines((prev) => [...prev, incoming])
+              addProcessingChunk(card.id, incoming)
+
+              // Classifica para cores semanticas no terminal
+              const isTool = incoming.startsWith('▶ ')
+              const isLog = !!event.message  // mensagens vem do daemon (analyzing/branching)
+              const kind: TerminalLine['kind'] = isTool ? 'tool' : isLog ? 'log' : 'output'
+
+              setTerminalLines((prev) => {
+                // Buffer trick: se o ultimo line eh do mesmo kind 'output' e o
+                // novo chunk NAO comeca com newline, concatena (resolve o
+                // problema de "V" seguido de "ou comecar..." em linhas
+                // separadas — agora vira "Vou comecar..." uma linha so).
+                if (kind === 'output' && prev.length > 0) {
+                  const last = prev[prev.length - 1]
+                  if (last.kind === 'output' && !incoming.startsWith('\n')) {
+                    return [
+                      ...prev.slice(0, -1),
+                      { ...last, text: last.text + incoming },
+                    ]
+                  }
+                }
+                return [...prev, {
+                  id: `line-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
+                  kind,
+                  text: incoming,
+                  ts: Date.now(),
+                }]
+              })
             }
             if (event.phase === 'file' && event.path && event.action) {
               setFiles((prev) => {
@@ -481,22 +514,16 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
         </div>
       </div>
 
-      {/* Terminal output */}
-      <Conversation className="flex-1 bg-muted/10">
-        <ConversationContent className="gap-0.5 px-4 py-3">
-          {outputLines.map((line, i) => (
-            <p key={i} className="text-[12px] font-mono leading-relaxed text-muted-foreground">
-              {line}
-            </p>
-          ))}
-          {isRunning && outputLines.length === 0 && (
-            <p className="text-[12px] font-mono text-muted-foreground/50 italic py-2">
-              Agent processando...
-            </p>
-          )}
-        </ConversationContent>
-        <ConversationScrollButton />
-      </Conversation>
+      {/* Terminal output — cockpit-style */}
+      <div className="flex-1 min-h-0 px-4 py-3 flex flex-col">
+        <AgentTerminal
+          lines={terminalLines}
+          isLive={isRunning}
+          totalChunks={outputLines.length}
+          silenceSeconds={silenceSeconds}
+          agentLabel="claude-code/sonnet"
+        />
+      </div>
 
       {/* File tracker */}
       {files.length > 0 && (

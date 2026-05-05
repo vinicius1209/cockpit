@@ -20,7 +20,7 @@ export interface ImplementConfig {
 }
 
 export interface ImplementEvent {
-  phase: 'analyzing' | 'branching' | 'implementing' | 'output' | 'file' | 'creating-pr' | 'done' | 'error'
+  phase: 'analyzing' | 'branching' | 'implementing' | 'output' | 'file' | 'creating-pr' | 'done' | 'error' | 'heartbeat'
   message?: string
   text?: string
   branch?: string
@@ -28,6 +28,9 @@ export interface ImplementEvent {
   path?: string
   summary?: { filesModified: number; filesCreated: number; filesDeleted: number; branch: string | null; prUrl?: string; prNumber?: number }
   exitCode?: number
+  /** When phase=heartbeat: seconds since last real chunk arrived. UI shows this
+   *  as a status bar indicator instead of spam lines. */
+  silenceSeconds?: number
 }
 
 const BRANCH_PREFIX: Record<string, string> = {
@@ -287,15 +290,14 @@ export async function runImplementation(
     stopWatcher = () => { if (watchTimer) clearTimeout(watchTimer) }
   }
 
-  // 6. Heartbeat — emit a single updating status (not output lines)
+  // 6. Heartbeat — emit como evento separado (UI mostra como status bar
+  // indicator, NAO como linha de log repetida). Isso era spam visual antes.
   const allOutputLines: string[] = []
   let lastChunkAt = Date.now()
   heartbeatInterval = setInterval(() => {
     const silenceSeconds = Math.floor((Date.now() - lastChunkAt) / 1000)
-    if (silenceSeconds >= 5) {
-      emit({ phase: 'implementing', message: `Agent trabalhando... (${silenceSeconds}s)` })
-    }
-  }, 10000)
+    emit({ phase: 'heartbeat', silenceSeconds })
+  }, 5000)
 
   // 7. Execute agent
   try {

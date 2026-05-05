@@ -96,7 +96,7 @@ export interface DiscoveryResult {
 }
 
 export interface ImplementEvent {
-  phase: 'analyzing' | 'branching' | 'implementing' | 'output' | 'file' | 'creating-pr' | 'done' | 'error'
+  phase: 'analyzing' | 'branching' | 'implementing' | 'output' | 'file' | 'creating-pr' | 'done' | 'error' | 'heartbeat'
   message?: string
   text?: string
   branch?: string
@@ -104,6 +104,7 @@ export interface ImplementEvent {
   path?: string
   summary?: { filesModified: number; filesCreated: number; filesDeleted: number; branch: string | null; prUrl?: string; prNumber?: number }
   exitCode?: number
+  silenceSeconds?: number
 }
 
 export interface JobSummary {
