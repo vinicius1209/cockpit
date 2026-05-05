@@ -2,7 +2,6 @@ import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Badge } from '@/components/ui/badge'
 import {
   Tooltip,
   TooltipContent,
@@ -19,7 +18,7 @@ import { MessageResponse } from '@/components/ai-elements/message'
 import { createDocFromSpec } from '@/features/docs-vault/auto-doc'
 import { SpecGenerationOverlay } from './spec-generation-overlay'
 import { toast } from 'sonner'
-import { Sparkles, Save, Eye, Pencil, BookOpen, Settings } from 'lucide-react'
+import { Sparkles, Save, Eye, Pencil, BookOpen, Settings, FileText, ArrowRight, Lock } from 'lucide-react'
 
 // Note: spec status (draft/ready/in_progress/review/done) is now displayed
 // in the pipeline tabs and in the sidebar Telemetria block. The transition
@@ -202,125 +201,150 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
   }
 
   const navigate = useNavigate()
+  const projectName = projects.find((p) => p.path === getProjectPath())?.name || null
+  const hasContent = content.trim().length > 0
+  const showReadyGate = hasContent && currentStatus === 'draft' && !isGenerating
+  const showReadyBadge = currentStatus === 'ready' && !isGenerating
 
   return (
     <div className="flex flex-col h-full">
-      {/* Toolbar — geração + ações de spec. O status (draft/ready/etc) ja eh
-          mostrado na pipeline tab e na sidebar Detalhes/Telemetria, entao nao
-          precisa de Select aqui. Para transitar draft → ready, usa-se o CTA
-          "Marcar como pronta" abaixo. */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b flex-wrap">
-        {/* Generate / Template — ABORT lives inside the overlay during generation */}
-        {!isGenerating && (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={handleGenerateSpec}
-              disabled={!specWriter}
-            >
-              <Sparkles className="h-3.5 w-3.5 mr-1" />
-              Gerar com AI
-            </Button>
-            {specWriter && (
-              <TooltipProvider delayDuration={300}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground/70 hover:text-foreground transition-colors flex items-center gap-1">
-                      <span>{specWriter.model}</span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" className="max-w-xs text-[11px]">
-                    <p className="mb-1 font-medium">Spec Writer · {specWriter.provider}/{specWriter.model}</p>
-                    <p className="text-muted-foreground mb-2">
-                      Sem API key configurada, o agent roda via CLI local (claude-code/opencode/gemini-cli)
-                      com fallback automatico.
-                    </p>
-                    <button
-                      className="text-primary hover:underline flex items-center gap-1"
-                      onClick={() => navigate('/settings')}
-                    >
-                      <Settings className="h-2.5 w-2.5" />
-                      Configurar API key
-                    </button>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleUseTemplate}>
-              Template
-            </Button>
+      {/* ── TOOLBAR — single line, semantic groups: GERACAO | TELEMETRIA | OUTPUT ── */}
+      {!isGenerating && (
+        <div className="flex items-center gap-2 px-3 py-2 border-b flex-wrap">
+          {/* GERACAO */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
+            onClick={handleGenerateSpec}
+            disabled={!specWriter}
+          >
+            <Sparkles className="h-3.5 w-3.5 mr-1" />
+            Gerar
+          </Button>
+          <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleUseTemplate}>
+            <FileText className="h-3.5 w-3.5 mr-1" />
+            Template
+          </Button>
 
-            {/* Semantic CTA: transitar de Rascunho → Pronta quando spec ja tem conteudo */}
-            {content.trim() && currentStatus === 'draft' && (
+          {/* TELEMETRIA — info-only, mono small */}
+          {specWriter && (
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70 hover:text-foreground transition-colors">
+                    <span>via</span>
+                    <span className="text-foreground/80">{normalizeModelLabel(specWriter.model)}</span>
+                    <span className="text-muted-foreground/50">·</span>
+                    <span>cli</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs text-[11px]">
+                  <p className="mb-1 font-medium">Spec Writer · {specWriter.provider}/{specWriter.model}</p>
+                  <p className="text-muted-foreground mb-2">
+                    Sem API key configurada, o agent roda via CLI local (claude-code/opencode/gemini-cli)
+                    com fallback automatico.
+                  </p>
+                  <button
+                    className="text-primary hover:underline flex items-center gap-1"
+                    onClick={() => navigate('/settings')}
+                  >
+                    <Settings className="h-2.5 w-2.5" />
+                    Configurar API key
+                  </button>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
+          {projectName && (
+            <span className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground/70">
+              <span className="text-muted-foreground/50">·</span>
+              <span>proj:</span>
+              <span className="text-foreground/80">{projectName}</span>
+            </span>
+          )}
+
+          {/* OUTPUT — right-aligned */}
+          <div className="ml-auto flex items-center gap-2">
+            {card.spec_content?.trim() && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 text-xs text-blue-500 hover:text-blue-600 hover:bg-blue-500/10"
-                onClick={() => {
-                  handleStatusChange('ready')
-                  toast.success('Spec marcada como Pronta', { description: 'Disponivel para implementacao' })
-                }}
-                title="Aprovar a spec para implementacao (transita Rascunho → Pronta)"
+                className="h-7 text-xs"
+                onClick={handleSaveToVault}
+                title="Salvar spec atual como documento no Vault"
               >
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-500 mr-1.5" />
-                Marcar como pronta
+                <BookOpen className="h-3.5 w-3.5 mr-1" />
+                Vault
               </Button>
             )}
-            {currentStatus === 'ready' && (
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-blue-500 font-mono uppercase tracking-[0.14em]">
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
-                Pronta
-              </span>
+            {hasContent && (
+              <div className="flex rounded-md border overflow-hidden">
+                <button
+                  className={`px-2 py-1 text-[11px] flex items-center gap-1 transition-colors ${viewMode === 'preview' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => setViewMode('preview')}
+                >
+                  <Eye className="h-3 w-3" />
+                  Preview
+                </button>
+                <button
+                  className={`px-2 py-1 text-[11px] flex items-center gap-1 transition-colors ${viewMode === 'edit' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+                  onClick={() => setViewMode('edit')}
+                >
+                  <Pencil className="h-3 w-3" />
+                  Editar
+                </button>
+              </div>
             )}
-          </>
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
-          {getProjectPath() && (
-            <Badge variant="outline" className="text-[10px] font-mono">
-              {projects.find((p) => p.path === getProjectPath())?.name || 'projeto'}
-            </Badge>
-          )}
-          {card.spec_content?.trim() && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              onClick={handleSaveToVault}
-              title="Salvar spec atual como documento no Vault"
-            >
-              <BookOpen className="h-3.5 w-3.5 mr-1" />
-              Vault
+            <Button size="sm" className="h-7 text-xs" onClick={handleSave}>
+              <Save className="h-3.5 w-3.5 mr-1" />
+              {saved ? 'Salvo!' : 'Salvar'}
             </Button>
-          )}
-          {content.trim() && (
-            <div className="flex rounded-md border overflow-hidden">
-              <button
-                className={`px-2 py-1 text-[11px] flex items-center gap-1 transition-colors ${viewMode === 'preview' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                onClick={() => setViewMode('preview')}
-              >
-                <Eye className="h-3 w-3" />
-                Preview
-              </button>
-              <button
-                className={`px-2 py-1 text-[11px] flex items-center gap-1 transition-colors ${viewMode === 'edit' ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-                onClick={() => setViewMode('edit')}
-              >
-                <Pencil className="h-3 w-3" />
-                Editar
-              </button>
-            </div>
-          )}
-          <Button size="sm" className="h-7 text-xs" onClick={handleSave}>
-            <Save className="h-3.5 w-3.5 mr-1" />
-            {saved ? 'Salvo!' : 'Salvar'}
+          </div>
+        </div>
+      )}
+
+      {/* ── READY GATE — banner entre etapas 3 e 4 ── */}
+      {showReadyGate && (
+        <div className="border-b border-blue-500/30 bg-blue-500/5 px-3 py-2 flex items-center gap-3">
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-blue-500 flex items-center gap-1.5">
+            <Lock className="h-3 w-3" />
+            ━ READY GATE
+          </span>
+          <span className="text-[12px] text-foreground/80 flex-1">
+            Spec em rascunho. Aprovar para destravar
+            {' '}<span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">[4] IMPLEMENTAR</span>?
+          </span>
+          <Button
+            size="sm"
+            className="h-7 text-xs bg-blue-500 hover:bg-blue-600 text-white"
+            onClick={() => {
+              handleStatusChange('ready')
+              toast.success('Spec marcada como Pronta', { description: 'Disponivel para implementacao' })
+            }}
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-white mr-1.5" />
+            Marcar como pronta
+            <ArrowRight className="h-3 w-3 ml-1" />
           </Button>
         </div>
-      </div>
+      )}
 
-      {/* Content: Generating / Preview / Editor */}
+      {/* ── READY BADGE — quando ja foi aprovada ── */}
+      {showReadyBadge && (
+        <div className="border-b border-blue-500/30 bg-blue-500/5 px-3 py-1.5 flex items-center gap-2">
+          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-blue-500 flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+            ━ SPEC PRONTA
+          </span>
+          <span className="text-[11px] text-muted-foreground">
+            Disponivel para implementar. Va para a aba
+            {' '}<span className="font-mono uppercase tracking-[0.14em] text-foreground">[4] IMPLEMENTAR</span>.
+          </span>
+        </div>
+      )}
+
+      {/* ── CONTENT — generation overlay / empty state / preview / editor ── */}
       <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
         {isGenerating ? (
           <SpecGenerationOverlay
@@ -329,9 +353,16 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
             modelName={specWriter?.model || null}
             onAbort={handleCancel}
           />
+        ) : !hasContent ? (
+          <SpecEmptyState
+            onGenerate={handleGenerateSpec}
+            onTemplate={handleUseTemplate}
+            agentReady={!!specWriter}
+            modelLabel={specWriter ? normalizeModelLabel(specWriter.model) : null}
+          />
         ) : (
           <div className="p-4 flex-1 flex flex-col overflow-y-auto">
-            {viewMode === 'preview' && content.trim() ? (
+            {viewMode === 'preview' ? (
               <div className="prose prose-sm dark:prose-invert max-w-none flex-1">
                 <MessageResponse>{content}</MessageResponse>
               </div>
@@ -339,14 +370,84 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
               <Textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                placeholder="Escreva a spec aqui ou use o botao 'Gerar com AI'..."
+                placeholder="Escreva a spec aqui ou use o botao 'Gerar'..."
                 className="flex-1 resize-none font-mono text-sm"
-                disabled={isGenerating}
               />
             )}
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+// Convert long Anthropic model IDs to the short tier label used in CLI fallback.
+function normalizeModelLabel(model: string): string {
+  const lower = model.toLowerCase()
+  if (lower.includes('sonnet')) return 'sonnet'
+  if (lower.includes('haiku')) return 'haiku'
+  if (lower.includes('opus')) return 'opus'
+  return model
+}
+
+interface SpecEmptyStateProps {
+  onGenerate: () => void
+  onTemplate: () => void
+  agentReady: boolean
+  modelLabel: string | null
+}
+
+function SpecEmptyState({ onGenerate, onTemplate, agentReady, modelLabel }: SpecEmptyStateProps) {
+  return (
+    <div className="flex flex-col items-center justify-center flex-1 px-6 text-center gap-5">
+      {/* Header line — radar-style */}
+      <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+        <span className="h-px w-8 bg-border" />
+        <span>AWAITING SPEC</span>
+        <span className="h-px w-8 bg-border" />
+      </div>
+
+      {/* Big icon */}
+      <div className="relative h-16 w-16">
+        <span className="absolute inset-0 rounded-full border border-border" />
+        <span className="absolute inset-2 rounded-full border border-border/60" />
+        <span className="absolute inset-0 flex items-center justify-center">
+          <FileText className="h-6 w-6 text-muted-foreground" />
+        </span>
+      </div>
+
+      <div className="space-y-1 max-w-sm">
+        <p className="text-sm text-foreground">
+          Ainda nao ha especificacao para este card.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Sem spec, a etapa
+          {' '}<span className="font-mono uppercase tracking-[0.14em]">[4] IMPLEMENTAR</span>
+          {' '}fica bloqueada.
+        </p>
+      </div>
+
+      {/* Two CTAs */}
+      <div className="flex items-center gap-2">
+        <Button onClick={onGenerate} disabled={!agentReady}>
+          <Sparkles className="h-4 w-4 mr-1.5" />
+          Gerar com AI
+          {modelLabel && (
+            <span className="ml-2 font-mono text-[10px] uppercase tracking-[0.12em] opacity-70">
+              {modelLabel}
+            </span>
+          )}
+        </Button>
+        <Button variant="outline" onClick={onTemplate}>
+          <FileText className="h-4 w-4 mr-1.5" />
+          Usar Template
+        </Button>
+      </div>
+
+      {/* Hint */}
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground/60 mt-2">
+        ━ standby ━
+      </p>
     </div>
   )
 }

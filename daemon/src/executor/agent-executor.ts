@@ -37,6 +37,8 @@ export interface AgentExecResult {
   duration: number
 }
 
+type StreamFormat = 'plain-lines' | 'claude-stream-json'
+
 interface KnownAgent {
   name: string
   command: string
@@ -45,6 +47,7 @@ interface KnownAgent {
   modelFlag: string
   models: AgentModel[]
   defaultModel: string | null
+  streamFormat?: StreamFormat
   buildArgs: (headlessFlag: string, prompt: string, model?: string) => string[]
 }
 
@@ -61,10 +64,20 @@ const KNOWN_AGENTS: KnownAgent[] = [
       { id: 'opus', label: 'Opus (profundo, caro)', cost: 'high' },
     ],
     defaultModel: 'sonnet',
+    streamFormat: 'claude-stream-json',
     buildArgs: (flag, prompt, model) => {
       // bypassPermissions: necessario em modo -p sem TTY, senao Read/Edit
       // sao bloqueados silenciosamente e o agent responde "nao tenho permissao".
-      const args = [flag, prompt, '--output-format', 'text', '--permission-mode', 'bypassPermissions']
+      // stream-json + include-partial-messages: streaming real (text deltas em
+      // tempo real). Sem isso o claude-code bufferiza ate o fim e o frontend
+      // fica 30s+ vendo "0 chunks".
+      const args = [
+        flag, prompt,
+        '--output-format', 'stream-json',
+        '--include-partial-messages',
+        '--verbose',
+        '--permission-mode', 'bypassPermissions',
+      ]
       if (model) args.push('--model', model)
       return args
     },
@@ -208,6 +221,75 @@ async function writePromptToStdin(stdin: unknown, prompt: string): Promise<void>
   throw new Error('Process stdin has no recognized write API (FileSink/WritableStream)')
 }
 
+// Parser para o stream-json do claude-code. Cada linha eh um envelope JSON;
+// extrai text deltas em tempo real.
+//
+// Formatos relevantes (verbose + include-partial-messages):
+//   { type: 'system',    subtype: 'init', ... }                 → ignorar (header)
+//   { type: 'assistant', message: { content: [{type:'text', text:'...'}] } } → texto completo de uma assistant turn
+//   { type: 'stream_event', event: { type:'content_block_delta', delta:{type:'text_delta', text:'...'} } } → DELTA de texto
+//   { type: 'tool_use',  ... }                                  → action visivel
+//   { type: 'result',    result: '...', is_error: false }       → final
+//
+// Funcao de incremento devolve o texto novo (delta). Se for envelope sem texto,
+// devolve null. Se quiser sinais semanticos (tool_use), retorna prefixados.
+function parseClaudeStreamLine(line: string): { text?: string; meta?: string } | null {
+  let evt: Record<string, unknown>
+  try {
+    evt = JSON.parse(line)
+  } catch {
+    // Algumas linhas podem ser texto puro (versoes antigas ou erros). Devolve cru.
+    return line.trim() ? { text: line } : null
+  }
+
+  const type = evt.type as string | undefined
+
+  // Stream event with delta — true streaming
+  if (type === 'stream_event') {
+    const event = evt.event as Record<string, unknown> | undefined
+    const eventType = event?.type as string | undefined
+    if (eventType === 'content_block_delta') {
+      const delta = event?.delta as Record<string, unknown> | undefined
+      if (delta?.type === 'text_delta' && typeof delta.text === 'string') {
+        return { text: delta.text }
+      }
+    }
+    return null
+  }
+
+  // Assistant turn — fallback se nao houver stream_event
+  if (type === 'assistant') {
+    const msg = evt.message as Record<string, unknown> | undefined
+    const content = msg?.content as Array<Record<string, unknown>> | undefined
+    if (content) {
+      const text = content
+        .filter((b) => b.type === 'text' && typeof b.text === 'string')
+        .map((b) => b.text as string)
+        .join('')
+      if (text) return { text }
+    }
+    return null
+  }
+
+  // Tool use — sinaliza ao usuario
+  if (type === 'tool_use' || (type === 'stream_event' && (evt.event as Record<string, unknown>)?.type === 'tool_use')) {
+    const name = evt.name || (evt.event as Record<string, unknown>)?.name
+    return { meta: `[tool: ${name || 'unknown'}]` }
+  }
+
+  // Final result
+  if (type === 'result') {
+    const text = evt.result
+    if (typeof text === 'string' && text) {
+      // result eh o texto completo - nao re-emitimos como chunk pra evitar duplicacao
+      return null
+    }
+  }
+
+  // System/init messages — ignorar silenciosamente
+  return null
+}
+
 function validateModel(agentDef: KnownAgent, model?: string): string | null {
   if (!model) return null
   if (agentDef.models.length === 0) return null // agent has no model list (e.g. aider)
@@ -314,23 +396,53 @@ export async function executeAgentWithCallbacks(
 
     const reader = proc.stdout.getReader()
     const decoder = new TextDecoder()
-    let fullOutput = ''
+    const streamFormat: StreamFormat = agentDef.streamFormat || 'plain-lines'
+    let fullText = ''      // texto extraido (apenas content, nao envelopes JSON)
+    let lineBuffer = ''    // acumula bytes ate \n para parser por linha
 
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
-      const text = decoder.decode(value, { stream: true })
-      fullOutput += text
-      const lines = text.split('\n').filter((l) => l.trim())
-      for (const line of lines) {
-        onChunk(line.trim())
+      lineBuffer += decoder.decode(value, { stream: true })
+
+      // Split por \n, mantem o ultimo (incompleto) no buffer
+      const lines = lineBuffer.split('\n')
+      lineBuffer = lines.pop() || ''
+
+      for (const rawLine of lines) {
+        const line = rawLine.trim()
+        if (!line) continue
+
+        if (streamFormat === 'claude-stream-json') {
+          const parsed = parseClaudeStreamLine(line)
+          if (parsed?.text) {
+            fullText += parsed.text
+            onChunk(parsed.text)
+          } else if (parsed?.meta) {
+            onChunk(parsed.meta)
+          }
+        } else {
+          fullText += line + '\n'
+          onChunk(line)
+        }
+      }
+    }
+
+    // Processa qualquer linha residual no buffer
+    if (lineBuffer.trim()) {
+      if (streamFormat === 'claude-stream-json') {
+        const parsed = parseClaudeStreamLine(lineBuffer.trim())
+        if (parsed?.text) { fullText += parsed.text; onChunk(parsed.text) }
+      } else {
+        fullText += lineBuffer
+        onChunk(lineBuffer.trim())
       }
     }
 
     const exitCode = await withTimeout(proc.exited, AGENT_TIMEOUT_MS, request.agent)
     const duration = Date.now() - startTime
 
-    return { agent: request.agent, output: fullOutput, exitCode, duration }
+    return { agent: request.agent, output: fullText, exitCode, duration }
   } catch (err) {
     proc?.kill()
     return {

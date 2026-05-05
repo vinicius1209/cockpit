@@ -23,7 +23,9 @@ import { useDocStore } from '@/entities/docs/store'
 import { useProjectStore } from '@/entities/card/project-store'
 import { DOC_TEMPLATES } from '@/entities/docs/templates'
 import type { Doc } from '@/entities/docs/types'
-import { FileText, Plus, Search, Trash2, Edit, BookOpen, Eye, Pencil, FolderOpen, Link2, Filter } from 'lucide-react'
+import { CockpitPageHeader } from '@/widgets/cockpit-page-header'
+import { useConfirm } from '@/components/ui/confirm-dialog'
+import { FileText, Plus, Search, Trash2, Edit, Eye, Pencil, FolderOpen, Link2, Filter, Bot } from 'lucide-react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 
@@ -49,6 +51,7 @@ export function DocsPage() {
   const [source, setSource] = useState<'manual' | 'jira-mirror'>('manual')
   const [sourceRef, setSourceRef] = useState('')
   const [selectedTemplate, setSelectedTemplate] = useState('blank')
+  const [confirm, confirmDialog] = useConfirm()
 
   if (!activeWorkspaceId) {
     return <div className="p-6 text-muted-foreground">Selecione um workspace na sidebar</div>
@@ -126,8 +129,14 @@ export function DocsPage() {
     setDialogOpen(false)
   }
 
-  const handleDelete = (id: string) => {
-    deleteDoc(id)
+  const handleDelete = async (doc: Doc) => {
+    const ok = await confirm({
+      title: `Excluir documento "${doc.title}"?`,
+      description: 'O documento sera removido permanentemente do Vault.',
+      confirmLabel: 'Excluir documento',
+    })
+    if (!ok) return
+    deleteDoc(doc.id)
     setViewingDoc(null)
     toast.success('Documento excluido')
   }
@@ -143,38 +152,45 @@ export function DocsPage() {
     }
   }
 
-  return (
-    <div className="p-4 lg:p-6 max-w-4xl mx-auto space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight flex items-center gap-2">
-            <BookOpen className="h-5 w-5" />
-            Docs Vault
-          </h1>
-          <p className="text-muted-foreground text-sm mt-0.5">
-            {docs.length} documento{docs.length !== 1 ? 's' : ''}
-          </p>
-        </div>
-        <Button onClick={openNew}>
-          <Plus className="h-4 w-4 mr-1" />
-          Novo Doc
-        </Button>
-      </div>
+  const totalDocs = getWorkspaceDocs(activeWorkspaceId).length
+  const aiCount = sourceCountMap['agent-generated'] || 0
+  const manualCount = sourceCountMap['manual'] || 0
 
-      {/* Search + Filters */}
-      <div className="flex items-center gap-2">
+  return (
+    <div className="p-4 lg:p-6 max-w-4xl mx-auto">
+      {confirmDialog}
+
+      <CockpitPageHeader
+        systemLabel="ARCHIVE · DOCS VAULT"
+        title="Docs Vault"
+        subtitle="Especificacoes, anotacoes e contexto persistido"
+        rightSlot={
+          <Button onClick={openNew} size="sm" className="h-7 text-xs">
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Novo Doc
+          </Button>
+        }
+        stats={[
+          { label: 'TOTAL', value: String(totalDocs).padStart(3, '0') },
+          { label: 'AI', value: String(aiCount).padStart(2, '0') },
+          { label: 'MANUAL', value: String(manualCount).padStart(2, '0') },
+          { label: 'FILTRO', value: docs.length === totalDocs ? 'OFF' : `${docs.length}/${totalDocs}`, tone: docs.length !== totalDocs ? 'live' : 'default' },
+        ]}
+      />
+
+      {/* ── SEARCH + FILTERS BAR ── */}
+      <div className="flex items-center gap-2 mb-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Buscar por titulo, conteudo ou tag..."
-            className="pl-9"
+            className="pl-9 font-mono text-sm"
           />
         </div>
         <Select value={filterSource} onValueChange={setFilterSource}>
-          <SelectTrigger className="w-36 h-9">
+          <SelectTrigger className="w-36 h-9 font-mono text-xs uppercase tracking-wider">
             <Filter className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
             <SelectValue />
           </SelectTrigger>
@@ -187,7 +203,7 @@ export function DocsPage() {
         </Select>
         {projects.length > 0 && (
           <Select value={filterProject} onValueChange={setFilterProject}>
-            <SelectTrigger className="w-36 h-9">
+            <SelectTrigger className="w-36 h-9 font-mono text-xs uppercase tracking-wider">
               <FolderOpen className="h-3.5 w-3.5 mr-1 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
@@ -201,54 +217,102 @@ export function DocsPage() {
         )}
       </div>
 
-      {/* Doc list */}
-      <div className="space-y-2">
-        {docs.length === 0 && (
-          <div className="text-center py-16 text-muted-foreground">
-            <FileText className="h-10 w-10 mx-auto mb-3 opacity-40" />
-            <p className="text-sm">{searchQuery ? 'Nenhum resultado encontrado' : 'Nenhum documento criado'}</p>
-            {!searchQuery && (
-              <p className="text-xs mt-1">Clique em "Novo Doc" para comecar</p>
-            )}
-          </div>
-        )}
-
-        {docs.map((doc) => (
-          <div
-            key={doc.id}
-            className="group flex items-start gap-3 rounded-lg border p-3 cursor-pointer hover:bg-muted/30 transition-colors"
-            onClick={() => setViewingDoc(doc)}
-          >
-            <FileText className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-            <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-medium truncate">{doc.title}</h3>
-              <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
-                {doc.content.slice(0, 150).replace(/[#*`\n]/g, ' ').trim()}
-              </p>
-              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                {doc.tags.slice(0, 3).map((tag) => (
-                  <Badge key={tag} variant="secondary" className="text-[10px]">{tag}</Badge>
-                ))}
-                {doc.tags.length > 3 && (
-                  <Badge variant="outline" className="text-[10px]">+{doc.tags.length - 3}</Badge>
-                )}
-                {doc.source !== 'manual' && (
-                  <Badge variant="outline" className="text-[10px]">{doc.source === 'agent-generated' ? 'AI' : doc.source}</Badge>
-                )}
-                {doc.card_id && (
-                  <Badge variant="outline" className="text-[10px]">
-                    <Link2 className="h-2.5 w-2.5 mr-0.5" />
-                    card
-                  </Badge>
-                )}
-              </div>
-            </div>
-            <span className="text-[10px] text-muted-foreground shrink-0">
-              {format(new Date(doc.updated_at), 'dd/MM')}
+      {/* ── DOC LIST ── */}
+      {docs.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 px-6 text-center gap-4 border border-dashed rounded-md">
+          <div className="relative h-14 w-14">
+            <span className="absolute inset-0 rounded-full border border-border" />
+            <span className="absolute inset-2 rounded-full border border-border/60" />
+            <span className="absolute inset-0 flex items-center justify-center">
+              <FileText className="h-5 w-5 text-muted-foreground" />
             </span>
           </div>
-        ))}
-      </div>
+          <div className="space-y-1">
+            <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+              ━ {searchQuery ? 'NENHUM RESULTADO' : 'ARCHIVE VAZIO'} ━
+            </p>
+            <p className="text-xs text-muted-foreground/70">
+              {searchQuery ? 'Tente outro termo de busca' : 'Crie um novo doc ou gere uma spec via card'}
+            </p>
+          </div>
+          {!searchQuery && (
+            <Button onClick={openNew} size="sm">
+              <Plus className="h-4 w-4 mr-1" />
+              Novo Doc
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {docs.map((doc, i) => {
+            const shortId = doc.id.replace(/[^a-z0-9]/gi, '').slice(-4).toUpperCase()
+            const sourceLabel = doc.source === 'agent-generated' ? 'AI' : doc.source === 'jira-mirror' ? 'JIRA' : 'MAN'
+            const sourceColor =
+              doc.source === 'agent-generated' ? 'text-violet-500' :
+              doc.source === 'jira-mirror' ? 'text-blue-500' :
+              'text-muted-foreground'
+
+            return (
+              <div
+                key={doc.id}
+                className="group relative flex items-start gap-3 rounded-md border bg-card p-3 cursor-pointer hover:border-primary/40 transition-colors"
+                onClick={() => setViewingDoc(doc)}
+              >
+                {/* Accent bar */}
+                <span className="absolute left-0 top-2 bottom-2 w-[2px] rounded-r-sm bg-primary/40" aria-hidden />
+
+                <div className="flex-1 min-w-0 pl-2">
+                  {/* Identifier strip */}
+                  <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground mb-1">
+                    <span className="tabular-nums">{String(i + 1).padStart(2, '0')}</span>
+                    <span className="text-muted-foreground/30">·</span>
+                    <span className="rounded-sm bg-muted/60 px-1 py-0 text-foreground/80 tabular-nums">#{shortId}</span>
+                    <span className="text-muted-foreground/30">·</span>
+                    <span className={sourceColor}>
+                      {doc.source === 'agent-generated' && <Bot className="h-2.5 w-2.5 inline mr-0.5" />}
+                      {sourceLabel}
+                    </span>
+                    {doc.card_id && (
+                      <>
+                        <span className="text-muted-foreground/30">·</span>
+                        <span className="flex items-center gap-0.5 text-emerald-500/80">
+                          <Link2 className="h-2.5 w-2.5" />
+                          card
+                        </span>
+                      </>
+                    )}
+                    <span className="ml-auto tabular-nums text-muted-foreground/70 normal-case tracking-normal">
+                      {format(new Date(doc.updated_at), 'dd/MM/yy')}
+                    </span>
+                  </div>
+
+                  {/* Title */}
+                  <h3 className="text-sm font-semibold truncate leading-snug">{doc.title}</h3>
+
+                  {/* Snippet */}
+                  <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
+                    {doc.content.slice(0, 180).replace(/[#*`\n]/g, ' ').trim() || '—'}
+                  </p>
+
+                  {/* Tags */}
+                  {doc.tags.length > 0 && (
+                    <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                      {doc.tags.slice(0, 5).map((tag) => (
+                        <span key={tag} className="font-mono text-[9px] uppercase tracking-wider px-1.5 py-0 rounded-sm bg-muted/60 text-muted-foreground">
+                          {tag}
+                        </span>
+                      ))}
+                      {doc.tags.length > 5 && (
+                        <span className="font-mono text-[9px] text-muted-foreground/60">+{doc.tags.length - 5}</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* View doc dialog */}
       <Dialog open={!!viewingDoc} onOpenChange={(v) => !v && setViewingDoc(null)}>
@@ -280,7 +344,7 @@ export function DocsPage() {
                   <Edit className="h-3.5 w-3.5 mr-1" />
                   Editar
                 </Button>
-                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDelete(viewingDoc.id)}>
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDelete(viewingDoc)}>
                   <Trash2 className="h-3.5 w-3.5 mr-1" />
                   Excluir
                 </Button>

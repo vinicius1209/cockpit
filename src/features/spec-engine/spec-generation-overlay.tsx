@@ -121,27 +121,93 @@ export function SpecGenerationOverlay({ content, agentName, modelName, onAbort }
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full gap-3 px-6 text-center">
-            {/* Radar pulse */}
-            <div className="relative h-16 w-16">
-              <span className="absolute inset-0 rounded-full border border-amber-500/40" />
-              <span className="absolute inset-2 rounded-full border border-amber-500/30 animate-ping" />
-              <span className="absolute inset-4 rounded-full border border-amber-500/20" />
-              <span className="absolute inset-0 flex items-center justify-center">
-                <Radio className="h-5 w-5 text-amber-500" />
-              </span>
-            </div>
-            <div className="space-y-1">
-              <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-amber-500">
-                ━ AWAITING TRANSMISSION ━
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                Agent processando contexto · primeiro chunk a caminho
-              </p>
-            </div>
-          </div>
+          <AwaitingPhases elapsed={elapsed} />
         )}
       </div>
+    </div>
+  )
+}
+
+// Phases visuais enquanto o primeiro chunk nao chega — da feedback ao usuario
+// que algo esta acontecendo (em vez de spinner mudo).
+function AwaitingPhases({ elapsed }: { elapsed: number }) {
+  // Phases conceituais (estimadas) baseadas em tempo decorrido.
+  // Sao otimistas — se demora muito, exibe ultimo phase + dica.
+  const phases = [
+    { from: 0,  label: 'Inicializando agent CLI',          icon: '⚙' },
+    { from: 3,  label: 'Carregando contexto do workspace', icon: '📡' },
+    { from: 8,  label: 'Lendo arquivos do projeto',        icon: '📂' },
+    { from: 18, label: 'Analisando codigo e dependencias', icon: '🔬' },
+    { from: 30, label: 'Processando spec — primeiro chunk a caminho', icon: '✍' },
+  ]
+  const currentIdx = phases.findIndex((p, i) =>
+    elapsed >= p.from && (i === phases.length - 1 || elapsed < phases[i + 1].from)
+  )
+  const current = phases[currentIdx] || phases[0]
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full gap-5 px-6 text-center">
+      {/* Radar concentric */}
+      <div className="relative h-20 w-20">
+        <span className="absolute inset-0 rounded-full border border-amber-500/40" />
+        <span className="absolute inset-2 rounded-full border border-amber-500/30 animate-ping" />
+        <span className="absolute inset-4 rounded-full border border-amber-500/20" />
+        <span className="absolute inset-6 rounded-full bg-amber-500/10" />
+        <span className="absolute inset-0 flex items-center justify-center">
+          <Radio className="h-5 w-5 text-amber-500" />
+        </span>
+      </div>
+
+      <div className="space-y-1.5 max-w-md">
+        <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-amber-500">
+          ━ AWAITING TRANSMISSION ━
+        </p>
+
+        {/* Current phase — animated */}
+        <p className="text-[13px] text-foreground flex items-center justify-center gap-2 min-h-[20px]">
+          <span className="opacity-70">{current.icon}</span>
+          <span>{current.label}</span>
+          <span className="inline-flex gap-0.5 ml-1">
+            <span className="h-1 w-1 rounded-full bg-amber-500 animate-[pulse_1.4s_ease-in-out_infinite]" />
+            <span className="h-1 w-1 rounded-full bg-amber-500 animate-[pulse_1.4s_ease-in-out_0.2s_infinite]" />
+            <span className="h-1 w-1 rounded-full bg-amber-500 animate-[pulse_1.4s_ease-in-out_0.4s_infinite]" />
+          </span>
+        </p>
+
+        {/* Phase progress dots */}
+        <div className="flex items-center justify-center gap-1.5 pt-2">
+          {phases.map((p, i) => (
+            <span
+              key={p.label}
+              className={`h-1 rounded-full transition-all ${
+                i < currentIdx ? 'w-4 bg-emerald-500/60' :
+                i === currentIdx ? 'w-6 bg-amber-500' :
+                'w-2 bg-muted-foreground/20'
+              }`}
+              title={p.label}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Slow-warning + log hint */}
+      {elapsed > 25 && (
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 max-w-md text-left">
+          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-amber-500 mb-0.5 flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+            LATENCIA ELEVADA
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-snug">
+            Demorando mais que o esperado. O agent pode estar lendo arquivos grandes
+            ou aguardando rate limit. Se passar de 2min, considere
+            {' '}<button
+              className="text-rose-500 hover:underline font-mono uppercase tracking-wider text-[10px]"
+              onClick={(e) => { e.preventDefault() }}
+            >ABORT</button>
+            {' '}e tentar com modelo mais rapido (haiku).
+          </p>
+        </div>
+      )}
     </div>
   )
 }
