@@ -102,8 +102,12 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
 
     const currentAttempt = feedback ? attempt + 1 : attempt
     if (currentAttempt > MAX_ATTEMPTS) {
-      setError(`Limite de ${MAX_ATTEMPTS} tentativas atingido. Revise a spec ou implemente manualmente.`)
+      setError(
+        `Limite de ${MAX_ATTEMPTS} tentativas atingido. ` +
+        'Use "Voltar para Ready" para revisar a spec, ou implemente manualmente.',
+      )
       setPhase('error')
+      errorProcessing(card.id, `Limite de ${MAX_ATTEMPTS} tentativas atingido`)
       return
     }
     if (feedback) setAttempt(currentAttempt)
@@ -289,9 +293,45 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
     }
   }, [card, projectPath, columns, moveCard, updateCard, workspaceId, wsSlug, attempt])
 
-  const handleCancel = () => {
-    abortRef.current?.abort()
+  // ── Reset helpers — garantem consistencia entre state local + card + processing ──
+
+  /** Limpa o state local da UI (phase, terminal, errors). Nao mexe no card. */
+  const clearLocalState = () => {
     setPhase('idle')
+    setError(null)
+    setSummary(null)
+    setOutputLines([])
+    setTerminalLines([])
+    setSilenceSeconds(0)
+    setBranch(null)
+    setShowFeedback(false)
+    setFeedbackText('')
+  }
+
+  /** Reset completo: aborta exec, limpa state, devolve card pra Ready,
+   *  remove processingCards. Use em ABORT / Limpar / Reset apos erro. */
+  const resetToReady = (opts?: { silent?: boolean }) => {
+    abortRef.current?.abort()
+    completeProcessing(card.id)
+    clearLocalState()
+
+    // Move card de volta pra Ready se estava em-progress (ou implementing)
+    const readyCol = columns.find((c) => c.slug === 'ready')
+    if (readyCol && card.column_id !== readyCol.id) {
+      moveCard(card.id, readyCol.id, 0)
+    }
+    if (card.spec_status === 'in_progress' || card.spec_status === 'review') {
+      updateCard(card.id, { spec_status: 'ready' })
+    }
+    if (!opts?.silent) {
+      toast.info('Card devolvido para Ready', {
+        description: 'Implementacao pode ser iniciada novamente quando quiser',
+      })
+    }
+  }
+
+  const handleCancel = () => {
+    resetToReady()
   }
 
   const isRunning = phase === 'analyzing' || phase === 'branching' || phase === 'implementing' || phase === 'creating-pr'
@@ -484,17 +524,8 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
                   variant="ghost"
                   size="sm"
                   className="h-7 text-xs text-destructive hover:text-destructive"
-                  onClick={() => {
-                    // Move card back to Ready
-                    const readyCol = columns.find((c) => c.slug === 'ready')
-                    if (readyCol) {
-                      useCardStore.getState().moveCard(card.id, readyCol.id, 0)
-                      useCardStore.getState().updateCard(card.id, { spec_status: 'ready' })
-                    }
-                    setPhase('idle')
-                    setSummary(null)
-                    toast.info('Card movido de volta para Ready')
-                  }}
+                  onClick={() => resetToReady()}
+                  title="Rejeitar resultado e voltar card para Ready"
                 >
                   <XCircle className="h-3 w-3 mr-1" />
                   Rejeitar
@@ -518,18 +549,11 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
                   variant="ghost"
                   size="sm"
                   className="h-7 text-xs text-muted-foreground"
-                  onClick={() => {
-                    // Reset state — UI volta pra idle, sem mover card
-                    setPhase('idle')
-                    setError(null)
-                    setSummary(null)
-                    setOutputLines([])
-                    setTerminalLines([])
-                  }}
-                  title="Limpar erro e voltar para tela inicial"
+                  onClick={() => resetToReady()}
+                  title="Limpar erro, devolver card para Ready"
                 >
                   <XCircle className="h-3 w-3 mr-1" />
-                  Limpar
+                  Voltar para Ready
                 </Button>
               </>
             )}
