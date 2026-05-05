@@ -23,8 +23,10 @@ export function BoardView() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId)
   // Subscribe only to data arrays — re-render when cards/columns/labels change
   const cards = useCardStore((s) => s.cards)
-  const _columns = useCardStore((s) => s.columns)  // trigger re-render on column changes
-  const _labels = useCardStore((s) => s.labels)     // trigger re-render on label changes
+  // Subscribe to columns/labels arrays to trigger re-render when they change.
+  // The values themselves are read via useCardStore.getState() below.
+  useCardStore((s) => s.columns)
+  useCardStore((s) => s.labels)
 
   const [activeCard, setActiveCard] = useState<Card | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -161,7 +163,7 @@ export function BoardView() {
       >
         <div className="flex-1 overflow-x-auto overflow-y-hidden">
           <div className="flex gap-4 p-4 h-full">
-            {columns.map((column) => {
+            {columns.map((column, idx) => {
               const columnCards = filterCards(getColumnCards(activeWorkspaceId, column.id))
               return (
                 <BoardColumn
@@ -170,6 +172,8 @@ export function BoardView() {
                   cards={columnCards}
                   onCardClick={handleCardClick}
                   onAddCard={handleAddCard}
+                  index={idx}
+                  totalColumns={columns.length}
                 />
               )
             })}

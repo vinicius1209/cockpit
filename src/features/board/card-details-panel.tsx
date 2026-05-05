@@ -149,139 +149,165 @@ export function CardDetailsPanel({
         )}
       </div>
 
-      {/* Right: Metadata sidebar */}
-      <div className="w-48 shrink-0 space-y-3 border-l pl-4">
-        {/* Type */}
-        <div className="space-y-1">
-          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Tipo</span>
-          <Select value={type} onValueChange={(v) => setType(v as CardType)} disabled={disabled}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CARD_TYPES.map((t) => (
-                <SelectItem key={t} value={t}>
-                  <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${CARD_TYPE_CONFIG[t].bgColor} ${CARD_TYPE_CONFIG[t].color} border-0`}>
-                    {CARD_TYPE_CONFIG[t].label}
-                  </Badge>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      {/* Right: cockpit sidebar — agrupado em IDENTIFICAÇÃO / ROTEAMENTO / TELEMETRIA */}
+      <div className="w-52 shrink-0 space-y-4 border-l pl-4">
 
-        {/* Priority */}
-        <div className="space-y-1">
-          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Prioridade</span>
-          <Select value={priority} onValueChange={(v) => setPriority(v as CardPriority)} disabled={disabled}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {CARD_PRIORITIES.map((p) => (
-                <SelectItem key={p} value={p}>
-                  <span className={CARD_PRIORITY_CONFIG[p].color}>{CARD_PRIORITY_CONFIG[p].label}</span>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* ─── IDENTIFICAÇÃO ─── */}
+        <SectionBlock label="Identificacao">
+          <FieldRow label="Tipo">
+            <Select value={type} onValueChange={(v) => setType(v as CardType)} disabled={disabled}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CARD_TYPES.map((t) => (
+                  <SelectItem key={t} value={t}>
+                    <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${CARD_TYPE_CONFIG[t].bgColor} ${CARD_TYPE_CONFIG[t].color} border-0`}>
+                      {CARD_TYPE_CONFIG[t].label}
+                    </Badge>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FieldRow>
+          <FieldRow label="Prioridade">
+            <Select value={priority} onValueChange={(v) => setPriority(v as CardPriority)} disabled={disabled}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {CARD_PRIORITIES.map((p) => (
+                  <SelectItem key={p} value={p}>
+                    <span className={CARD_PRIORITY_CONFIG[p].color}>{CARD_PRIORITY_CONFIG[p].label}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FieldRow>
+        </SectionBlock>
 
-        {/* Due date */}
-        <div className="space-y-1">
-          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Data limite</span>
-          <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="h-8 text-xs" disabled={disabled} />
-        </div>
+        {/* ─── ROTEAMENTO ─── */}
+        <SectionBlock label="Roteamento">
+          <FieldRow label="Responsavel">
+            <Select value={assignee || 'unassigned'} onValueChange={(v) => setAssignee(v === 'unassigned' ? '' : v)} disabled={disabled}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassigned"><span className="text-muted-foreground">Nao atribuido</span></SelectItem>
+                <SelectItem value="eu"><span className="flex items-center gap-1.5"><User className="h-3 w-3" /> Eu</span></SelectItem>
+                <SelectItem value="ai-agent"><span className="flex items-center gap-1.5"><Bot className="h-3 w-3" /> AI Agent</span></SelectItem>
+              </SelectContent>
+            </Select>
+          </FieldRow>
+          <FieldRow label="Data limite">
+            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="h-8 text-xs" disabled={disabled} />
+          </FieldRow>
 
-        {/* Assignee */}
-        <div className="space-y-1">
-          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Responsavel</span>
-          <Select value={assignee || 'unassigned'} onValueChange={(v) => setAssignee(v === 'unassigned' ? '' : v)} disabled={disabled}>
-            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="unassigned">
-                <span className="text-muted-foreground">Nao atribuido</span>
-              </SelectItem>
-              <SelectItem value="eu">
-                <span className="flex items-center gap-1.5"><User className="h-3 w-3" /> Eu</span>
-              </SelectItem>
-              <SelectItem value="ai-agent">
-                <span className="flex items-center gap-1.5"><Bot className="h-3 w-3" /> AI Agent</span>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* Spec status */}
-        {card?.spec_status && (
-          <div className="space-y-1">
-            <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Spec</span>
-            <Badge variant="outline" className="text-[10px]">{card.spec_status}</Badge>
-          </div>
-        )}
-
-        {/* Labels */}
-        {isEditing && (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Labels</span>
-              <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => setShowNewLabel(!showNewLabel)} disabled={disabled}>
-                <Plus className="h-3 w-3" />
-              </Button>
-            </div>
-
-            {showNewLabel && (
-              <div className="space-y-1.5">
-                <Input
-                  value={newLabelName}
-                  onChange={(e) => setNewLabelName(e.target.value)}
-                  placeholder="Nome..."
-                  className="h-7 text-xs"
-                  onKeyDown={(e) => e.key === 'Enter' && handleCreateLabel()}
-                />
-                <div className="flex gap-1">
-                  {LABEL_COLORS.slice(0, 6).map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      className={`h-4 w-4 rounded-full shrink-0 ${newLabelColor === c ? 'ring-2 ring-primary ring-offset-1 ring-offset-background scale-110' : 'opacity-50 hover:opacity-100'}`}
-                      style={{ backgroundColor: c }}
-                      onClick={() => setNewLabelColor(c)}
-                    />
-                  ))}
-                </div>
-                <Button size="sm" className="h-6 text-[10px] w-full" onClick={handleCreateLabel} disabled={!newLabelName.trim()}>Criar</Button>
+          {isEditing && (
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">Labels</span>
+                <Button variant="ghost" size="sm" className="h-5 w-5 p-0" onClick={() => setShowNewLabel(!showNewLabel)} disabled={disabled}>
+                  <Plus className="h-3 w-3" />
+                </Button>
               </div>
-            )}
 
-            <div className="flex flex-wrap gap-1">
-              {workspaceLabels.map((label) => {
-                const active = isLabelActive(label.id)
-                return (
-                  <Badge
-                    key={label.id}
-                    variant={active ? 'default' : 'outline'}
-                    className={`cursor-pointer text-[10px] ${active ? 'text-white border-0' : 'opacity-50 hover:opacity-100'}`}
-                    style={active ? { backgroundColor: label.color } : undefined}
-                    onClick={() => !disabled && card && toggleCardLabel(card.id, label)}
-                  >
-                    {!active && <span className="h-1.5 w-1.5 rounded-full mr-0.5" style={{ backgroundColor: label.color }} />}
-                    {label.name}
-                    {active && <X className="h-2.5 w-2.5 ml-0.5" />}
-                  </Badge>
-                )
-              })}
-              {workspaceLabels.length === 0 && !showNewLabel && (
-                <span className="text-[10px] text-muted-foreground">Nenhuma</span>
+              {showNewLabel && (
+                <div className="space-y-1.5">
+                  <Input
+                    value={newLabelName}
+                    onChange={(e) => setNewLabelName(e.target.value)}
+                    placeholder="Nome..."
+                    className="h-7 text-xs"
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreateLabel()}
+                  />
+                  <div className="flex gap-1">
+                    {LABEL_COLORS.slice(0, 6).map((c) => (
+                      <button
+                        key={c}
+                        type="button"
+                        className={`h-4 w-4 rounded-full shrink-0 ${newLabelColor === c ? 'ring-2 ring-primary ring-offset-1 ring-offset-background scale-110' : 'opacity-50 hover:opacity-100'}`}
+                        style={{ backgroundColor: c }}
+                        onClick={() => setNewLabelColor(c)}
+                      />
+                    ))}
+                  </div>
+                  <Button size="sm" className="h-6 text-[10px] w-full" onClick={handleCreateLabel} disabled={!newLabelName.trim()}>Criar</Button>
+                </div>
               )}
-            </div>
-          </div>
-        )}
 
-        {/* Timestamps */}
+              <div className="flex flex-wrap gap-1">
+                {workspaceLabels.map((label) => {
+                  const active = isLabelActive(label.id)
+                  return (
+                    <Badge
+                      key={label.id}
+                      variant={active ? 'default' : 'outline'}
+                      className={`cursor-pointer text-[10px] ${active ? 'text-white border-0' : 'opacity-50 hover:opacity-100'}`}
+                      style={active ? { backgroundColor: label.color } : undefined}
+                      onClick={() => !disabled && card && toggleCardLabel(card.id, label)}
+                    >
+                      {!active && <span className="h-1.5 w-1.5 rounded-full mr-0.5" style={{ backgroundColor: label.color }} />}
+                      {label.name}
+                      {active && <X className="h-2.5 w-2.5 ml-0.5" />}
+                    </Badge>
+                  )
+                })}
+                {workspaceLabels.length === 0 && !showNewLabel && (
+                  <span className="text-[10px] text-muted-foreground">Nenhuma</span>
+                )}
+              </div>
+            </div>
+          )}
+        </SectionBlock>
+
+        {/* ─── TELEMETRIA ─── (read-only, somente edicao) */}
         {isEditing && card && (
-          <div className="pt-2 border-t space-y-0.5 text-[10px] text-muted-foreground">
-            <p>Criado: {new Date(card.created_at).toLocaleDateString('pt-BR')}</p>
-            <p>Atualizado: {new Date(card.updated_at).toLocaleDateString('pt-BR')}</p>
-          </div>
+          <SectionBlock label="Telemetria">
+            <TelemetryRow label="Spec">
+              {card.spec_status ? (
+                <Badge variant="outline" className="text-[10px] h-4 px-1.5">{card.spec_status}</Badge>
+              ) : <span className="text-muted-foreground/60">—</span>}
+            </TelemetryRow>
+            <TelemetryRow label="Docs">
+              <span className="font-mono tabular-nums text-foreground">{linkedDocs.length}</span>
+            </TelemetryRow>
+            <TelemetryRow label="Criado">
+              <span className="font-mono">{new Date(card.created_at).toLocaleDateString('pt-BR')}</span>
+            </TelemetryRow>
+            <TelemetryRow label="Atualizado">
+              <span className="font-mono">{new Date(card.updated_at).toLocaleDateString('pt-BR')}</span>
+            </TelemetryRow>
+          </SectionBlock>
         )}
       </div>
+    </div>
+  )
+}
+
+// ─── helpers ───
+
+function SectionBlock({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-muted-foreground">{label}</span>
+        <span className="flex-1 h-px bg-border/60" />
+      </div>
+      <div className="space-y-2">{children}</div>
+    </div>
+  )
+}
+
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">{label}</span>
+      {children}
+    </div>
+  )
+}
+
+function TelemetryRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between text-[11px]">
+      <span className="font-mono uppercase tracking-[0.12em] text-muted-foreground">{label}</span>
+      <span className="text-right">{children}</span>
     </div>
   )
 }

@@ -4,20 +4,29 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import type { Card, CardType, CardPriority } from '@/entities/card/types'
 import { useCardStore, type ProcessingState } from '@/entities/card/store'
+import { useAgentStore } from '@/entities/agent/store'
+import { useWorkspaceStore } from '@/entities/workspace/store'
+import { useProjectStore } from '@/entities/card/project-store'
 import { useState, useEffect } from 'react'
-import { Trash2, Bot, FileText, ScrollText, MessageSquare, Rocket, Loader2 } from 'lucide-react'
+import { Trash2, Bot } from 'lucide-react'
 import { AgentChat } from '@/features/agent-runner/agent-chat'
 import { SpecPanel } from '@/features/spec-engine/spec-panel'
 import { InterviewPanel } from '@/features/agent-runner/interview-panel'
 import { ImplementPanel } from '@/features/implement/implement-panel'
 import { CardDetailsPanel } from './card-details-panel'
+import { CardFlightStrip } from './card-flight-strip'
+import { CardPipelineTabs, type PipelineTab } from './card-pipeline-tabs'
+import { CardStatusBar } from './card-status-bar'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
-
-type TabId = 'details' | 'interview' | 'spec' | 'implement' | 'agent'
 
 interface CardDialogProps {
   card: Card | null
@@ -35,10 +44,27 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
   const [priority, setPriority] = useState<CardPriority>('medium')
   const [dueDate, setDueDate] = useState('')
   const [assignee, setAssignee] = useState('')
-  const [activeTab, setActiveTab] = useState<TabId>('details')
+  const [activeTab, setActiveTab] = useState<PipelineTab>('details')
+  const [agentDrawerOpen, setAgentDrawerOpen] = useState(false)
 
   const isEditing = !!card
   const processing = useCardStore((s) => card ? s.processingCards[card.id] : undefined) as ProcessingState | undefined
+
+  const activeWorkspace = useWorkspaceStore((s) => s.getActiveWorkspace())
+  const { getWorkspaceProjects } = useProjectStore()
+  const { getWorkspaceAgents } = useAgentStore()
+  const projects = getWorkspaceProjects(workspaceId)
+  const projectName = card?.project_id
+    ? projects.find((p) => p.id === card.project_id)?.name || null
+    : projects[0]?.name || null
+
+  // Telemetry — qual agente/model esta sendo usado nesta tab
+  const agents = getWorkspaceAgents(workspaceId)
+  const tabAgent =
+    activeTab === 'interview' ? agents.find((a) => a.role === 'interviewer') :
+    activeTab === 'spec' ? agents.find((a) => a.role === 'spec-writer') :
+    activeTab === 'implement' ? agents.find((a) => a.role === 'implementer') :
+    null
 
   useEffect(() => {
     if (card) {
@@ -56,6 +82,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
       setDueDate('')
       setAssignee('')
       setActiveTab('details')
+      setAgentDrawerOpen(false)
     }
   }, [card, open])
 
@@ -106,146 +133,118 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className={`sm:max-w-3xl ${isEditing ? 'h-[85vh]' : 'h-auto'} flex flex-col`}>
-        <DialogHeader>
-          <DialogTitle>{isEditing ? 'Editar Card' : 'Novo Card'}</DialogTitle>
+    <>
+      <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+        <DialogContent className={`sm:max-w-4xl ${isEditing ? 'h-[88vh]' : 'h-auto'} flex flex-col p-0 gap-0 overflow-hidden`}>
+          {/* ──── FLIGHT STRIP HEADER ──── */}
+          <DialogHeader className="border-b px-4 py-3 space-y-1.5 shrink-0">
+            <CardFlightStrip card={card} isEditing={isEditing} />
+            <DialogTitle className="text-base font-semibold leading-snug pr-8 line-clamp-2">
+              {isEditing ? (title || card?.title || 'Editar Card') : 'Novo Card'}
+            </DialogTitle>
+          </DialogHeader>
 
-          {/* Processing banner */}
-          {processing && (
-            <div className="flex items-center gap-2 rounded-md bg-amber-500/10 border border-amber-500/20 px-3 py-2 mt-1">
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-amber-500 shrink-0" />
-              <div className="flex-1 min-w-0">
-                <span className="text-xs font-medium text-amber-500">
-                  {processing.action === 'discovery' ? 'Agent analisando card...' :
-                   processing.action === 'spec' ? 'Gerando especificacao...' :
-                   'Processando...'}
-                </span>
-                {processing.chunks.length > 0 && (
-                  <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                    {processing.chunks[processing.chunks.length - 1]}
-                  </p>
-                )}
-              </div>
-              <span className="text-[10px] text-muted-foreground tabular-nums shrink-0">{processing.chunks.length} chunks</span>
-            </div>
+          {/* ──── PIPELINE TABS (only when editing) ──── */}
+          {isEditing && card && (
+            <CardPipelineTabs
+              card={card}
+              active={activeTab}
+              onChange={setActiveTab}
+              onOpenAgent={() => setAgentDrawerOpen(true)}
+              agentActive={agentDrawerOpen}
+              processing={processing}
+            />
           )}
 
-          {isEditing && (
-            <div className="flex gap-1 pt-1">
-              <Button
-                variant={activeTab === 'details' ? 'secondary' : 'ghost'}
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => setActiveTab('details')}
-              >
-                <FileText className="h-3.5 w-3.5 mr-1" />
-                Detalhes
-              </Button>
-              <Button
-                variant={activeTab === 'interview' ? 'secondary' : 'ghost'}
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => setActiveTab('interview')}
-              >
-                <MessageSquare className="h-3.5 w-3.5 mr-1" />
-                Entrevista
-              </Button>
-              <Button
-                variant={activeTab === 'spec' ? 'secondary' : 'ghost'}
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => setActiveTab('spec')}
-              >
-                <ScrollText className="h-3.5 w-3.5 mr-1" />
-                Spec
-                {card?.spec_status && (
-                  <Badge variant="outline" className="ml-1 text-[9px] px-1 py-0">{card.spec_status}</Badge>
-                )}
-              </Button>
-              {card?.spec_content && (
-                <Button
-                  variant={activeTab === 'implement' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-7 text-xs"
-                  onClick={() => setActiveTab('implement')}
-                >
-                  <Rocket className="h-3.5 w-3.5 mr-1" />
-                  Implementar
-                </Button>
-              )}
-              <Button
-                variant={activeTab === 'agent' ? 'secondary' : 'ghost'}
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => setActiveTab('agent')}
-              >
-                <Bot className="h-3.5 w-3.5 mr-1" />
-                AI Agent
-              </Button>
-            </div>
-          )}
-        </DialogHeader>
+          {/* ──── ACTIVE PANEL ──── */}
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col px-4 py-3">
+            {activeTab === 'details' && (
+              <CardDetailsPanel
+                card={card}
+                isEditing={isEditing}
+                workspaceId={workspaceId}
+                title={title} setTitle={setTitle}
+                description={description} setDescription={setDescription}
+                type={type} setType={setType}
+                priority={priority} setPriority={setPriority}
+                dueDate={dueDate} setDueDate={setDueDate}
+                assignee={assignee} setAssignee={setAssignee}
+                disabled={!!processing}
+              />
+            )}
 
-        {activeTab === 'details' ? (
-          <CardDetailsPanel
-            card={card}
-            isEditing={isEditing}
-            workspaceId={workspaceId}
-            title={title} setTitle={setTitle}
-            description={description} setDescription={setDescription}
-            type={type} setType={setType}
-            priority={priority} setPriority={setPriority}
-            dueDate={dueDate} setDueDate={setDueDate}
-            assignee={assignee} setAssignee={setAssignee}
-            disabled={!!processing}
-          />
-        ) : null}
-
-        {/* Lazy mount: only render active panel (state persisted in sessions/SQLite) */}
-        {isEditing && card && (
-          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-            {activeTab === 'interview' && (
+            {isEditing && card && activeTab === 'interview' && (
               <ErrorBoundary fallbackLabel="Entrevista">
                 <InterviewPanel card={card} workspaceId={workspaceId} />
               </ErrorBoundary>
             )}
-            {activeTab === 'spec' && (
+            {isEditing && card && activeTab === 'spec' && (
               <ErrorBoundary fallbackLabel="Spec">
                 <SpecPanel card={card} workspaceId={workspaceId} />
               </ErrorBoundary>
             )}
-            {activeTab === 'implement' && (
+            {isEditing && card && activeTab === 'implement' && (
               <ErrorBoundary fallbackLabel="Implementacao">
                 <ImplementPanel card={card} workspaceId={workspaceId} />
               </ErrorBoundary>
             )}
-            {activeTab === 'agent' && (
+          </div>
+
+          {/* ──── STATUS BAR (telemetria persistente) ──── */}
+          {isEditing && (
+            <CardStatusBar
+              processing={processing}
+              workspaceName={activeWorkspace?.name}
+              projectName={projectName}
+              agentName={tabAgent?.name || null}
+              modelName={tabAgent?.model || null}
+            />
+          )}
+
+          {/* ──── FOOTER ──── */}
+          <div className="flex items-center justify-between border-t px-4 py-3 shrink-0">
+            {isEditing ? (
+              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleDelete}>
+                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                Excluir
+              </Button>
+            ) : <div />}
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={onClose}>
+                Cancelar
+              </Button>
+              <Button size="sm" onClick={handleSave} disabled={!title.trim()}>
+                {isEditing ? 'Salvar' : 'Criar'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ──── AI AGENT DRAWER (off-pipeline) ──── */}
+      {isEditing && card && (
+        <Sheet open={agentDrawerOpen} onOpenChange={setAgentDrawerOpen}>
+          <SheetContent
+            side="right"
+            className="w-full sm:max-w-xl flex flex-col p-0 gap-0"
+          >
+            <SheetHeader className="border-b px-4 py-3 space-y-1">
+              <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                <Bot className="h-3 w-3" />
+                <span>AI CHAT · OFF-PIPELINE</span>
+              </div>
+              <SheetTitle className="text-sm">
+                Conversa livre sobre <span className="text-muted-foreground font-normal">{card.title}</span>
+              </SheetTitle>
+            </SheetHeader>
+            <div className="flex-1 min-h-0 overflow-hidden">
               <ErrorBoundary fallbackLabel="AI Agent">
                 <AgentChat card={card} workspaceId={workspaceId} />
               </ErrorBoundary>
-            )}
-          </div>
-        )}
-
-        {/* Footer — fixed at bottom */}
-        <div className="flex items-center justify-between border-t pt-3 shrink-0">
-          {isEditing ? (
-            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleDelete}>
-              <Trash2 className="h-3.5 w-3.5 mr-1" />
-              Excluir
-            </Button>
-          ) : <div />}
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button size="sm" onClick={handleSave} disabled={!title.trim()}>
-              {isEditing ? 'Salvar' : 'Criar'}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+            </div>
+          </SheetContent>
+        </Sheet>
+      )}
+    </>
   )
 }

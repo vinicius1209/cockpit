@@ -1,7 +1,20 @@
 import { useState, useCallback, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+} from '@/components/ui/select'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { useCardStore } from '@/entities/card/store'
 import { useAgentStore } from '@/entities/agent/store'
 import { useProjectStore } from '@/entities/card/project-store'
@@ -11,14 +24,15 @@ import type { Card, SpecStatus } from '@/entities/card/types'
 import { MessageResponse } from '@/components/ai-elements/message'
 import { createDocFromSpec } from '@/features/docs-vault/auto-doc'
 import { toast } from 'sonner'
-import { Sparkles, Save, Loader2, ChevronRight, Eye, Pencil, BookOpen } from 'lucide-react'
+import { Sparkles, Save, Loader2, Eye, Pencil, BookOpen, Info, Settings } from 'lucide-react'
 
-const SPEC_STEPS: { status: SpecStatus; label: string; color: string }[] = [
-  { status: 'draft', label: 'Rascunho', color: '#f59e0b' },
-  { status: 'ready', label: 'Pronta', color: '#3b82f6' },
-  { status: 'in_progress', label: 'Implementando', color: '#8b5cf6' },
-  { status: 'review', label: 'Review', color: '#ec4899' },
-  { status: 'done', label: 'Concluida', color: '#10b981' },
+// Spec status definitions with explicit semantics so the user understands what each means.
+const SPEC_STATUSES: { value: SpecStatus; label: string; color: string; hint: string }[] = [
+  { value: 'draft',       label: 'Rascunho',     color: 'text-amber-500',  hint: 'Em escrita / em revisao' },
+  { value: 'ready',       label: 'Pronta',       color: 'text-blue-500',   hint: 'Aprovada para implementar' },
+  { value: 'in_progress', label: 'Implementando',color: 'text-violet-500', hint: 'Implementacao em andamento' },
+  { value: 'review',      label: 'Em review',    color: 'text-pink-500',   hint: 'PR aberto, aguardando review' },
+  { value: 'done',        label: 'Concluida',    color: 'text-emerald-500',hint: 'Mergeada e finalizada' },
 ]
 
 const SPEC_TEMPLATE = `## Titulo
@@ -180,35 +194,73 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
     setIsGenerating(false)
   }
 
+  // Vault — only allow if persisted content matches local content (avoid saving stale/empty)
+  const handleSaveToVault = () => {
+    if (!content.trim()) {
+      toast.error('Sem conteudo para salvar')
+      return
+    }
+    // Persist current content first to ensure card.spec_content is in sync
+    const refreshedSpec = content
+    if (refreshedSpec !== card.spec_content) {
+      updateCard(card.id, { spec_content: refreshedSpec, spec_status: card.spec_status || 'draft' })
+    }
+    const docId = createDocFromSpec({ ...card, spec_content: refreshedSpec }, workspaceId)
+    if (docId) toast.success('Spec salva no Docs Vault')
+    else toast.error('Falha ao salvar no Vault')
+  }
+
+  const navigate = useNavigate()
+  const currentStatusMeta = SPEC_STATUSES.find((s) => s.value === currentStatus)
+
   return (
     <div className="flex flex-col h-full">
-      {/* Status timeline */}
-      <div className="flex items-center gap-1 px-3 py-2.5 border-b">
-        {SPEC_STEPS.map((step, i) => {
-          const isActive = currentStatus === step.status
-          const isPast = currentStatus ? SPEC_STEPS.findIndex((s) => s.status === currentStatus) > i : false
-          return (
-            <div key={step.status} className="flex items-center">
-              <Badge
-                variant={isActive ? 'default' : 'outline'}
-                className={`cursor-pointer text-[10px] px-2 py-0.5 transition-colors ${
-                  isActive ? 'text-white border-0' : isPast ? 'opacity-100' : 'opacity-50 hover:opacity-100'
-                }`}
-                style={isActive ? { backgroundColor: step.color } : undefined}
-                onClick={() => handleStatusChange(step.status)}
-              >
-                {step.label}
-              </Badge>
-              {i < SPEC_STEPS.length - 1 && (
-                <ChevronRight className="h-3 w-3 text-muted-foreground mx-0.5" />
-              )}
-            </div>
-          )
-        })}
-      </div>
+      {/* Toolbar — compact: status + ações principais */}
+      <div className="flex items-center gap-2 px-3 py-2 border-b flex-wrap">
+        {/* Status — discreet select with semantic */}
+        <TooltipProvider delayDuration={300}>
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-[9px] uppercase tracking-[0.18em] text-muted-foreground">Status</span>
+            <Select value={currentStatus || 'draft'} onValueChange={(v) => handleStatusChange(v as SpecStatus)}>
+              <SelectTrigger className="h-7 text-[11px] w-auto gap-1.5">
+                <span className={`flex items-center gap-1.5 ${currentStatusMeta?.color || 'text-muted-foreground'}`}>
+                  <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                  {currentStatusMeta?.label || 'Rascunho'}
+                </span>
+              </SelectTrigger>
+              <SelectContent>
+                {SPEC_STATUSES.map((s) => (
+                  <SelectItem key={s.value} value={s.value} className="text-xs">
+                    <div className="flex flex-col">
+                      <span className={s.color}>{s.label}</span>
+                      <span className="text-[10px] text-muted-foreground">{s.hint}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button className="text-muted-foreground/60 hover:text-foreground transition-colors">
+                  <Info className="h-3 w-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-xs text-[11px]">
+                <p className="mb-1 font-medium">Status da spec</p>
+                <p className="text-muted-foreground">
+                  Marca o estagio do trabalho. <strong>Rascunho</strong> = em escrita;
+                  {' '}<strong>Pronta</strong> = aprovada para implementar;
+                  {' '}<strong>Implementando/Review/Concluida</strong> sao gerenciados automaticamente
+                  pelo painel Implementar.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </TooltipProvider>
 
-      {/* Actions */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b">
+        <span className="h-5 w-px bg-border/60 mx-1" />
+
+        {/* Generate / Template */}
         {isGenerating ? (
           <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={handleCancel}>
             <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
@@ -226,28 +278,50 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
               <Sparkles className="h-3.5 w-3.5 mr-1" />
               Gerar com AI
             </Button>
+            {specWriter && (
+              <TooltipProvider delayDuration={300}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button className="font-mono text-[9px] uppercase tracking-[0.14em] text-muted-foreground/70 hover:text-foreground transition-colors flex items-center gap-1">
+                      <span>{specWriter.model}</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="max-w-xs text-[11px]">
+                    <p className="mb-1 font-medium">Spec Writer · {specWriter.provider}/{specWriter.model}</p>
+                    <p className="text-muted-foreground mb-2">
+                      Sem API key configurada, o agent roda via CLI local (claude-code/opencode/gemini-cli)
+                      com fallback automatico.
+                    </p>
+                    <button
+                      className="text-primary hover:underline flex items-center gap-1"
+                      onClick={() => navigate('/settings')}
+                    >
+                      <Settings className="h-2.5 w-2.5" />
+                      Configurar API key
+                    </button>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             <Button variant="outline" size="sm" className="h-7 text-xs" onClick={handleUseTemplate}>
               Template
             </Button>
           </>
         )}
+
         <div className="ml-auto flex items-center gap-2">
           {getProjectPath() && (
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="text-[10px] font-mono">
               {projects.find((p) => p.path === getProjectPath())?.name || 'projeto'}
             </Badge>
           )}
-          {content.trim() && (
+          {card.spec_content?.trim() && (
             <Button
               variant="ghost"
               size="sm"
               className="h-7 text-xs"
-              onClick={() => {
-                const docId = createDocFromSpec(card, workspaceId)
-                if (docId) toast.success('Spec salva no Docs Vault')
-                else toast.error('Sem conteudo para salvar')
-              }}
-              title="Salvar spec como documento no Vault"
+              onClick={handleSaveToVault}
+              title="Salvar spec atual como documento no Vault"
             >
               <BookOpen className="h-3.5 w-3.5 mr-1" />
               Vault

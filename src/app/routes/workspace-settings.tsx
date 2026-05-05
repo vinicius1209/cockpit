@@ -17,6 +17,7 @@ import { AUTOMATION_ACTION_LABELS } from '@/entities/card/types'
 import { daemonClient } from '@/shared/lib/daemon-client'
 import type { InstalledAgent, ScanResult } from '@/entities/card/project-types'
 import { toast } from 'sonner'
+import { AgentsSettingsPanel } from '@/features/workspace-mgmt/agents-settings-panel'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#06b6d4', '#f97316']
 const LABEL_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
@@ -188,6 +189,10 @@ export function WorkspaceSettingsPage() {
           <TabsTrigger value="board">
             <Columns3 className="h-3.5 w-3.5 mr-1.5" />
             Board
+          </TabsTrigger>
+          <TabsTrigger value="agentes">
+            <Bot className="h-3.5 w-3.5 mr-1.5" />
+            Agentes
           </TabsTrigger>
         </TabsList>
 
@@ -447,6 +452,11 @@ export function WorkspaceSettingsPage() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* ── TAB: Agentes ── */}
+        <TabsContent value="agentes" className="space-y-4">
+          <AgentsSettingsPanel workspaceId={workspaceId} />
         </TabsContent>
 
         {/* ── TAB: Board ── */}
