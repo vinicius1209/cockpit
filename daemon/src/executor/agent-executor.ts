@@ -171,6 +171,41 @@ export async function detectInstalledAgents(): Promise<InstalledAgent[]> {
   return agents
 }
 
+// Normalize API-style model IDs (e.g. "claude-sonnet-4-6") to CLI tier names
+// (haiku/sonnet/opus). Keeps full IDs unchanged for executors that accept them.
+function normalizeModelForCli(agentName: string, model?: string): string | undefined {
+  if (!model) return undefined
+  if (agentName === 'claude-code') {
+    const lower = model.toLowerCase()
+    if (lower.includes('haiku')) return 'haiku'
+    if (lower.includes('sonnet')) return 'sonnet'
+    if (lower.includes('opus')) return 'opus'
+  }
+  return model
+}
+
+// Bun's proc.stdin (when spawned with stdin: 'pipe') is a FileSink — it has
+// write/end/flush methods, NOT WritableStream getWriter(). The previous
+// implementation called getWriter() which threw silently and was caught into
+// a generic "Failed to write prompt to stdin" error.
+async function writePromptToStdin(stdin: unknown, prompt: string): Promise<void> {
+  const sink = stdin as { write?: (s: string) => unknown; end?: () => unknown | Promise<unknown> }
+  if (typeof sink.write === 'function' && typeof sink.end === 'function') {
+    sink.write(prompt)
+    await sink.end()
+    return
+  }
+  // Fallback for environments where stdin behaves like a WritableStream
+  const ws = stdin as WritableStream<Uint8Array>
+  if (typeof ws.getWriter === 'function') {
+    const writer = ws.getWriter()
+    await writer.write(new TextEncoder().encode(prompt))
+    await writer.close()
+    return
+  }
+  throw new Error('Process stdin has no recognized write API (FileSink/WritableStream)')
+}
+
 function validateModel(agentDef: KnownAgent, model?: string): string | null {
   if (!model) return null
   if (agentDef.models.length === 0) return null // agent has no model list (e.g. aider)
@@ -183,15 +218,16 @@ export async function executeAgent(request: AgentExecRequest): Promise<AgentExec
   if (!agentDef) {
     return { agent: request.agent, output: `Agent "${request.agent}" not found`, exitCode: 1, duration: 0 }
   }
-  const modelErr = validateModel(agentDef, request.model)
+  const model = normalizeModelForCli(agentDef.name, request.model)
+  const modelErr = validateModel(agentDef, model)
   if (modelErr) {
     return { agent: request.agent, output: modelErr, exitCode: 1, duration: 0 }
   }
 
   const usePipe = request.prompt.length > 4000
   const args = usePipe
-    ? agentDef.buildArgs(agentDef.headlessFlag, '-', request.model)
-    : agentDef.buildArgs(agentDef.headlessFlag, request.prompt, request.model)
+    ? agentDef.buildArgs(agentDef.headlessFlag, '-', model)
+    : agentDef.buildArgs(agentDef.headlessFlag, request.prompt, model)
   const startTime = Date.now()
   let proc: ReturnType<typeof Bun.spawn> | null = null
 
@@ -206,12 +242,11 @@ export async function executeAgent(request: AgentExecRequest): Promise<AgentExec
 
     if (usePipe && proc.stdin) {
       try {
-        const writer = proc.stdin.getWriter()
-        await writer.write(new TextEncoder().encode(request.prompt))
-        await writer.close()
-      } catch {
+        await writePromptToStdin(proc.stdin, request.prompt)
+      } catch (err) {
         proc.kill()
-        return { agent: request.agent, output: 'Failed to write prompt to stdin', exitCode: 1, duration: Date.now() - startTime }
+        const msg = err instanceof Error ? err.message : String(err)
+        return { agent: request.agent, output: `Failed to write prompt to stdin: ${msg}`, exitCode: 1, duration: Date.now() - startTime }
       }
     }
 
@@ -243,15 +278,16 @@ export async function executeAgentWithCallbacks(
   if (!agentDef) {
     return { agent: request.agent, output: `Agent "${request.agent}" not found`, exitCode: 1, duration: 0 }
   }
-  const modelErr = validateModel(agentDef, request.model)
+  const model = normalizeModelForCli(agentDef.name, request.model)
+  const modelErr = validateModel(agentDef, model)
   if (modelErr) {
     return { agent: request.agent, output: modelErr, exitCode: 1, duration: 0 }
   }
 
   const usePipe = request.prompt.length > 4000
   const args = usePipe
-    ? agentDef.buildArgs(agentDef.headlessFlag, '-', request.model)
-    : agentDef.buildArgs(agentDef.headlessFlag, request.prompt, request.model)
+    ? agentDef.buildArgs(agentDef.headlessFlag, '-', model)
+    : agentDef.buildArgs(agentDef.headlessFlag, request.prompt, model)
   const startTime = Date.now()
   let proc: ReturnType<typeof Bun.spawn> | null = null
 
@@ -266,12 +302,11 @@ export async function executeAgentWithCallbacks(
 
     if (usePipe && proc.stdin) {
       try {
-        const writer = proc.stdin.getWriter()
-        await writer.write(new TextEncoder().encode(request.prompt))
-        await writer.close()
-      } catch {
+        await writePromptToStdin(proc.stdin, request.prompt)
+      } catch (err) {
         proc.kill()
-        return { agent: request.agent, output: 'Failed to write prompt to stdin', exitCode: 1, duration: Date.now() - startTime }
+        const msg = err instanceof Error ? err.message : String(err)
+        return { agent: request.agent, output: `Failed to write prompt to stdin: ${msg}`, exitCode: 1, duration: Date.now() - startTime }
       }
     }
 
@@ -322,10 +357,11 @@ export function executeAgentStreaming(request: AgentExecRequest): {
     }
   }
 
+  const model = normalizeModelForCli(agentDef.name, request.model)
   const usePipe = request.prompt.length > 4000
   const args = usePipe
-    ? agentDef.buildArgs(agentDef.headlessFlag, '-', request.model)
-    : agentDef.buildArgs(agentDef.headlessFlag, request.prompt, request.model)
+    ? agentDef.buildArgs(agentDef.headlessFlag, '-', model)
+    : agentDef.buildArgs(agentDef.headlessFlag, request.prompt, model)
 
   let proc: ReturnType<typeof Bun.spawn> | null = null
 
@@ -341,9 +377,7 @@ export function executeAgentStreaming(request: AgentExecRequest): {
         })
 
         if (usePipe && proc.stdin) {
-          const writer = proc.stdin.getWriter()
-          await writer.write(new TextEncoder().encode(request.prompt))
-          await writer.close()
+          await writePromptToStdin(proc.stdin, request.prompt)
         }
 
         const reader = proc.stdout.getReader()
