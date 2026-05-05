@@ -185,7 +185,25 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
             const event = JSON.parse(line.slice(6)) as ImplementEvent
 
             if (event.phase === 'analyzing' || event.phase === 'branching' || event.phase === 'implementing' || event.phase === 'creating-pr') {
-              setPhase(event.phase as ImplPhase)
+              const newPhase = event.phase as ImplPhase
+              // Quando phase muda, insere um divider visual no terminal
+              setPhase((prev) => {
+                if (prev !== newPhase) {
+                  const labels: Record<string, string> = {
+                    analyzing: 'ANALISANDO',
+                    branching: 'CRIANDO BRANCH',
+                    implementing: 'AGENT EXECUTANDO',
+                    'creating-pr': 'CRIANDO PR',
+                  }
+                  setTerminalLines((lines) => [...lines, {
+                    id: `phase-${Date.now()}`,
+                    kind: 'phase',
+                    text: labels[newPhase] || newPhase.toUpperCase(),
+                    ts: Date.now(),
+                  }])
+                }
+                return newPhase
+              })
             }
             if (event.branch) setBranch(event.branch)
 
