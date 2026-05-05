@@ -221,6 +221,9 @@ CLI cockpit (Bun standalone)       ──HTTP──▶
   Zustand com adapter customizado que persiste no daemon (`createDaemonStorageAdapter`).
 - **Daemon**: `daemon/src/index.ts` (Bun.serve), rotas em `daemon/src/routes/`.
 - **Project lock (F9-A)**: `daemon/src/tasks/project-lock.ts` impede 2 implementacoes simultaneas no mesmo path. Pre-check nas rotas implement retorna 409 com payload `held_by` rico antes de criar session. Locks orfaos sao limpos lazy (peek) + batch (reaper 5min) + boot. Lock NAO afeta spec/discovery/chat/watch — so implementations.
+- **Worktree opt-in (F9-B)**: `daemon/src/git/worktree-manager.ts` cria git worktree separado por session quando `isolation=worktree`. Path: `<projectPath>.cockpit-worktrees/<sessionId>/`. Skipa lock, usa working tree isolado. Cleanup automatico no finally. CLI: `--isolation worktree`. MCP: `isolation: "worktree"` arg.
+- **Card archive (F10)**: `Card.archived_at` field (Zustand-persisted). Web UI tem botao Descartar (amber) separado de Excluir. Board filtra archived por padrao com toggle. Cards archived: opacity-50 + grayscale + border-dashed.
+- **TUI (`cli/src/tui/`)**: engine proprio (alternate screen + raw mode), screens em `cli/src/tui/screens/`. Cada screen implementa interface `Screen` (render + onKey + onEnter/onLeave + tick opcional). Engine gerencia stack (push/pop/replace) e cleanup ANSI no exit.
 - **Agent execution**: `daemon/src/executor/agent-executor.ts` — abstrai
   CLI agents (claude-code, opencode, gemini-cli) com `KNOWN_AGENTS` registry.
   - **claude-code precisa de `--permission-mode bypassPermissions`** em modo
@@ -308,6 +311,12 @@ cd mcp && bunx tsc --noEmit  # type check do MCP
 - **Novo helper de UI ANSI**: `cli/src/ui/` (zero deps por convenção — cores via `colors.ts`)
 - **Nova chamada ao daemon**: `cli/src/api/client.ts` (request) ou `cli/src/api/store.ts` (mutation via persist envelope)
 - **SSE streaming**: usar `cli/src/api/sse.ts` (`postSSE` ou `getSSE`)
+
+### TUI (`cli/src/tui/`)
+- **Nova screen**: `cli/src/tui/screens/<name>-screen.ts` implementando interface `Screen` (render(width, height) → string, onKey(key) → KeyResult com `'consumed' | 'quit' | 'push' | 'pop' | 'replace'`)
+- **Push/pop**: dentro de `onKey` retornar `{ kind: 'push', screen: new OutraScreen() }` ou `{ kind: 'pop' }`
+- **Live data (SSE)**: spawn no `onEnter`, abort no `onLeave`. Engine chama `tick()` a cada 500ms se a screen tiver
+- **Layout**: usar `cli/src/tui/layout.ts` (`clip`, `padRight`, `joinCols`, `box`) — respeitam ANSI
 
 ### MCP (`mcp/src/`)
 - **Nova tool**: adicionar entry em `setRequestHandler(ListToolsRequestSchema, ...)` em `mcp/src/index.ts` + handler no `CallToolRequestSchema` switch

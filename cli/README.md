@@ -139,6 +139,7 @@ cockpit log SW79 --json | jq       # processar com jq
 | Comando | Descrição |
 |---|---|
 | `cockpit` | status overview global (active ws, live runs, other ws) |
+| `cockpit tui` | TUI fullscreen — kanban interativo + sessions live |
 | `cockpit doctor` | health check (daemon, agents CLI, workspaces, projetos, gh) |
 | `cockpit metrics [--json]` | KPIs + sparklines + velocity |
 | `cockpit help [cmd]` | ajuda |
@@ -177,7 +178,10 @@ cockpit log SW79 --json | jq       # processar com jq
 | `cockpit card new "<title>" [opts]` | cria card (`--type --prio --ws --col --desc`) |
 | `cockpit card move <id> <col>` | move entre colunas |
 | `cockpit card edit <id> [opts]` | edita campos (`--title --type --prio --assignee --due`) |
-| `cockpit card delete <id> [--force]` | exclui |
+| `cockpit card delete <id> [--force]` | exclui permanente |
+| `cockpit card archive <id>` | descarta (archive) — preserva spec/sessions, alias: `discard` |
+| `cockpit card unarchive <id>` | reativa card descartado, alias: `restore` |
+| `cockpit card list --include-archived \| --only-archived` | inclui ou só descartados |
 
 ### Spec lifecycle
 
@@ -194,7 +198,7 @@ cockpit log SW79 --json | jq       # processar com jq
 
 | Comando | Descrição |
 |---|---|
-| `cockpit implement <id> [opts]` | dispara implementação (`--watch --feedback "..." --no-pr`) |
+| `cockpit implement <id> [opts]` | dispara implementação (`--watch --feedback "..." --no-pr --isolation worktree`) |
 | `cockpit watch <id> [--action ...]` | tail live de session em curso ou histórica |
 | `cockpit watch --all` | multiplex SSE de todas sessions running (timeline cronológica) |
 | `cockpit alarm <id>` | notify desktop quando session terminar (`--silent --sound Glass`) |

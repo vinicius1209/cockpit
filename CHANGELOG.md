@@ -2,7 +2,19 @@
 
 Todas as mudanças notáveis do Cockpit. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
-## [Unreleased]
+## [0.2.0] — 2026-05-05
+
+Foco: **multi-session orchestration**, **descarte de cards** e **TUI fullscreen**. Cockpit deixa de ser apenas Web/CLI/MCP isolados e ganha primitivas pra trabalhar com N agents em paralelo de forma segura.
+
+### Added — F10: archive (descartar) cards
+
+Linear/Jira/GH-style: separar "soft delete" (preserva tudo) de "hard delete". Resolve a frustração de ter só `Excluir` vermelho.
+
+- Field `Card.archived_at` (Zustand-persisted, sem migration SQLite)
+- Web UI: botão `Descartar` (amber) ao lado de `Excluir`. Excluir agora exige `requireText` se card tem spec/entrevista
+- Board: toggle `descartados <count>` no filtros bar; cards renderizam com opacity-50 + grayscale + border-dashed
+- CLI: `cockpit card archive <id>`, `cockpit card unarchive <id>`, `--include-archived` / `--only-archived` no list
+- MCP: `cockpit_archive_card`, `cockpit_unarchive_card`, args `include_archived` / `only_archived` em list_cards
 
 ### Added — F9-A: project lock (multi-session orchestration)
 
@@ -17,7 +29,47 @@ Quando duas implementações tentam rodar no mesmo projeto, a segunda recebe `40
 - Lock NÃO afeta: spec gen, discovery, chat, watch, log, metrics — só implementations que tocam working tree
 - Lock por path: 2 implementations em projetos diferentes rodam paralelo. Apenas o mesmo path bloqueia.
 
-Próximo passo (F9-B): `--isolation worktree` opt-in pra paralelismo real no mesmo projeto via `git worktree`.
+### Added — F9-B: `--isolation worktree` opt-in
+
+Complemento do F9-A: lock continua sendo o default sensato, mas agora o usuário pode optar por worktree quando precisa rodar 2+ implementações no mesmo projeto ao mesmo tempo.
+
+- `daemon/src/git/worktree-manager.ts`: `createWorktree`, `removeWorktree`, `listCockpitWorktrees`, `cleanupAbandonedWorktrees`. Worktrees em `<projectPath>.cockpit-worktrees/<sessionId>/`
+- `ImplementConfig.isolation: 'lock' | 'worktree'` (default `'lock'`)
+- `runImplementation`:
+  - Em modo lock (default): comportamento idêntico ao v0.1.0
+  - Em modo worktree: pula lock, cria worktree, redireciona toda atividade git e copy-to-project pro worktree, remove worktree no finally
+- CLI: `cockpit implement <id> --isolation worktree` (alias `--worktree`)
+- MCP: `cockpit_implement_async` aceita `isolation: "worktree"`. Description guia o LLM: "use worktree quando o usuário quer rodar 2+ no mesmo projeto ao mesmo tempo"
+- Custo conhecido: full checkout duplicado, `node_modules` não compartilhado, portas conflitam entre worktrees do mesmo projeto. Opt-in justamente por isso.
+
+### Added — `cockpit tui` (fullscreen kanban)
+
+TUI interativo, zero deps. Engine próprio (alternate screen buffer + raw mode + event loop), múltiplas screens, navegação por teclado.
+
+- Engine (`cli/src/tui/engine.ts`, `keys.ts`, `layout.ts`): Screen interface + KeyResult (push/pop/replace/quit), parser de stdin raw, helpers de clip/pad/center respeitando ANSI
+- Screens:
+  - **Board**: kanban interativo. Setas movem seleção entre colunas/cards, enter abre detalhe, w troca workspace, tab → sessions, a toggle archived, r refresh, q sai
+  - **Card detail**: tabs `[1] DETALHES [2] SPEC [3] ENTREVISTA [4] SESSIONS`, scroll com ↑/↓, a archive/unarchive inline
+  - **Sessions**: lista live com auto-refresh 3s, enter abre live tail
+  - **Session tail**: SSE live no fullscreen, cap 1000 linhas
+  - **Workspace picker**: modal pra trocar workspace ativo (persiste em `~/.cockpit/cli.json`)
+- Coexiste com Web UI sem conflito — ambos clientes do daemon
+
+### Added — Dogfood checklist (`DOGFOOD.md`)
+
+10 cenários pra validar v0.2.0 num projeto real (1-2h investidas). Saiu como roteiro pra abrir issues estruturadas no repo público em vez de codar features especulativas.
+
+### Changed
+
+- Daemon health endpoint reporta `version: 0.2.0`
+- CLI banner mostra `v0.2.0`
+- MCP server identifica como `cockpit/0.2.0`
+- README marca os novos componentes como ✅
+
+### Migration
+
+- SQLite migration v4: tabela `project_locks` (auto-aplicada no boot)
+- Sem mudança breaking de API. Clients antigos do daemon continuam funcionando — os flags novos (`isolation`, `include_archived`, etc) têm defaults seguros.
 
 ## [0.1.0] — 2026-05-05
 

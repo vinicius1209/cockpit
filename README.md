@@ -3,7 +3,7 @@
 > Cabine de comando pra orquestrar code agents (Claude Code, OpenCode, Gemini CLI, Aider) em workspaces multi-projeto.
 
 ```
-▰▰▰▰▰  COCKPIT v0.1.0
+▰▰▰▰▰  COCKPIT v0.2.0
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ━ ACTIVE WORKSPACE
@@ -40,8 +40,10 @@ Kanban visual, board drag-and-drop, dashboard de métricas, AI Chat com contexto
 ```bash
 bun run cli:install             # symlink em ~/.local/bin/cockpit
 cockpit                         # status global
-cockpit board                   # ASCII kanban
+cockpit tui                     # 🆕 TUI fullscreen (kanban interativo)
+cockpit board                   # ASCII kanban (one-shot)
 cockpit implement SW78 --watch  # implementa + tail no terminal
+cockpit implement SW78 --isolation worktree  # 🆕 paralelismo real no mesmo projeto
 cockpit ai SW78                 # REPL de chat com card+projeto como contexto
 ```
 Ideal pra power-user que vive no terminal (Warp/iTerm/etc). [Ver `cli/README.md`](./cli/README.md).
@@ -61,7 +63,7 @@ bun run mcp:install                # registra em ~/.claude.json
 [Claude] → cockpit_create_card(title='...', type='chore') → ✓ #SW82
 ```
 
-Tools expostas: `cockpit_health`, `cockpit_list_workspaces`, `cockpit_list_cards`, `cockpit_show_card`, `cockpit_create_card`, `cockpit_move_card`, `cockpit_search`, `cockpit_metrics`, `cockpit_implement_async`, `cockpit_get_session`. Resources: `cockpit://card/<id>`, `cockpit://board/<workspace>`.
+Tools expostas: `cockpit_health`, `cockpit_list_workspaces`, `cockpit_list_cards`, `cockpit_show_card`, `cockpit_create_card`, `cockpit_move_card`, `cockpit_archive_card`, `cockpit_unarchive_card`, `cockpit_search`, `cockpit_metrics`, `cockpit_implement_async`, `cockpit_get_session`. Resources: `cockpit://card/<id>`, `cockpit://board/<workspace>`.
 
 ## Quickstart
 
@@ -153,7 +155,8 @@ cockpit/
 |---|---|
 | `cockpit` | status overview global |
 | `cockpit doctor` | health check (daemon, agents, projetos, gh) |
-| `cockpit board` | ASCII kanban |
+| `cockpit tui` | TUI fullscreen — kanban interativo + sessions live |
+| `cockpit board` | ASCII kanban (one-shot) |
 | `cockpit card list` | lista cards filtraveis |
 | `cockpit card new "Title" --type bugfix --prio high` | cria card |
 | `cockpit spec gen SW78 --watch` | gera spec via AI |
@@ -192,11 +195,27 @@ cockpit spec ready SW79    # aprova
 cockpit implement SW79 --watch
 # Phase headers, tool uses, output do agent ao vivo
 
+# Multi-card paralelo — modo padrão (lock) bloqueia 2x mesmo projeto
+cockpit implement SW79  &           # primeiro
+cockpit implement SW80              # → 409 PROJECT LOCKED, mostra opções
+
+# Multi-card paralelo — modo worktree (isolamento real)
+cockpit implement SW79 --isolation worktree --watch &
+cockpit implement SW80 --isolation worktree --watch
+# Cada um em <project>.cockpit-worktrees/<sessionId>/
+
 # Re-implementar com feedback se não resolveu
 cockpit implement SW79 --feedback "PDF ainda corta na direita em A4 portrait" --watch
 
+# Descartar card (preserva spec + sessions, some do board)
+cockpit card archive SW82
+cockpit card unarchive SW82  # reativa
+
 # Ver métricas globais
 cockpit metrics
+
+# Ou navegar tudo isso num TUI fullscreen
+cockpit tui
 ```
 
 ## Status do projeto
@@ -209,9 +228,11 @@ cockpit metrics
 | **Multi-agent** (claude-code, opencode, gemini, aider) | ✅ |
 | **CLI Tier 1-4** (read, write, long-running, misc) | ✅ |
 | **`cockpit spec` lifecycle** | ✅ |
-| **MCP server** (10 tools + 2 resources, inclui `implement_async`) | ✅ |
+| **MCP server** (12 tools + 2 resources, inclui `implement_async`, `archive_card`) | ✅ |
 | **Daemon como serviço** (launchd auto-start no macOS) | ✅ |
-| **TUI fullscreen** (`cockpit tui`) | 🚧 planejado |
+| **TUI fullscreen** (`cockpit tui` — board + sessions + live tail) | ✅ |
+| **Multi-session orchestration** (project lock + `--isolation worktree` opt-in) | ✅ |
+| **Archive de cards** (Descartar separado de Excluir) | ✅ |
 | **Auth multi-user** | ❌ não está no roadmap (single-user OSS) |
 
 ## Documentação adicional
@@ -219,8 +240,11 @@ cockpit metrics
 - [`CLAUDE.md`](./CLAUDE.md) — design system COCKPIT, arquitetura, comandos de dev
 - [`AGENTS.md`](./AGENTS.md) — ponto de entrada pra LLMs trabalhando no repo
 - [`cli/README.md`](./cli/README.md) — cheatsheet do CLI
-- [`TODO_CLI.md`](./TODO_CLI.md) — roadmap do CLI (Tier 5 e além)
-- [`TODO_HUMAN_LLM.md`](./TODO_HUMAN_LLM.md) — backlog técnico
+- [`mcp/README.md`](./mcp/README.md) — tools/resources do MCP server
+- [`DOGFOOD.md`](./DOGFOOD.md) — checklist de validação real (10 cenários)
+- [`CHANGELOG.md`](./CHANGELOG.md) — mudanças por versão
+- [`TODO_CLI.md`](./TODO_CLI.md) — roadmap do CLI
+- [`TODO_HUMAN_LLM.md`](./TODO_HUMAN_LLM.md) — backlog técnico (inclui F9 multi-session research direction)
 
 ## Licença
 

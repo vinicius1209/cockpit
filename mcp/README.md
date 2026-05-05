@@ -53,7 +53,9 @@ O instalador:
 | `cockpit_move_card` | Move entre colunas | card_id*, column_slug* |
 | `cockpit_search` | Busca substring cross-workspace | query*, in (cards/specs/all), limit |
 | `cockpit_metrics` | KPIs globais | — |
-| `cockpit_implement_async` | Dispara `implement` em background, retorna sessionId | card_id*, feedback, no_pr |
+| `cockpit_archive_card` | Descarta card (preserva spec/sessions) | card_id* |
+| `cockpit_unarchive_card` | Reativa card descartado | card_id* |
+| `cockpit_implement_async` | Dispara `implement` em background, retorna sessionId | card_id*, feedback, no_pr, **isolation** (`lock`/`worktree`) |
 | `cockpit_get_session` | Status de uma session (phase + últimas chunks) | session_id*, tail_chunks |
 
 ## Resources
