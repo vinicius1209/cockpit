@@ -21,16 +21,30 @@ export async function handleImplementRoutes(req: Request, url: URL): Promise<Res
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder()
+        let closed = false
+
+        function safeEnqueue(text: string) {
+          if (closed) return
+          try { controller.enqueue(encoder.encode(text)) } catch { closed = true }
+        }
 
         function send(event: ImplementEvent) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
+          safeEnqueue(`data: ${JSON.stringify(event)}\n\n`)
         }
+
+        // Anti-buffering: flush imediato + heartbeat. SSE comments (`: ...\n\n`)
+        // sao ignorados pelo browser mas forcam o flush do socket. Sem isso,
+        // Bun.serve pode acumular eventos pequenos por minutos antes de mandar.
+        safeEnqueue(': stream-open\n\n')
+        const heartbeat = setInterval(() => safeEnqueue(': hb\n\n'), 1500)
 
         try {
           await runImplementation(body, send)
         } catch (err) {
           send({ phase: 'error', message: err instanceof Error ? err.message : 'Erro desconhecido' })
         } finally {
+          clearInterval(heartbeat)
+          closed = true
           controller.close()
         }
       },
@@ -41,6 +55,7 @@ export async function handleImplementRoutes(req: Request, url: URL): Promise<Res
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
       },
     })
   }

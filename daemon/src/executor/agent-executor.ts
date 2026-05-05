@@ -233,13 +233,23 @@ async function writePromptToStdin(stdin: unknown, prompt: string): Promise<void>
 //
 // Funcao de incremento devolve o texto novo (delta). Se for envelope sem texto,
 // devolve null. Se quiser sinais semanticos (tool_use), retorna prefixados.
+const DEBUG_STREAM = process.env.COCKPIT_DEBUG_STREAM === '1'
+
 function parseClaudeStreamLine(line: string): { text?: string; meta?: string } | null {
   let evt: Record<string, unknown>
   try {
     evt = JSON.parse(line)
   } catch {
-    // Algumas linhas podem ser texto puro (versoes antigas ou erros). Devolve cru.
-    return line.trim() ? { text: line } : null
+    // Linha nao-JSON. Em modo stream-json isso normalmente eh banner, prompt
+    // do CLI esperando confirmacao, ou erro. Logamos pra debug mas NAO
+    // emitimos como chunk (evita poluir o output do usuario com lixo tipo "_").
+    if (DEBUG_STREAM && line.trim()) console.log('[claude-stream] non-json:', JSON.stringify(line.slice(0, 200)))
+    return null
+  }
+
+  if (DEBUG_STREAM) {
+    const summary = `${evt.type}${evt.subtype ? '/' + evt.subtype : ''}${(evt.event as Record<string, unknown>)?.type ? ':' + (evt.event as Record<string, unknown>).type : ''}`
+    console.log('[claude-stream]', summary)
   }
 
   const type = evt.type as string | undefined

@@ -95,10 +95,19 @@ export async function handleChatRoutes(req: Request, url: URL): Promise<Response
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder()
+        let closed = false
 
-        function send(data: Record<string, unknown>) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`))
+        function safeEnqueue(text: string) {
+          if (closed) return
+          try { controller.enqueue(encoder.encode(text)) } catch { closed = true }
         }
+        function send(data: Record<string, unknown>) {
+          safeEnqueue(`data: ${JSON.stringify(data)}\n\n`)
+        }
+
+        // Anti-buffering: flush imediato + heartbeat
+        safeEnqueue(': stream-open\n\n')
+        const heartbeat = setInterval(() => safeEnqueue(': hb\n\n'), 1500)
 
         try {
           send({ type: 'start', agent: agentName, sessionId: session?.id })
@@ -136,6 +145,8 @@ export async function handleChatRoutes(req: Request, url: URL): Promise<Response
           }
           send({ type: 'error', message: msg, sessionId: session?.id })
         } finally {
+          clearInterval(heartbeat)
+          closed = true
           controller.close()
         }
       },
@@ -146,6 +157,7 @@ export async function handleChatRoutes(req: Request, url: URL): Promise<Response
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
         'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no',
       },
     })
   }

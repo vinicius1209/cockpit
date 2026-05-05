@@ -15,24 +15,23 @@ import { LayoutDashboard, Settings, Plus, Sparkles, BarChart3, BookOpen, Activit
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { daemonClient } from '@/shared/lib/daemon-client'
+import { useDaemonStatus } from '@/shared/hooks/use-daemon-status'
 
 export function AppSidebar() {
   const { workspaces, activeWorkspaceId, setActiveWorkspace } = useWorkspaceStore()
   const navigate = useNavigate()
   const location = useLocation()
-  const [daemonStatus, setDaemonStatus] = useState<{ online: boolean; version?: string }>({ online: false })
+
+  // Single source of truth: useDaemonStatus (also used elsewhere). Fetch
+  // version separately when online — apenas pra mostrar no footer.
+  const online = useDaemonStatus()
+  const [version, setVersion] = useState<string | undefined>()
+  const daemonStatus = { online: online === true, version }
 
   useEffect(() => {
-    let cancelled = false
-    const ping = () => {
-      daemonClient.health()
-        .then((h) => { if (!cancelled) setDaemonStatus({ online: true, version: h.version }) })
-        .catch(() => { if (!cancelled) setDaemonStatus({ online: false }) })
-    }
-    ping()
-    const t = setInterval(ping, 15000)
-    return () => { cancelled = true; clearInterval(t) }
-  }, [])
+    if (online !== true) return
+    daemonClient.health().then((h) => setVersion(h.version)).catch(() => {})
+  }, [online])
 
   const handleWorkspaceClick = (id: string) => {
     setActiveWorkspace(id)
