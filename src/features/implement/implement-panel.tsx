@@ -501,6 +501,38 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
                 </Button>
               </>
             )}
+            {phase === 'error' && (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => handleStart()}
+                  disabled={!card.spec_content || !projectPath}
+                  title="Iniciar nova tentativa de implementacao"
+                >
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Re-implementar
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs text-muted-foreground"
+                  onClick={() => {
+                    // Reset state — UI volta pra idle, sem mover card
+                    setPhase('idle')
+                    setError(null)
+                    setSummary(null)
+                    setOutputLines([])
+                    setTerminalLines([])
+                  }}
+                  title="Limpar erro e voltar para tela inicial"
+                >
+                  <XCircle className="h-3 w-3 mr-1" />
+                  Limpar
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
