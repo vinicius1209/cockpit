@@ -20,6 +20,7 @@ import {
   MessageResponse,
 } from '@/components/ai-elements/message'
 import { useAgentStore } from '@/entities/agent/store'
+import type { AgentMessage } from '@/entities/agent/types'
 import { useProjectStore } from '@/entities/card/project-store'
 import { runAgent } from './agent-service'
 import type { Card } from '@/entities/card/types'
@@ -28,6 +29,74 @@ import { Send, Square, Bot, Loader2, AlertCircle, Plus, MessageSquare } from 'lu
 interface AgentChatProps {
   card: Card
   workspaceId: string
+}
+
+// Builds the agent's system prompt enriched with full card+project context.
+// The agent must respond ONLY within the scope of this card/project.
+//
+// Strategy: agent's original system_prompt + restrictive scope rules +
+// full card snapshot (description, interview, spec) + project info.
+// Sent ONCE in system_prompt → no token duplication across turns.
+function buildEnrichedSystemPrompt(
+  baseSystemPrompt: string,
+  card: Card,
+  project: { name: string; path: string } | null,
+): string {
+  const sections: string[] = []
+
+  // 1. Original agent prompt
+  if (baseSystemPrompt?.trim()) {
+    sections.push(baseSystemPrompt.trim())
+  }
+
+  // 2. SCOPE — restrict the agent to this card/project context
+  sections.push(`## Escopo da conversa
+
+Voce esta conversando sobre UM card especifico de um projeto. Sua atuacao deve
+ficar restrita ao escopo deste card e do projeto vinculado.
+
+- Responda APENAS perguntas relacionadas a este card ou ao projeto.
+- Se o usuario perguntar algo fora desse escopo, redirecione gentilmente.
+- NAO faca perguntas sobre informacoes que ja estao no contexto abaixo.
+- Use ativamente o contexto: titulo, descricao, entrevista, spec, projeto.`)
+
+  // 3. CARD snapshot
+  const cardLines: string[] = ['## Contexto do card']
+  cardLines.push(`- Titulo: ${card.title}`)
+  cardLines.push(`- Tipo: ${card.type}`)
+  cardLines.push(`- Prioridade: ${card.priority}`)
+  if (card.assignee) cardLines.push(`- Responsavel: ${card.assignee}`)
+  if (card.due_date) cardLines.push(`- Data limite: ${card.due_date}`)
+  if (card.description?.trim()) {
+    cardLines.push('')
+    cardLines.push('### Descricao')
+    cardLines.push(card.description.trim())
+  }
+  if (card.interview_notes?.trim()) {
+    cardLines.push('')
+    cardLines.push('### Notas da entrevista')
+    cardLines.push(card.interview_notes.trim())
+  }
+  if (card.spec_content?.trim()) {
+    cardLines.push('')
+    cardLines.push(`### Spec (status: ${card.spec_status || 'rascunho'})`)
+    const spec = card.spec_content.trim()
+    cardLines.push(spec.length > 3000 ? spec.slice(0, 3000) + '\n\n…[truncada]' : spec)
+  }
+  sections.push(cardLines.join('\n'))
+
+  // 4. PROJECT snapshot
+  if (project) {
+    sections.push(`## Projeto vinculado
+
+- Nome: ${project.name}
+- Path: ${project.path}
+
+Voce tem acesso ao codigo-fonte deste projeto via filesystem (cwd ja apontando
+para o path acima). Pode ler arquivos para responder com mais precisao.`)
+  }
+
+  return sections.join('\n\n')
 }
 
 export function AgentChat({ card, workspaceId }: AgentChatProps) {
@@ -47,7 +116,15 @@ export function AgentChat({ card, workspaceId }: AgentChatProps) {
   const projects = getWorkspaceProjects(workspaceId)
   const projectPath = card.project_id ? projects.find((p) => p.id === card.project_id)?.path : projects[0]?.path
 
-  const [selectedAgentId, setSelectedAgentId] = useState(agents[0]?.id || '')
+  // Default agent for AI Chat: prefer analyzer (best for free conversation),
+  // then any non-interviewer (interviewer is meant for the dedicated Entrevista
+  // tab and ignores context to ask questions from zero).
+  const enabledAgents = agents.filter((a) => a.enabled)
+  const defaultAgent =
+    enabledAgents.find((a) => a.role === 'analyzer') ||
+    enabledAgents.find((a) => a.role !== 'interviewer') ||
+    enabledAgents[0]
+  const [selectedAgentId, setSelectedAgentId] = useState(defaultAgent?.id || '')
   const [activeRunId, setActiveRunId] = useState<string | null>(cardRuns[0]?.id || null)
   const [input, setInput] = useState('')
   const [streamingText, setStreamingText] = useState('')
@@ -76,25 +153,27 @@ export function AgentChat({ card, workspaceId }: AgentChatProps) {
     setStreamingText('')
 
     const currentRun = getRun(runId)
-    const allMessages = [
-      ...(currentRun?.messages || []),
-      { id: 'temp', role: 'user' as const, content: userMessage, timestamp: new Date().toISOString() },
-    ]
+    const allMessages = currentRun?.messages || []
 
-    const contextPrefix = allMessages.filter((m) => m.role === 'user').length === 1
-      ? `[Contexto do Card]\nTitulo: ${card.title}\nTipo: ${card.type}\nPrioridade: ${card.priority}\nDescricao: ${card.description || 'Sem descricao'}\n\n[Mensagem]\n`
-      : ''
-
-    const messagesForApi = allMessages.map((m, i) => ({
-      ...m,
-      content: i === allMessages.length - 1 && contextPrefix ? contextPrefix + m.content : m.content,
-    }))
+    // Contexto do card + projeto vai no SYSTEM PROMPT do agente (e nao nas
+    // messages, que sao filtradas em agent-service). Assim:
+    // 1. Nao gasta tokens duplicando em cada turno
+    // 2. Sobrevive a multiplas mensagens
+    // 3. Inclui escopo restritivo: agent so responde sobre card+projeto
+    const project = card.project_id
+      ? projects.find((p) => p.id === card.project_id) ?? null
+      : projects[0] ?? null
+    const enrichedConfig = {
+      ...selectedAgent,
+      system_prompt: buildEnrichedSystemPrompt(selectedAgent.system_prompt, card, project),
+    }
+    const messagesForApi: AgentMessage[] = allMessages
 
     const abort = new AbortController()
     abortRef.current = abort
 
     await runAgent(
-      selectedAgent,
+      enrichedConfig,
       messagesForApi,
       apiKey,
       {
@@ -151,6 +230,11 @@ export function AgentChat({ card, workspaceId }: AgentChatProps) {
                 <div className="flex items-center gap-2">
                   <span>{agent.name}</span>
                   <Badge variant="outline" className="text-[10px]">{agent.role}</Badge>
+                  {agent.role === 'interviewer' && (
+                    <span className="text-[9px] font-mono uppercase tracking-wider text-amber-500/80" title="Otimizado para a aba Entrevista — pode ignorar contexto em chat livre">
+                      ENTREVISTA
+                    </span>
+                  )}
                 </div>
               </SelectItem>
             ))}

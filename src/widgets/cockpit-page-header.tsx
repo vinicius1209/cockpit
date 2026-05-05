@@ -12,19 +12,20 @@ interface CockpitPageHeaderProps {
   rightSlot?: ReactNode
   /** Optional row of mono key-value stats below the header. */
   stats?: { label: string; value: string | number; tone?: 'default' | 'live' | 'error' }[]
-  /** Hide the daemon LED on the right. */
-  hideDaemonStatus?: boolean
+  /** Show daemon LED on the right (default off — sidebar already has it globally). */
+  showDaemonStatus?: boolean
 }
 
 // Cockpit-style page header. Combines flight-strip identification with optional
-// stats row and daemon LED. Use as the top of every full-page route.
+// stats row. Daemon LED is OFF by default since the sidebar already shows it
+// globally — only enable on pages where local daemon awareness is critical.
 export function CockpitPageHeader({
   systemLabel,
   title,
   subtitle,
   rightSlot,
   stats,
-  hideDaemonStatus = false,
+  showDaemonStatus = false,
 }: CockpitPageHeaderProps) {
   const daemonOnline = useDaemonStatus()
 
@@ -35,7 +36,7 @@ export function CockpitPageHeader({
         <span className="text-muted-foreground">━ {systemLabel}</span>
         <div className="ml-auto flex items-center gap-3">
           {rightSlot}
-          {!hideDaemonStatus && (
+          {showDaemonStatus && (
             <DaemonLed online={daemonOnline} />
           )}
         </div>

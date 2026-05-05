@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -69,8 +69,49 @@ export function SpecPanel({ card, workspaceId }: SpecPanelProps) {
   const [content, setContent] = useState(card.spec_content || '')
   const [isGenerating, setIsGenerating] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [autoSaveState, setAutoSaveState] = useState<'idle' | 'pending' | 'saving' | 'saved'>('idle')
   const [viewMode, setViewMode] = useState<'preview' | 'edit'>(card.spec_content ? 'preview' : 'edit')
   const abortRef = useRef<AbortController | null>(null)
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastPersistedRef = useRef<string>(card.spec_content || '')
+
+  // Auto-save: debounced 1.5s after last change. Only persists when content
+  // differs from what's stored. Disabled while the agent is generating
+  // (the generation flow has its own onComplete persistence).
+  useEffect(() => {
+    if (isGenerating) return
+    if (content === lastPersistedRef.current) {
+      // No diff — clear pending state
+      if (autoSaveState === 'pending') setAutoSaveState('idle')
+      return
+    }
+    setAutoSaveState('pending')
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+    autoSaveTimerRef.current = setTimeout(() => {
+      setAutoSaveState('saving')
+      updateCard(card.id, {
+        spec_content: content || null,
+        spec_status: content.trim() ? (card.spec_status || 'draft') : null,
+      })
+      lastPersistedRef.current = content
+      setAutoSaveState('saved')
+      // Fade back to idle after 2s
+      setTimeout(() => setAutoSaveState((s) => (s === 'saved' ? 'idle' : s)), 2000)
+    }, 1500)
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+    }
+  }, [content, isGenerating, card.id, card.spec_status, updateCard, autoSaveState])
+
+  // Sync local state if card.spec_content changes externally (e.g. agent finished)
+  useEffect(() => {
+    const incoming = card.spec_content || ''
+    if (incoming !== lastPersistedRef.current && incoming !== content) {
+      setContent(incoming)
+      lastPersistedRef.current = incoming
+    }
+  }, [card.spec_content])
 
   const currentStatus = card.spec_status
   const specWriter = getWorkspaceAgents(workspaceId).find((a) => a.role === 'spec-writer')
@@ -296,6 +337,7 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
                 </button>
               </div>
             )}
+            <AutoSaveIndicator state={autoSaveState} />
             <Button size="sm" className="h-7 text-xs" onClick={handleSave}>
               <Save className="h-3.5 w-3.5 mr-1" />
               {saved ? 'Salvo!' : 'Salvar'}
@@ -449,5 +491,24 @@ function SpecEmptyState({ onGenerate, onTemplate, agentReady, modelLabel }: Spec
         ━ standby ━
       </p>
     </div>
+  )
+}
+
+// Auto-save state indicator — sutil, mono, ao lado do botao Salvar.
+function AutoSaveIndicator({ state }: { state: 'idle' | 'pending' | 'saving' | 'saved' }) {
+  if (state === 'idle') return null
+  const config = {
+    pending: { dot: 'bg-muted-foreground/50',  label: 'editando…',     color: 'text-muted-foreground/60' },
+    saving:  { dot: 'bg-amber-500 animate-pulse', label: 'salvando…',  color: 'text-amber-500' },
+    saved:   { dot: 'bg-emerald-500',          label: 'auto-salvo',    color: 'text-emerald-500' },
+  }[state]
+  return (
+    <span
+      className={`flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] transition-opacity ${config.color}`}
+      title="Spec eh salva automaticamente apos 1.5s sem digitar"
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
+      {config.label}
+    </span>
   )
 }
