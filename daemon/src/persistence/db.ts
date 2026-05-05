@@ -23,8 +23,31 @@ export async function initDB(): Promise<void> {
   runMigrations()
   await migrateFromJSON()
   cleanupOldData()
+  cleanupOrphanedSessions()
 
   console.log(`[db] SQLite ready at ${DB_PATH}`)
+}
+
+// Sessions com phase != done/error e completed_at IS NULL ficaram orfas do
+// daemon anterior (crash, restart). Sem isto, o frontend reidrata uma session
+// "running" que nao tem agent processo vivo, abre EventSource, conexao morre,
+// browser auto-reconecta → loop infinito de GET /stream.
+function cleanupOrphanedSessions(): void {
+  try {
+    const result = db.query(`
+      UPDATE sessions
+      SET phase = 'error',
+          error = 'Sessao orfa (daemon foi reiniciado durante execucao)',
+          completed_at = datetime('now')
+      WHERE phase NOT IN ('done', 'error')
+        AND completed_at IS NULL
+    `).run() as { changes: number }
+    if (result.changes > 0) {
+      console.log(`[db] Marcadas ${result.changes} sessao(oes) orfa(s) como error`)
+    }
+  } catch (err) {
+    console.warn('[db] cleanupOrphanedSessions failed:', err)
+  }
 }
 
 // ── Schema Migrations ──

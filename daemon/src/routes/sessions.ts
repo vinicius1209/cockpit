@@ -42,16 +42,24 @@ export async function handleSessionRoutes(req: Request, url: URL): Promise<Respo
     // the stream while session is still running.
     const replayedCount = session.chunks.length
 
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null
     const stream = new ReadableStream({
       async start(controller) {
-        function safeEnqueue(payload: Record<string, unknown>) {
+        function safeEnqueueRaw(text: string) {
           if (closed) return
-          try {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(payload)}\n\n`))
-          } catch {
-            closed = true
-          }
+          try { controller.enqueue(encoder.encode(text)) } catch { closed = true }
         }
+        function safeEnqueue(payload: Record<string, unknown>) {
+          safeEnqueueRaw(`data: ${JSON.stringify(payload)}\n\n`)
+        }
+
+        // Anti-buffering + retry directive: SSE 'retry: 60000' tells the browser
+        // to wait 60s before auto-reconnecting if the connection drops. Sem
+        // isso, o browser tenta reconectar a cada ~3s gerando dezenas de GET.
+        safeEnqueueRaw('retry: 60000\n: stream-open\n\n')
+
+        // Heartbeat a cada 15s mantem socket vivo + forca flush
+        heartbeatTimer = setInterval(() => safeEnqueueRaw(': hb\n\n'), 15_000)
 
         // Snapshot evento — informa cliente do estado atual
         safeEnqueue({
@@ -81,6 +89,7 @@ export async function handleSessionRoutes(req: Request, url: URL): Promise<Respo
             error: session.error,
             exitCode: session.exitCode,
           })
+          if (heartbeatTimer) clearInterval(heartbeatTimer)
           controller.close()
           return
         }
@@ -93,16 +102,19 @@ export async function handleSessionRoutes(req: Request, url: URL): Promise<Respo
           } else if (event.type === 'done') {
             safeEnqueue({ type: 'done', exitCode: event.exitCode })
             closed = true
+            if (heartbeatTimer) clearInterval(heartbeatTimer)
             try { controller.close() } catch { /* ignore */ }
           } else if (event.type === 'error') {
             safeEnqueue({ type: 'error', error: event.error })
             closed = true
+            if (heartbeatTimer) clearInterval(heartbeatTimer)
             try { controller.close() } catch { /* ignore */ }
           }
         })
       },
       cancel() {
         closed = true
+        if (heartbeatTimer) clearInterval(heartbeatTimer)
         unsubscribe?.()
       },
     })
