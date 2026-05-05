@@ -1,13 +1,17 @@
 import { loadAll } from '../api/store'
 import { resolveCard, shortId } from '../api/resolve'
-import { c, sym } from '../ui/colors'
+import { c, sym, strip } from '../ui/colors'
 import { divider } from '../ui/box'
-import { api } from '../api/client'
+import { api, type AgentSession } from '../api/client'
 import { getSSE } from '../api/sse'
 import { createStreamRenderer, renderChunk, classifyLine, flushOutputBuffer } from '../ui/stream-render'
 
 interface WatchOpts {
   action?: 'spec' | 'implementation' | 'discovery' | 'chat'
+}
+
+interface WatchAllOpts {
+  includeCompleted?: boolean  // se true, mostra completas tambem (snapshot read-only)
 }
 
 export async function watch(ref: string, opts: WatchOpts = {}): Promise<void> {
@@ -109,4 +113,159 @@ export async function watch(ref: string, opts: WatchOpts = {}): Promise<void> {
     console.log(c.dim(`  ━ ${liveCount} chunks live recebidos`))
   }
   void sym
+}
+
+// ── Multiplex (cockpit watch --all) ──
+//
+// Conecta SSE em todas as sessions rodando e renderiza cronologicamente,
+// cada chunk prefixado com [#SW79·spec] colorido. Quando uma session termina,
+// emite footer e remove do pool. Sai quando todas terminarem ou em Ctrl+C.
+
+const LANE_COLORS = [c.cyan, c.amber, c.emerald, c.magenta, c.sky, c.rose] as const
+type Colorizer = typeof LANE_COLORS[number]
+
+interface Lane {
+  session: AgentSession
+  cardShort: string
+  cardTitle: string
+  workspace: string
+  colorize: Colorizer
+  label: string  // pre-rendered [#SW79·spec]
+  liveCount: number
+  unsubscribe?: () => void
+}
+
+export async function watchAll(opts: WatchAllOpts = {}): Promise<void> {
+  const { workspaces, cards } = await loadAll()
+  const wsByCardId = new Map<string, string>()
+  const titleByCardId = new Map<string, string>()
+  for (const card of cards) {
+    const ws = workspaces.find((w) => w.id === card.workspace_id)
+    if (ws) wsByCardId.set(card.id, ws.slug)
+    titleByCardId.set(card.id, card.title)
+  }
+
+  const r = await api.listRunningSessions()
+  let sessions = r.sessions
+  if (!opts.includeCompleted) {
+    sessions = sessions.filter((s) => !s.completedAt && s.phase !== 'done' && s.phase !== 'error')
+  }
+
+  if (sessions.length === 0) {
+    console.log(divider('WATCH · ALL', 'gray'))
+    console.log()
+    console.log(c.dim('  nenhuma session rodando agora'))
+    console.log()
+    console.log(c.dim('  dispare uma com:'))
+    console.log(c.dim('    cockpit implement <id>          ') + c.gray('# CLI'))
+    console.log(c.dim('    cockpit_implement_async         ') + c.gray('# MCP no Claude Code'))
+    return
+  }
+
+  // Header
+  console.log(divider(`WATCH · ALL · ${sessions.length} session${sessions.length > 1 ? 's' : ''}`, 'amber'))
+  console.log()
+
+  const lanes = new Map<string, Lane>()
+  sessions.forEach((session, idx) => {
+    const cardShort = shortId(session.cardId)
+    const colorize = LANE_COLORS[idx % LANE_COLORS.length]
+    const label = colorize(`[#${cardShort}·${session.action}]`)
+    const lane: Lane = {
+      session,
+      cardShort,
+      cardTitle: titleByCardId.get(session.cardId) || '(sem titulo)',
+      workspace: session.workspaceSlug,
+      colorize,
+      label,
+      liveCount: 0,
+    }
+    lanes.set(session.id, lane)
+
+    // Print lane header
+    console.log(`  ${label} ${c.bold(lane.cardTitle.slice(0, 50))}`)
+    console.log(`  ${' '.repeat(strip(label).length)} ${c.dim(`ws: ${lane.workspace} · agent: ${session.agent}${session.model ? '/' + session.model : ''} · phase: ${session.phase}`)}`)
+  })
+  console.log()
+  console.log(divider('TIMELINE', 'gray'))
+  console.log()
+
+  const ctrl = new AbortController()
+  let aborted = false
+  process.on('SIGINT', () => {
+    aborted = true
+    ctrl.abort()
+    console.log()
+    console.log(c.dim(`━ desconectado. ${lanes.size} session${lanes.size > 1 ? 's' : ''} segue${lanes.size > 1 ? 'm' : ''} rodando no daemon.`))
+    process.exit(0)
+  })
+
+  // Promise por lane — resolve quando a SSE termina (done/error/cancel)
+  const lanePromises = Array.from(lanes.values()).map((lane) =>
+    streamLane(lane, lanes, ctrl).catch((err) => {
+      if (aborted) return
+      printLaneLine(lane, c.rose(`✕ stream error: ${(err as Error).message}`))
+    }),
+  )
+
+  await Promise.all(lanePromises)
+
+  if (!aborted) {
+    console.log()
+    console.log(divider('SUMMARY', 'emerald'))
+    const totalLive = Array.from(lanes.values()).reduce((acc, l) => acc + l.liveCount, 0)
+    console.log()
+    console.log(`  ${sym.ok} ${sessions.length} session${sessions.length > 1 ? 's' : ''} concluida${sessions.length > 1 ? 's' : ''} ${c.dim(`· ${totalLive} chunks live`)}`)
+  }
+}
+
+async function streamLane(
+  lane: Lane,
+  lanes: Map<string, Lane>,
+  ctrl: AbortController,
+): Promise<void> {
+  let replayDone = false  // suprime chunks anteriores ate replay-done
+
+  await getSSE(
+    `/agents/sessions/${lane.session.id}/stream`,
+    (event) => {
+      if (event.type === 'snapshot') return
+      if (event.type === 'replay-done') {
+        replayDone = true
+        // Marca inicio do live com um divisor sutil
+        printLaneLine(lane, c.dim(`━ live (replay ${(event.replayedCount as number) || 0})`))
+        return
+      }
+      if (event.type === 'chunk') {
+        if (!replayDone) return  // ignora replays no modo --all (foco em live)
+        const text = (event.text as string) || ''
+        lane.liveCount++
+        // Quebra em linhas, cada uma com prefix
+        for (const line of text.split('\n')) {
+          if (!line.trim()) continue
+          printLaneLine(lane, line)
+        }
+        return
+      }
+      if (event.type === 'done') {
+        printLaneLine(lane, c.emerald(`✓ done (exit=${(event.exitCode as number) ?? 0})`))
+        lanes.delete(lane.session.id)
+        ctrl.signal.aborted || lane.unsubscribe?.()
+        return
+      }
+      if (event.type === 'error') {
+        printLaneLine(lane, c.rose(`✕ ${(event.error as string) || 'error'}`))
+        lanes.delete(lane.session.id)
+        return
+      }
+    },
+    { signal: ctrl.signal },
+  )
+}
+
+function printLaneLine(lane: Lane, text: string): void {
+  // Trunca linhas longas pra nao quebrar o layout
+  const w = (process.stdout.columns || 100) - strip(lane.label).length - 4
+  const truncated = strip(text).length > w ? text.slice(0, w) + c.dim('…') : text
+  console.log(`  ${lane.label} ${truncated}`)
 }

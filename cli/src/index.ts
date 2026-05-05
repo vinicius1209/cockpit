@@ -176,8 +176,13 @@ async function main(): Promise<void> {
       }
 
       case 'watch': {
-        const { watch } = await import('./commands/watch')
-        if (!sub) return errorExit('uso: cockpit watch <id> [--action spec|implementation|chat]')
+        const { watch, watchAll } = await import('./commands/watch')
+        if (flags.all || sub === '--all' || sub === 'all') {
+          return watchAll({
+            includeCompleted: !!flags['include-completed'],
+          })
+        }
+        if (!sub) return errorExit('uso: cockpit watch <id> [--action spec|implementation|chat]\n  ou: cockpit watch --all  (multiplex de todas sessions running)')
         return watch(sub, {
           action: flags.action as 'spec' | 'implementation' | 'discovery' | 'chat' | undefined,
         })

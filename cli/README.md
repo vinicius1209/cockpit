@@ -87,6 +87,22 @@ cockpit implement SW79 --watch
 cockpit implement SW79 --feedback "ainda quebra no Safari mobile" --watch
 ```
 
+### Multiplex de várias sessions ao mesmo tempo
+
+```bash
+# Em um terminal, dispara N implementações em background
+cockpit implement SW79 &
+cockpit implement SW80 &
+
+# Em outro, acompanha tudo numa timeline única (cores por card)
+cockpit watch --all
+# [#SW79·implementation] ▶ Read src/auth.ts
+# [#SW80·implementation] ▶ Edit src/login.tsx
+# [#SW79·implementation] ✓ done (exit=0)
+```
+
+Cada session ganha um label `[#SW79·implementation]` colorido (rotaciona em 6 cores). Linhas ficam intercaladas em ordem cronológica. Ctrl+C desconecta sem matar — sessions continuam rodando no daemon.
+
 ### Acompanhar implementação rodando em background
 
 ```bash
@@ -169,6 +185,7 @@ cockpit log SW79 --json | jq       # processar com jq
 |---|---|
 | `cockpit implement <id> [opts]` | dispara implementação (`--watch --feedback "..." --no-pr`) |
 | `cockpit watch <id> [--action ...]` | tail live de session em curso ou histórica |
+| `cockpit watch --all` | multiplex SSE de todas sessions running (timeline cronológica) |
 | `cockpit log <id> [--last N] [--json]` | histórico de attempts em tabela |
 | `cockpit ai <id>` | REPL de chat com card+projeto como contexto |
 
