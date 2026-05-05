@@ -61,17 +61,23 @@ interface SpecPanelProps {
 }
 
 export function SpecPanel({ card, workspaceId }: SpecPanelProps) {
-  const { updateCard } = useCardStore()
+  const { updateCard, startProcessing, addProcessingChunk, completeProcessing, errorProcessing } = useCardStore()
   const { getWorkspaceAgents, getApiKey } = useAgentStore()
   const { getWorkspaceProjects } = useProjectStore()
   const activeWorkspace = useWorkspaceStore((s) => s.getActiveWorkspace())
 
+  // Generation state agora vem do store (fonte global). isGenerating é derivado:
+  // mostra true sempre que houver processing entry com action='spec' rodando
+  // para este card — sobrevive a fechar/abrir o dialog ou trocar de aba.
+  const processing = useCardStore((s) => s.processingCards[card.id])
+  const isGenerating = processing?.action === 'spec' && processing.status === 'running'
+  // Reflete chunks acumulados no store em vez de state local
+  const streamedContent = isGenerating ? processing.chunks.join('') : ''
+
   const [content, setContent] = useState(card.spec_content || '')
-  const [isGenerating, setIsGenerating] = useState(false)
   const [saved, setSaved] = useState(false)
   const [autoSaveState, setAutoSaveState] = useState<'idle' | 'pending' | 'saving' | 'saved'>('idle')
   const [viewMode, setViewMode] = useState<'preview' | 'edit'>(card.spec_content ? 'preview' : 'edit')
-  const abortRef = useRef<AbortController | null>(null)
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastPersistedRef = useRef<string>(card.spec_content || '')
 
@@ -170,8 +176,6 @@ export function SpecPanel({ card, workspaceId }: SpecPanelProps) {
     if (!specWriter) return
     const apiKey = getApiKey(specWriter.provider) || ''
 
-    setIsGenerating(true)
-    setContent('')
     setViewMode('preview')
 
     const userMessage = `Gere uma spec tecnica completa para o seguinte card:
@@ -191,28 +195,42 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
     }
 
     const abort = new AbortController()
-    abortRef.current = abort
+
+    // Inicia processing global (visivel no kanban + sobrevive close do dialog)
+    startProcessing(card.id, 'spec', {
+      agent: specWriter.name,
+      model: specWriter.model,
+      abort: () => abort.abort(),
+    })
 
     await runAgent(
       enrichedConfig,
       [{ id: 'user-msg', role: 'user', content: userMessage, timestamp: new Date().toISOString() }],
       apiKey,
       {
-        onToken: (token) => setContent((prev) => prev + token),
+        onSessionStart: (sessionId) => {
+          // Atrela sessionId ao processing — usado pra reconciliacao em N3
+          const current = useCardStore.getState().processingCards[card.id]
+          if (current) {
+            useCardStore.getState().setProcessing({ ...current, sessionId })
+          }
+        },
+        onToken: (token) => addProcessingChunk(card.id, token),
         onComplete: (fullText) => {
-          setContent(fullText)
           updateCard(card.id, { spec_content: fullText, spec_status: 'draft' })
-          setIsGenerating(false)
+          setContent(fullText)
+          lastPersistedRef.current = fullText
+          completeProcessing(card.id)
         },
         onError: (error) => {
-          setContent((prev) => prev + `\n\n[Erro: ${error}]`)
-          setIsGenerating(false)
+          errorProcessing(card.id, error)
         },
       },
       abort.signal,
       getProjectPath(),
+      { cardId: card.id, workspaceSlug: activeWorkspace?.slug || 'default', action: 'spec' },
     )
-  }, [specWriter, card, getApiKey, updateCard, projects, activeWorkspace])
+  }, [specWriter, card, getApiKey, updateCard, projects, activeWorkspace, startProcessing, addProcessingChunk, completeProcessing, errorProcessing])
 
   const handleUseTemplate = () => {
     const filled = SPEC_TEMPLATE.replace('{title}', card.title)
@@ -221,8 +239,8 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
   }
 
   const handleCancel = () => {
-    abortRef.current?.abort()
-    setIsGenerating(false)
+    processing?.abort?.()
+    completeProcessing(card.id)
   }
 
   // Vault — only allow if persisted content matches local content (avoid saving stale/empty)
@@ -390,9 +408,9 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
       <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
         {isGenerating ? (
           <SpecGenerationOverlay
-            content={content}
-            agentName={specWriter?.name || null}
-            modelName={specWriter?.model || null}
+            content={streamedContent}
+            agentName={processing?.agent || specWriter?.name || null}
+            modelName={processing?.model || specWriter?.model || null}
             onAbort={handleCancel}
           />
         ) : !hasContent ? (

@@ -16,7 +16,8 @@ import {
 import { useAgentStore } from '@/entities/agent/store'
 import { AGENT_PRESETS } from '@/entities/agent/presets'
 import type { AgentConfig, AgentProvider, AgentRole } from '@/entities/agent/types'
-import { Bot, RotateCcw, ChevronDown, ChevronRight, Sparkles, ScrollText, MessageSquare, Rocket, Shield } from 'lucide-react'
+import { daemonClient } from '@/shared/lib/daemon-client'
+import { Bot, RotateCcw, ChevronDown, ChevronRight, Sparkles, ScrollText, MessageSquare, Rocket, Shield, Loader2, CheckCircle2, XCircle, Play } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface AgentsSettingsPanelProps {
@@ -127,9 +128,43 @@ function AgentEditor({ agent, onUpdate }: AgentEditorProps) {
   const [expanded, setExpanded] = useState(false)
   const [promptDraft, setPromptDraft] = useState(agent.system_prompt)
 
+  // Test state — N6: hello-world via daemon's /agents/execute
+  const [testState, setTestState] = useState<'idle' | 'running' | 'ok' | 'error'>('idle')
+  const [testInfo, setTestInfo] = useState<{ duration?: number; output?: string; error?: string }>({})
+
   const models = MODEL_CATALOG[agent.provider] || []
   const knownModel = models.some((m) => m.id === agent.model)
   const [customModel, setCustomModel] = useState(!knownModel)
+
+  const handleTest = async () => {
+    setTestState('running')
+    setTestInfo({})
+    const start = Date.now()
+    // Map provider → installed CLI agent name. claude-code is the only one we
+    // currently support testing via /agents/execute.
+    const cliAgent = agent.provider === 'claude' ? 'claude-code'
+      : agent.provider === 'gemini' ? 'gemini-cli'
+      : 'opencode'
+    try {
+      const res = await daemonClient.executeAgent(
+        cliAgent,
+        'Responda apenas a palavra "OK" se voce conseguir me ouvir.',
+      )
+      const duration = Date.now() - start
+      if (res.exitCode === 0) {
+        setTestState('ok')
+        setTestInfo({ duration, output: res.output.slice(0, 80) })
+      } else {
+        setTestState('error')
+        setTestInfo({ duration, error: res.output.slice(0, 200) })
+      }
+    } catch (err) {
+      setTestState('error')
+      setTestInfo({ error: err instanceof Error ? err.message : 'Erro' })
+    }
+    // Auto-clear after 6s
+    setTimeout(() => setTestState('idle'), 6000)
+  }
 
   const handleProviderChange = (newProvider: AgentProvider) => {
     const defaultModel = MODEL_CATALOG[newProvider]?.[0]?.id || agent.model
@@ -255,7 +290,21 @@ function AgentEditor({ agent, onUpdate }: AgentEditorProps) {
               className="h-8 text-xs font-mono w-24"
             />
           </div>
-          <div className="text-right">
+          <div className="flex items-center gap-2 justify-end">
+            {/* N6 — Testar */}
+            <TestResultBadge state={testState} info={testInfo} />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 text-[11px]"
+              onClick={handleTest}
+              disabled={testState === 'running' || !agent.enabled}
+              title="Hello-world ao agente CLI: confirma que ele responde"
+            >
+              {testState === 'running'
+                ? <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> testando…</>
+                : <><Play className="h-3 w-3 mr-1" /> Testar</>}
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -318,5 +367,27 @@ function AgentEditor({ agent, onUpdate }: AgentEditorProps) {
         </div>
       </CardContent>
     </Card>
+  )
+}
+
+function TestResultBadge({
+  state,
+  info,
+}: {
+  state: 'idle' | 'running' | 'ok' | 'error'
+  info: { duration?: number; output?: string; error?: string }
+}) {
+  if (state === 'idle' || state === 'running') return null
+  const isOk = state === 'ok'
+  return (
+    <span
+      className={`flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] ${
+        isOk ? 'text-emerald-500' : 'text-rose-500'
+      }`}
+      title={isOk ? `OK · ${info.output}` : info.error}
+    >
+      {isOk ? <CheckCircle2 className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+      {isOk ? `OK · ${info.duration}ms` : 'falhou'}
+    </span>
   )
 }

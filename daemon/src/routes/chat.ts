@@ -1,6 +1,7 @@
 import { jsonResponse } from '../http'
 import { executeAgentWithCallbacks, detectInstalledAgents } from '../executor/agent-executor'
 import { getSecret } from '../persistence/secrets-store'
+import { createAgentSession, appendChunk, finishAgentSession, type SessionAction } from '../tasks/session-manager'
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -13,6 +14,10 @@ interface ChatRequest {
   systemPrompt: string
   messages: ChatMessage[]
   projectPath?: string
+  // Optional N2 fields — when present, daemon persists session for reconciliation
+  cardId?: string
+  workspaceSlug?: string
+  action?: SessionAction
 }
 
 interface ApiProxyRequest {
@@ -73,6 +78,19 @@ export async function handleChatRoutes(req: Request, url: URL): Promise<Response
 
     const prompt = buildPrompt(body.systemPrompt || '', body.messages)
 
+    // Persistencia opcional — se cliente mandou cardId+action, criamos session
+    // para que o frontend possa reconciliar apos reload (N2/N3).
+    const persist = body.cardId && body.workspaceSlug && body.action
+    const session = persist
+      ? await createAgentSession({
+          workspaceSlug: body.workspaceSlug!,
+          cardId: body.cardId!,
+          action: body.action!,
+          agent: agentName!,
+          model: body.model || null,
+        })
+      : null
+
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder()
@@ -82,23 +100,34 @@ export async function handleChatRoutes(req: Request, url: URL): Promise<Response
         }
 
         try {
-          send({ type: 'start', agent: agentName })
+          send({ type: 'start', agent: agentName, sessionId: session?.id })
 
           const result = await executeAgentWithCallbacks(
             {
-              agent: agentName,
+              agent: agentName!,
               prompt,
               projectPath: body.projectPath,
               model: body.model,
             },
             (chunk) => {
               send({ type: 'chunk', text: chunk })
+              if (session) appendChunk(session.id, chunk).catch(() => {})
             },
           )
 
-          send({ type: 'done', exitCode: result.exitCode, fullText: result.output })
+          if (session) {
+            await finishAgentSession(session.id, {
+              phase: 'done',
+              exitCode: result.exitCode,
+            })
+          }
+          send({ type: 'done', exitCode: result.exitCode, fullText: result.output, sessionId: session?.id })
         } catch (err) {
-          send({ type: 'error', message: err instanceof Error ? err.message : 'Erro desconhecido' })
+          const msg = err instanceof Error ? err.message : 'Erro desconhecido'
+          if (session) {
+            await finishAgentSession(session.id, { phase: 'error', error: msg }).catch(() => {})
+          }
+          send({ type: 'error', message: msg, sessionId: session?.id })
         } finally {
           controller.close()
         }

@@ -2,6 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useWorkspaceStore } from '@/entities/workspace/store'
 import { useCardStore } from '@/entities/card/store'
 import { useProjectStore } from '@/entities/card/project-store'
+import { useAgentStore } from '@/entities/agent/store'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +29,7 @@ export function WorkspaceSettingsPage() {
   const { workspaces, updateWorkspace, deleteWorkspace, setActiveWorkspace } = useWorkspaceStore()
   const { getWorkspaceLabels, addLabel, deleteLabel, getWorkspaceColumns, toggleColumnAutomation } = useCardStore()
   const { getWorkspaceProjects, addProject, updateProject, deleteProject } = useProjectStore()
+  const { getWorkspaceAgents } = useAgentStore()
 
   const workspace = workspaces.find((w) => w.id === workspaceId)
 
@@ -172,6 +174,31 @@ export function WorkspaceSettingsPage() {
     } catch (err) {
       toast.error('Erro no bootstrap', { description: err instanceof Error ? err.message : 'Daemon offline' })
     } finally { setBootstrapping(null) }
+  }
+
+  const handleSyncConfig = async (projectPath: string, projectId: string) => {
+    if (!workspaceId) return
+    try {
+      const agents = getWorkspaceAgents(workspaceId).map((a) => ({
+        name: a.name,
+        role: a.role,
+        provider: a.provider,
+        model: a.model,
+        temperature: a.temperature,
+        max_tokens: a.max_tokens,
+        system_prompt: a.system_prompt,
+        enabled: a.enabled,
+      }))
+      const result = await daemonClient.syncProjectConfig(projectPath, agents, workspace?.name)
+      updateProject(projectId, { config_synced_at: result.syncedAt })
+      toast.success(`Config exportada: ${result.agentsExported} agentes`, {
+        description: result.configPath.replace(/^\/Users\/[^/]+\//, '~/'),
+      })
+    } catch (err) {
+      toast.error('Erro ao sincronizar config', {
+        description: err instanceof Error ? err.message : 'Erro desconhecido',
+      })
+    }
   }
 
   const handleAnalyzeGitFlow = async (projectPath: string, projectId: string) => {
@@ -592,6 +619,41 @@ export function WorkspaceSettingsPage() {
                           onCheckedChange={(checked) => updateProject(proj.id, { auto_pr: checked })}
                         />
                       </div>
+
+                      {/* N7 — Sync config-in-project */}
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-2 text-xs">
+                          <FileCode className="h-3.5 w-3.5 text-muted-foreground" />
+                          Sincronizar agentes via git
+                          <span className="font-mono text-[9px] text-muted-foreground/60 normal-case tracking-normal">
+                            (.cockpit/config.json)
+                          </span>
+                        </span>
+                        <Switch
+                          checked={proj.sync_config_to_project ?? false}
+                          onCheckedChange={(checked) => {
+                            updateProject(proj.id, { sync_config_to_project: checked })
+                            if (checked) handleSyncConfig(proj.path, proj.id)
+                          }}
+                        />
+                      </div>
+                      {proj.sync_config_to_project && (
+                        <div className="flex items-center gap-2 pl-5 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-6 text-[10px]"
+                            onClick={() => handleSyncConfig(proj.path, proj.id)}
+                          >
+                            Sincronizar agora
+                          </Button>
+                          {proj.config_synced_at && (
+                            <span className="text-muted-foreground/60 normal-case tracking-normal">
+                              ultimo sync: {new Date(proj.config_synced_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       {daemonOnline && (
                         <div className="flex items-center gap-2 flex-wrap">
                           <Button

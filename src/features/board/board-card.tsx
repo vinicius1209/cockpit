@@ -1,9 +1,10 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { useEffect, useState } from 'react'
 import { CARD_TYPE_CONFIG, CARD_PRIORITY_CONFIG } from '@/shared/lib/constants'
-import { useCardStore } from '@/entities/card/store'
+import { useCardStore, type ProcessingState } from '@/entities/card/store'
 import type { Card } from '@/entities/card/types'
-import { GripVertical, Calendar, Loader2, Bot, User, MessageSquare, ScrollText, Rocket, FileText } from 'lucide-react'
+import { GripVertical, Calendar, Loader2, Bot, User, MessageSquare, ScrollText, Rocket, FileText, Square, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
 
 interface BoardCardProps {
@@ -84,12 +85,7 @@ export function BoardCard({ card, onClick }: BoardCardProps) {
         <span className={`${typeConfig.color}`}>{typeConfig.label}</span>
         <span className="text-muted-foreground/30">·</span>
         <span className={priorityConfig.color}>P:{priorityConfig.label.slice(0, 3)}</span>
-        {processing && (
-          <span className="ml-auto flex items-center gap-1 text-amber-500 normal-case tracking-normal">
-            <Loader2 className="h-2.5 w-2.5 animate-spin" />
-            <span className="text-[10px] font-semibold">LIVE</span>
-          </span>
-        )}
+        {processing && <ProcessingBadge processing={processing} />}
       </div>
 
       {/* Title */}
@@ -164,13 +160,109 @@ export function BoardCard({ card, onClick }: BoardCardProps) {
         </div>
       )}
 
-      {/* Live processing chunk preview */}
-      {processing && processing.chunks.length > 0 && (
-        <div className="mt-2 pl-2 pr-4 border-t border-amber-500/20 pt-1.5">
-          <p className="text-[10px] text-amber-500/80 truncate font-mono">
-            {processing.chunks[processing.chunks.length - 1]}
-          </p>
-        </div>
+      {/* Live processing — chunk preview + ABORT inline */}
+      {processing && (
+        <ProcessingFooter processing={processing} />
+      )}
+    </div>
+  )
+}
+
+// ── Processing helpers ──
+
+function actionLabel(action: string): string {
+  if (action === 'spec') return 'GERANDO SPEC'
+  if (action === 'implementation') return 'IMPLEMENTANDO'
+  if (action === 'discovery') return 'DISCOVERY'
+  if (action === 'chat') return 'AI CHAT'
+  return action.toUpperCase()
+}
+
+function ProcessingBadge({ processing }: { processing: ProcessingState }) {
+  const isError = processing.status === 'error'
+  return (
+    <span
+      className={`ml-auto flex items-center gap-1 normal-case tracking-normal ${
+        isError ? 'text-rose-500' : 'text-amber-500'
+      }`}
+      title={processing.agent ? `${processing.agent}${processing.model ? '/' + processing.model : ''} · ${processing.action}` : processing.action}
+    >
+      {isError ? (
+        <AlertTriangle className="h-2.5 w-2.5" />
+      ) : (
+        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+      )}
+      <span className="text-[10px] font-semibold">{isError ? 'ERRO' : 'LIVE'}</span>
+    </span>
+  )
+}
+
+function ProcessingFooter({ processing }: { processing: ProcessingState }) {
+  // Live timer based on startedAt
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (processing.status !== 'running') return
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [processing.status])
+
+  const elapsed = Math.floor((now - new Date(processing.startedAt).getTime()) / 1000)
+  const mins = Math.floor(elapsed / 60)
+  const secs = elapsed % 60
+  const timer = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+  const lastChunk = processing.chunks[processing.chunks.length - 1]?.slice(0, 80)
+
+  const isError = processing.status === 'error'
+  const tone = isError ? 'rose' : 'amber'
+
+  return (
+    <div
+      className={`mt-2 pl-2 pr-2 border-t pt-1.5 space-y-0.5 ${
+        tone === 'rose' ? 'border-rose-500/20' : 'border-amber-500/20'
+      }`}
+      onClick={(e) => e.stopPropagation()}
+    >
+      {/* Action + timer + abort */}
+      <div className="flex items-center gap-2 font-mono text-[9px] uppercase tracking-[0.14em]">
+        <span className={tone === 'rose' ? 'text-rose-500' : 'text-amber-500'}>
+          {isError ? '━ ERRO ━' : `━ ${actionLabel(processing.action)} ━`}
+        </span>
+        {!isError && (
+          <>
+            <span className={`tabular-nums ${tone === 'rose' ? 'text-rose-500' : 'text-amber-500'}`}>
+              T+{timer}
+            </span>
+            <span className="text-muted-foreground/40">·</span>
+            <span className="text-muted-foreground/70 normal-case tracking-normal">
+              {processing.chunks.length} <span className="text-muted-foreground/50">chunks</span>
+            </span>
+          </>
+        )}
+        {processing.status === 'running' && processing.abort && (
+          <button
+            className="ml-auto flex items-center gap-0.5 rounded-sm border border-rose-500/40 bg-rose-500/10 px-1.5 py-0 text-rose-500 hover:bg-rose-500/20 transition-colors uppercase tracking-[0.14em] text-[9px]"
+            onClick={(e) => {
+              e.stopPropagation()
+              processing.abort?.()
+            }}
+            title="Abortar execucao"
+          >
+            <Square className="h-2 w-2" fill="currentColor" />
+            ABORT
+          </button>
+        )}
+      </div>
+
+      {/* Last chunk preview / error message */}
+      {(lastChunk || isError) && (
+        <p
+          className={`text-[10px] truncate font-mono ${
+            isError ? 'text-rose-500' : 'text-amber-500/80'
+          }`}
+          title={isError ? processing.error : lastChunk}
+        >
+          {isError ? (processing.error || 'erro desconhecido') : lastChunk}
+        </p>
       )}
     </div>
   )

@@ -6,6 +6,7 @@ import { handleSchedulerRoutes } from './scheduler'
 import { handleSecretsRoutes } from './secrets'
 import { handleChatRoutes } from './chat'
 import { handleImplementRoutes } from './implement'
+import { handleSessionRoutes } from './sessions'
 import { handleDataRoutes } from './data'
 import { handleTaskRoutes } from './tasks'
 import { handleGitRoutes } from './git'
@@ -28,6 +29,11 @@ export async function handleRequest(req: Request): Promise<Response> {
   // Implement route (before /agents to avoid prefix conflict)
   if (path === '/agents/implement' && req.method === 'POST') {
     return handleImplementRoutes(req, url)
+  }
+
+  // Session reconciliation routes
+  if (path.startsWith('/agents/sessions')) {
+    return handleSessionRoutes(req, url)
   }
 
   // Agent routes

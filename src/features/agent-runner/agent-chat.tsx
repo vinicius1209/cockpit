@@ -20,6 +20,7 @@ import {
   MessageResponse,
 } from '@/components/ai-elements/message'
 import { useAgentStore } from '@/entities/agent/store'
+import { useWorkspaceStore } from '@/entities/workspace/store'
 import type { AgentMessage } from '@/entities/agent/types'
 import { useProjectStore } from '@/entities/card/project-store'
 import { runAgent } from './agent-service'
@@ -111,6 +112,7 @@ export function AgentChat({ card, workspaceId }: AgentChatProps) {
   } = useAgentStore()
 
   const { getWorkspaceProjects } = useProjectStore()
+  const activeWorkspace = useWorkspaceStore((s) => s.getActiveWorkspace())
   const agents = getWorkspaceAgents(workspaceId)
   const cardRuns = getCardRuns(card.id)
   const projects = getWorkspaceProjects(workspaceId)
@@ -191,8 +193,10 @@ export function AgentChat({ card, workspaceId }: AgentChatProps) {
       },
       abort.signal,
       projectPath,
+      // N5: persistencia da sessao no daemon — chunks sobrevivem reload.
+      { cardId: card.id, workspaceSlug: activeWorkspace?.slug || 'default', action: 'chat' },
     )
-  }, [input, selectedAgent, isStreaming, activeRunId, activeRun, card, workspaceId, getApiKey, createRun, addMessage, getRun, updateRunStatus, projectPath])
+  }, [input, selectedAgent, isStreaming, activeRunId, activeRun, card, workspaceId, getApiKey, createRun, addMessage, getRun, updateRunStatus, projectPath, projects, activeWorkspace])
 
   const handleCancel = () => {
     abortRef.current?.abort()

@@ -8,6 +8,11 @@ export interface Project {
   scan_interval_hours: number
   last_scan_at: string | null
   auto_pr: boolean
+  /** N7: when true, agents config is exported to <project>/.cockpit/config.json
+   *  so the same setup can be shared with the team via git. */
+  sync_config_to_project?: boolean
+  /** N7: ISO timestamp of last successful config export. */
+  config_synced_at?: string | null
   created_at: string
 }
 

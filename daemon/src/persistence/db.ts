@@ -122,6 +122,23 @@ function runMigrations(): void {
     v = 1
     console.log('[db] Migration v1: schema created')
   }
+
+  if (v < 2) {
+    // v2: generaliza tabela sessions para qualquer action (spec/implementation/discovery/chat)
+    // - action: tipo de execucao
+    // - model: model usado pelo agent
+    // - chunks: stream incremental do agent (texto livre, separado de 'output' que era especifico)
+    db.exec(`
+      ALTER TABLE sessions ADD COLUMN action TEXT NOT NULL DEFAULT 'implementation';
+      ALTER TABLE sessions ADD COLUMN model TEXT;
+      ALTER TABLE sessions ADD COLUMN chunks TEXT;
+      CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(phase);
+      CREATE INDEX IF NOT EXISTS idx_sessions_action ON sessions(action);
+      PRAGMA user_version = 2;
+    `)
+    v = 2
+    console.log('[db] Migration v2: sessions generalizada (action/model/chunks)')
+  }
 }
 
 // ── Legacy JSON Import ──

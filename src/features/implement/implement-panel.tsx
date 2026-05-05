@@ -30,7 +30,7 @@ interface TrackedFile {
 type ImplPhase = 'idle' | 'analyzing' | 'branching' | 'implementing' | 'creating-pr' | 'done' | 'error'
 
 export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
-  const { moveCard, updateCard, getWorkspaceColumns } = useCardStore()
+  const { moveCard, updateCard, getWorkspaceColumns, startProcessing, addProcessingChunk, completeProcessing, errorProcessing } = useCardStore()
   const { getWorkspaceProjects } = useProjectStore()
 
   const [phase, setPhase] = useState<ImplPhase>('idle')
@@ -131,6 +131,13 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
     const abort = new AbortController()
     abortRef.current = abort
 
+    // Inicia processing global — kanban mostra LIVE, sobrevive close do dialog
+    startProcessing(card.id, 'implementation', {
+      agent: 'claude-code',
+      model: 'sonnet',
+      abort: () => abort.abort(),
+    })
+
     try {
       const response = await fetch(`${DAEMON_URL}/agents/implement`, {
         method: 'POST',
@@ -181,8 +188,14 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
               setPhase(event.phase as ImplPhase)
             }
             if (event.branch) setBranch(event.branch)
-            if (event.message) setOutputLines((prev) => [...prev, event.message!])
-            if (event.text) setOutputLines((prev) => [...prev, event.text!])
+            if (event.message) {
+              setOutputLines((prev) => [...prev, event.message!])
+              addProcessingChunk(card.id, event.message)
+            }
+            if (event.text) {
+              setOutputLines((prev) => [...prev, event.text!])
+              addProcessingChunk(card.id, event.text)
+            }
             if (event.phase === 'file' && event.path && event.action) {
               setFiles((prev) => {
                 if (prev.some((f) => f.path === event.path)) return prev
@@ -192,6 +205,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
             if (event.phase === 'done') {
               setSummary(event.summary || null)
               setPhase('done')
+              completeProcessing(card.id)
               // Move to Review
               const reviewCol = columns.find((c) => c.slug === 'review')
               if (reviewCol && event.exitCode === 0) {
@@ -206,6 +220,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
             if (event.phase === 'error') {
               setError(event.message || 'Erro desconhecido')
               setPhase('error')
+              errorProcessing(card.id, event.message || 'Erro desconhecido')
             }
           } catch { /* skip */ }
         }
@@ -213,10 +228,13 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
     } catch (err) {
       if (abort.signal.aborted) {
         setPhase('idle')
+        completeProcessing(card.id)
         return
       }
-      setError(err instanceof Error ? err.message : 'Erro de conexao')
+      const msg = err instanceof Error ? err.message : 'Erro de conexao'
+      setError(msg)
       setPhase('error')
+      errorProcessing(card.id, msg)
     }
   }, [card, projectPath, columns, moveCard, updateCard, workspaceId, wsSlug, attempt])
 

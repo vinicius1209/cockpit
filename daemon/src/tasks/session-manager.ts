@@ -1,5 +1,33 @@
 import { getDB } from '../persistence/db'
 
+// Generic agent session — works for spec / implementation / discovery / chat.
+// Wraps the legacy implement-session schema with extra columns (action, model, chunks).
+export type SessionAction = 'spec' | 'implementation' | 'discovery' | 'chat'
+export type SessionPhase = 'analyzing' | 'branching' | 'implementing' | 'creating-pr' | 'done' | 'error' | 'running'
+
+export interface AgentSession {
+  id: string
+  workspaceSlug: string
+  cardId: string
+  action: SessionAction
+  agent: string
+  model: string | null
+  phase: SessionPhase
+  startedAt: string
+  completedAt: string | null
+  duration: number | null
+  exitCode: number | null
+  chunks: string[]   // incremental text stream from agent
+  error: string | null
+  // implementation-only fields kept here for compat
+  attempt: number
+  branch: string | null
+  feedback: string | null
+  summary: SessionSummary | null
+  output: string[]
+  files: SessionFile[]
+}
+
 export interface SessionFile {
   path: string
   action: 'modified' | 'created' | 'deleted' | 'changed'
@@ -48,6 +76,10 @@ interface SessionRow {
   output: string | null
   files: string | null
   error: string | null
+  // v2 columns
+  action: string | null
+  model: string | null
+  chunks: string | null
 }
 
 function rowToSession(row: SessionRow): ImplementSession {
@@ -66,6 +98,30 @@ function rowToSession(row: SessionRow): ImplementSession {
     output: row.output ? JSON.parse(row.output) : [],
     files: row.files ? JSON.parse(row.files) : [],
     error: row.error,
+  }
+}
+
+function rowToAgentSession(row: SessionRow): AgentSession {
+  return {
+    id: row.id,
+    workspaceSlug: row.workspace_slug,
+    cardId: row.card_id,
+    action: (row.action || 'implementation') as SessionAction,
+    agent: row.agent,
+    model: row.model,
+    phase: row.phase as SessionPhase,
+    startedAt: row.started_at,
+    completedAt: row.completed_at,
+    duration: row.duration,
+    exitCode: row.exit_code,
+    chunks: row.chunks ? JSON.parse(row.chunks) : [],
+    error: row.error,
+    attempt: row.attempt,
+    branch: row.branch,
+    feedback: row.feedback,
+    summary: row.summary ? JSON.parse(row.summary) : null,
+    output: row.output ? JSON.parse(row.output) : [],
+    files: row.files ? JSON.parse(row.files) : [],
   }
 }
 
@@ -178,4 +234,115 @@ export async function getLatestSession(wsSlug: string, cardId: string): Promise<
 export async function getSession(wsSlug: string, cardId: string, sessionId: string): Promise<ImplementSession | null> {
   const row = getDB().query('SELECT * FROM sessions WHERE id = ?').get(sessionId) as SessionRow | null
   return row ? rowToSession(row) : null
+}
+
+// ── Generic agent session API (N2) ──
+
+export async function createAgentSession(data: {
+  workspaceSlug: string
+  cardId: string
+  action: SessionAction
+  agent: string
+  model?: string | null
+  attempt?: number
+  feedback?: string | null
+}): Promise<AgentSession> {
+  const id = `session-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+  const startedAt = new Date().toISOString()
+  const initialPhase: SessionPhase = data.action === 'implementation' ? 'analyzing' : 'running'
+
+  getDB().query(`
+    INSERT INTO sessions (id, workspace_slug, card_id, attempt, agent, branch, phase, started_at, feedback, output, files, action, model, chunks)
+    VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, '[]', '[]', ?, ?, '[]')
+  `).run(
+    id, data.workspaceSlug, data.cardId, data.attempt ?? 1, data.agent,
+    initialPhase, startedAt, data.feedback ?? null,
+    data.action, data.model ?? null,
+  )
+
+  return {
+    id,
+    workspaceSlug: data.workspaceSlug,
+    cardId: data.cardId,
+    action: data.action,
+    agent: data.agent,
+    model: data.model ?? null,
+    phase: initialPhase,
+    startedAt,
+    completedAt: null,
+    duration: null,
+    exitCode: null,
+    chunks: [],
+    error: null,
+    attempt: data.attempt ?? 1,
+    branch: null,
+    feedback: data.feedback ?? null,
+    summary: null,
+    output: [],
+    files: [],
+  }
+}
+
+// Append a stream chunk atomically. Used for spec/chat/discovery (text deltas).
+export async function appendChunk(sessionId: string, text: string): Promise<void> {
+  getDB().query(`
+    UPDATE sessions SET chunks = json_insert(
+      CASE WHEN chunks IS NULL THEN '[]' ELSE chunks END,
+      '$[#]', ?
+    ) WHERE id = ?
+  `).run(text, sessionId)
+}
+
+export async function finishAgentSession(
+  sessionId: string,
+  result: { phase: SessionPhase; error?: string | null; exitCode?: number | null },
+): Promise<void> {
+  const completedAt = new Date().toISOString()
+  const sets: string[] = ['phase = ?', 'completed_at = ?']
+  const values: unknown[] = [result.phase, completedAt]
+
+  if (result.error !== undefined) { sets.push('error = ?'); values.push(result.error) }
+  if (result.exitCode !== undefined) { sets.push('exit_code = ?'); values.push(result.exitCode) }
+
+  // Compute duration from started_at
+  const row = getDB().query('SELECT started_at FROM sessions WHERE id = ?').get(sessionId) as { started_at: string } | null
+  if (row) {
+    const dur = Math.round((Date.now() - new Date(row.started_at).getTime()) / 1000)
+    sets.push('duration = ?')
+    values.push(dur)
+  }
+
+  values.push(sessionId)
+  getDB().query(`UPDATE sessions SET ${sets.join(', ')} WHERE id = ?`).run(...values)
+}
+
+// Returns all sessions still running (phase NOT IN done/error). Used by frontend
+// at app boot to reconcile state after a reload.
+export async function listRunningSessions(): Promise<AgentSession[]> {
+  const rows = getDB().query(`
+    SELECT * FROM sessions
+    WHERE phase NOT IN ('done', 'error')
+      AND completed_at IS NULL
+    ORDER BY started_at ASC
+  `).all() as SessionRow[]
+  return rows.map(rowToAgentSession)
+}
+
+export async function getAgentSession(sessionId: string): Promise<AgentSession | null> {
+  const row = getDB().query('SELECT * FROM sessions WHERE id = ?').get(sessionId) as SessionRow | null
+  return row ? rowToAgentSession(row) : null
+}
+
+// Latest session for a card filtered by action — used for spec/chat reidratation.
+export async function getLatestAgentSession(
+  wsSlug: string,
+  cardId: string,
+  action?: SessionAction,
+): Promise<AgentSession | null> {
+  const sql = action
+    ? 'SELECT * FROM sessions WHERE workspace_slug = ? AND card_id = ? AND action = ? ORDER BY started_at DESC LIMIT 1'
+    : 'SELECT * FROM sessions WHERE workspace_slug = ? AND card_id = ? ORDER BY started_at DESC LIMIT 1'
+  const params = action ? [wsSlug, cardId, action] : [wsSlug, cardId]
+  const row = getDB().query(sql).get(...params) as SessionRow | null
+  return row ? rowToAgentSession(row) : null
 }

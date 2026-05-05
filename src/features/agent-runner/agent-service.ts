@@ -5,6 +5,16 @@ interface StreamCallbacks {
   onToken: (token: string) => void
   onComplete: (fullText: string) => void
   onError: (error: string) => void
+  /** Optional: receives the daemon-side session id when persistence is active. */
+  onSessionStart?: (sessionId: string) => void
+}
+
+// Optional persistence info passed to /chat/run so daemon writes a session row.
+// Frontend uses session.id later for reconciliation (N3).
+export interface RunAgentOptions {
+  cardId?: string
+  workspaceSlug?: string
+  action?: 'spec' | 'implementation' | 'discovery' | 'chat'
 }
 
 export async function runAgent(
@@ -14,6 +24,7 @@ export async function runAgent(
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
   projectPath?: string,
+  options?: RunAgentOptions,
 ) {
   // Always route through daemon — API keys are stored server-side
   // If daemon has an API key for the provider → uses /chat/api (direct API, fast)
@@ -21,10 +32,10 @@ export async function runAgent(
   const provider = config.provider
 
   if (provider && ['claude', 'openai', 'gemini'].includes(provider)) {
-    return runViaApiProxy(config, messages, callbacks, signal)
+    return runViaApiProxy(config, messages, callbacks, signal, projectPath, options)
   }
 
-  return runViaDaemon(config, messages, callbacks, signal, projectPath)
+  return runViaDaemon(config, messages, callbacks, signal, projectPath, options)
 }
 
 async function runViaApiProxy(
@@ -32,6 +43,8 @@ async function runViaApiProxy(
   messages: AgentMessage[],
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
+  projectPath?: string,
+  options?: RunAgentOptions,
 ) {
   const chatMessages = messages
     .filter((m) => m.role !== 'system')
@@ -57,7 +70,7 @@ async function runViaApiProxy(
       const errMsg = (errBody as { error?: string }).error || `API proxy error ${response.status}`
       // If API key not configured, fall back to CLI agent
       if (response.status === 400 && errMsg.includes('nao configurada')) {
-        return runViaDaemon(config, messages, callbacks, signal)
+        return runViaDaemon(config, messages, callbacks, signal, projectPath, options)
       }
       callbacks.onError(errMsg)
       return
@@ -79,6 +92,7 @@ async function runViaDaemon(
   callbacks: StreamCallbacks,
   signal?: AbortSignal,
   projectPath?: string,
+  options?: RunAgentOptions,
 ) {
   const chatMessages = messages
     .filter((m) => m.role !== 'system')
@@ -93,6 +107,10 @@ async function runViaDaemon(
         messages: chatMessages,
         model: config.model,
         projectPath,
+        // Persistence hints — daemon ignores when missing
+        cardId: options?.cardId,
+        workspaceSlug: options?.workspaceSlug,
+        action: options?.action,
       }),
       signal,
     })
@@ -139,7 +157,9 @@ async function readDaemonSSE(response: Response, callbacks: StreamCallbacks) {
 
       try {
         const event = JSON.parse(data)
-        if (event.type === 'chunk' && event.text) {
+        if (event.type === 'start' && event.sessionId && callbacks.onSessionStart) {
+          callbacks.onSessionStart(event.sessionId as string)
+        } else if (event.type === 'chunk' && event.text) {
           fullText += event.text
           callbacks.onToken(event.text)
         } else if (event.type === 'done') {

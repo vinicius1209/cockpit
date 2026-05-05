@@ -10,6 +10,14 @@ export interface ProcessingState {
   status: 'running' | 'done' | 'error'
   chunks: string[]
   startedAt: string
+  // Optional metadata used by N2/N4 — session id no daemon, agent label, model
+  sessionId?: string
+  agent?: string
+  model?: string
+  // Last error message when status === 'error'
+  error?: string
+  // Abort handler — runtime only (not serialized)
+  abort?: () => void
 }
 
 interface CardState {
@@ -30,9 +38,12 @@ interface CardState {
   getWorkspaceLabels: (workspaceId: string) => Label[]
   toggleColumnAutomation: (workspaceId: string, columnId: string, automationId: string) => void
   toggleCardLabel: (cardId: string, label: Label) => void
-  startProcessing: (cardId: string, action: string) => void
+  startProcessing: (cardId: string, action: string, meta?: Partial<Pick<ProcessingState, 'sessionId' | 'agent' | 'model' | 'abort'>>) => void
   addProcessingChunk: (cardId: string, text: string) => void
+  errorProcessing: (cardId: string, error: string) => void
   completeProcessing: (cardId: string) => void
+  /** Hydrate a fully-formed processing state (e.g. from daemon reconciliation). */
+  setProcessing: (state: ProcessingState) => void
   getProcessing: (cardId: string) => ProcessingState | undefined
 }
 
@@ -194,11 +205,18 @@ export const useCardStore = create<CardState>()(
         }))
       },
 
-      startProcessing: (cardId, action) => {
+      startProcessing: (cardId, action, meta) => {
         set((state) => ({
           processingCards: {
             ...state.processingCards,
-            [cardId]: { cardId, action, status: 'running', chunks: [], startedAt: new Date().toISOString() },
+            [cardId]: {
+              cardId,
+              action,
+              status: 'running',
+              chunks: [],
+              startedAt: new Date().toISOString(),
+              ...meta,
+            },
           },
         }))
       },
@@ -216,11 +234,40 @@ export const useCardStore = create<CardState>()(
         })
       },
 
+      errorProcessing: (cardId, error) => {
+        set((state) => {
+          const existing = state.processingCards[cardId]
+          if (!existing) return state
+          return {
+            processingCards: {
+              ...state.processingCards,
+              [cardId]: { ...existing, status: 'error', error },
+            },
+          }
+        })
+        // Auto-clear error state after 8s so card returns to clean look
+        setTimeout(() => {
+          const cur = get().processingCards[cardId]
+          if (cur && cur.status === 'error') {
+            set((s) => {
+              const { [cardId]: _, ...rest } = s.processingCards
+              return { processingCards: rest }
+            })
+          }
+        }, 8000)
+      },
+
       completeProcessing: (cardId) => {
         set((state) => {
           const { [cardId]: _, ...rest } = state.processingCards
           return { processingCards: rest }
         })
+      },
+
+      setProcessing: (newState) => {
+        set((state) => ({
+          processingCards: { ...state.processingCards, [newState.cardId]: newState },
+        }))
       },
 
       getProcessing: (cardId) => {

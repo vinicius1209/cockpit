@@ -1,6 +1,26 @@
 import type { ScanResult, InstalledAgent, DiscoveryResult, JobSummary } from '@/entities/card/project-types'
 import { DAEMON_URL } from '@/shared/lib/constants'
 
+// Mirror of AgentSession in daemon/src/tasks/session-manager.ts
+export interface AgentSessionDto {
+  id: string
+  workspaceSlug: string
+  cardId: string
+  action: 'spec' | 'implementation' | 'discovery' | 'chat'
+  agent: string
+  model: string | null
+  phase: 'analyzing' | 'branching' | 'implementing' | 'creating-pr' | 'done' | 'error' | 'running'
+  startedAt: string
+  completedAt: string | null
+  duration: number | null
+  exitCode: number | null
+  chunks: string[]
+  error: string | null
+  attempt: number
+  branch: string | null
+  feedback: string | null
+}
+
 async function daemonFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${DAEMON_URL}${path}`, {
     ...options,
@@ -41,6 +61,13 @@ export const daemonClient = {
     daemonFetch<{ project: string; path: string; filesCreated: string[]; filesSkipped: string[] }>('/projects/bootstrap', {
       method: 'POST',
       body: JSON.stringify({ path, force }),
+    }),
+
+  // N7 — exporta agentes do workspace para <project>/.cockpit/config.json
+  syncProjectConfig: (path: string, agents: unknown[], workspaceName?: string) =>
+    daemonFetch<{ ok: boolean; configPath: string; agentsExported: number; syncedAt: string }>('/projects/sync-config', {
+      method: 'POST',
+      body: JSON.stringify({ path, agents, workspaceName }),
     }),
 
   linkFinding: (projectPath: string, fingerprint: string, cardId: string) =>
@@ -93,12 +120,24 @@ export const daemonClient = {
   getMetrics: () =>
     daemonFetch<Record<string, unknown>>('/api/metrics'),
 
-  // Sessions
+  // Sessions (legacy implement-only)
   getSessions: (wsSlug: string, cardId: string) =>
     daemonFetch<Record<string, unknown>[]>(`/api/tasks/${wsSlug}/${cardId}/sessions`),
 
   getLatestSession: (wsSlug: string, cardId: string) =>
     daemonFetch<Record<string, unknown> | null>(`/api/tasks/${wsSlug}/${cardId}/sessions/latest`),
+
+  // Generic agent sessions (N2/N3)
+  listRunningSessions: () =>
+    daemonFetch<{ sessions: AgentSessionDto[] }>('/agents/sessions/running'),
+
+  getAgentSession: (sessionId: string) =>
+    daemonFetch<{ session: AgentSessionDto | null }>(`/agents/sessions/${sessionId}`),
+
+  getLatestAgentSession: (wsSlug: string, cardId: string, action?: string) => {
+    const q = action ? `?action=${encodeURIComponent(action)}` : ''
+    return daemonFetch<{ session: AgentSessionDto | null }>(`/agents/sessions/${wsSlug}/${cardId}/latest${q}`)
+  },
 
   // Git flow
   analyzeGitFlow: (projectPath: string) =>
