@@ -10,10 +10,12 @@ interface PersistEnvelope<S> {
   _ts?: number
 }
 
-async function readStore<T>(name: string, key: keyof T): Promise<T[keyof T]> {
+// Lê um campo do state desempacotado. Retorna `undefined` se store ou campo
+// nao existem. Tipo de retorno deixado em `unknown` — caller faz cast guardado.
+async function readField<T>(name: string, key: string): Promise<unknown> {
   const env = await api.getStore<PersistEnvelope<T>>(name)
-  if (!env || !env.state) return {} as T[keyof T]
-  return (env.state as T)[key]
+  if (!env || !env.state) return undefined
+  return (env.state as Record<string, unknown>)[key]
 }
 
 interface CardStoreState {
@@ -32,28 +34,29 @@ interface ProjectStoreState {
 }
 
 export async function loadWorkspaces(): Promise<Workspace[]> {
-  const ws = await readStore<WorkspaceStoreState, 'workspaces'>('workspaces', 'workspaces')
-  return Array.isArray(ws) ? ws : []
+  const ws = await readField<WorkspaceStoreState>('workspaces', 'workspaces')
+  return Array.isArray(ws) ? ws as Workspace[] : []
 }
 
 export async function loadActiveWorkspaceId(): Promise<string | null> {
-  return readStore<WorkspaceStoreState, 'activeWorkspaceId'>('workspaces', 'activeWorkspaceId')
+  const v = await readField<WorkspaceStoreState>('workspaces', 'activeWorkspaceId')
+  return typeof v === 'string' ? v : null
 }
 
 export async function loadCards(): Promise<Card[]> {
-  const cards = await readStore<CardStoreState, 'cards'>('cards', 'cards')
-  return Array.isArray(cards) ? cards : []
+  const cards = await readField<CardStoreState>('cards', 'cards')
+  return Array.isArray(cards) ? cards as Card[] : []
 }
 
 export async function loadColumns(): Promise<Record<string, BoardColumn[]>> {
-  const cols = await readStore<CardStoreState, 'columns'>('cards', 'columns')
-  return cols && typeof cols === 'object' ? cols : {}
+  const cols = await readField<CardStoreState>('cards', 'columns')
+  return cols && typeof cols === 'object' && !Array.isArray(cols) ? cols as Record<string, BoardColumn[]> : {}
 }
 
 export async function loadProjects(): Promise<Project[]> {
-  const all = await readStore<ProjectStoreState, 'projects'>('projects', 'projects')
-  if (!all || typeof all !== 'object') return []
-  return Object.values(all).flat()
+  const all = await readField<ProjectStoreState>('projects', 'projects')
+  if (!all || typeof all !== 'object' || Array.isArray(all)) return []
+  return Object.values(all as Record<string, Project[]>).flat()
 }
 
 // Compose: tudo de uma vez
@@ -66,4 +69,101 @@ export async function loadAll() {
     loadActiveWorkspaceId(),
   ])
   return { workspaces, cards, columns, projects, activeWsId }
+}
+
+// ── Mutations ──
+//
+// Como o frontend usa Zustand persist, o /api/data/<store> é sempre
+// "full replace": lemos o envelope inteiro, mutamos o state, escrevemos
+// de volta. Isto pode ter race condition se web UI estiver ativo, mas
+// pra single-user funciona bem.
+
+interface PersistEnvelope2<S> {
+  state: S
+  version: number
+  _ts?: number
+}
+
+async function readAndPatch<S>(name: string, mutate: (state: S) => S): Promise<void> {
+  const env = await api.getStore<PersistEnvelope2<S>>(name)
+  if (!env || !env.state) {
+    throw new Error(`Store "${name}" nao encontrado ou vazio. Crie pelo web UI primeiro.`)
+  }
+  const patched: PersistEnvelope2<S> = {
+    ...env,
+    state: mutate(env.state),
+    _ts: Date.now(),
+  }
+  await api.setStore(name, patched)
+}
+
+export function newCardId(): string {
+  return `card-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
+}
+
+export function newWorkspaceId(): string {
+  return `ws-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
+}
+
+export async function addCard(input: Card): Promise<void> {
+  await readAndPatch<CardStoreState>('cards', (s) => ({
+    ...s,
+    cards: [...(s.cards || []), input],
+  }))
+}
+
+export async function updateCard(cardId: string, patch: Partial<Card>): Promise<Card> {
+  let updated: Card | null = null
+  await readAndPatch<CardStoreState>('cards', (s) => ({
+    ...s,
+    cards: (s.cards || []).map((c) => {
+      if (c.id !== cardId) return c
+      updated = { ...c, ...patch, updated_at: new Date().toISOString() }
+      return updated
+    }),
+  }))
+  if (!updated) throw new Error(`card ${cardId} nao encontrado`)
+  return updated
+}
+
+export async function moveCardToColumn(cardId: string, targetColumnId: string): Promise<void> {
+  await readAndPatch<CardStoreState>('cards', (s) => {
+    const cards = s.cards || []
+    const card = cards.find((c) => c.id === cardId)
+    if (!card) throw new Error(`card ${cardId} nao encontrado`)
+
+    // Posicao = ultima da coluna alvo
+    const targetCount = cards.filter((c) => c.column_id === targetColumnId).length
+
+    return {
+      ...s,
+      cards: cards.map((c) =>
+        c.id === cardId
+          ? { ...c, column_id: targetColumnId, position: targetCount, updated_at: new Date().toISOString() }
+          : c,
+      ),
+    }
+  })
+}
+
+export async function deleteCard(cardId: string): Promise<void> {
+  await readAndPatch<CardStoreState>('cards', (s) => ({
+    ...s,
+    cards: (s.cards || []).filter((c) => c.id !== cardId),
+  }))
+}
+
+export async function addWorkspace(ws: Workspace): Promise<void> {
+  await readAndPatch<WorkspaceStoreState>('workspaces', (s) => ({
+    ...s,
+    workspaces: [...(s.workspaces || []), ws],
+  }))
+}
+
+export async function deleteWorkspace(wsId: string): Promise<void> {
+  await readAndPatch<WorkspaceStoreState>('workspaces', (s) => ({
+    ...s,
+    workspaces: (s.workspaces || []).filter((w) => w.id !== wsId),
+    activeWorkspaceId: s.activeWorkspaceId === wsId ? null : s.activeWorkspaceId,
+  }))
 }

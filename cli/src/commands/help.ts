@@ -2,34 +2,49 @@ import { c, sym } from '../ui/colors'
 import { divider, section } from '../ui/box'
 import { banner } from '../ui/banner'
 
-const COMMANDS: Array<{ cmd: string; desc: string; tier: 1 | 2 | 3 | 4 }> = [
-  // Tier 1 — read
-  { cmd: 'cockpit',                   desc: 'status overview global', tier: 1 },
-  { cmd: 'cockpit doctor',            desc: 'health check (daemon, agents, projetos, gh)', tier: 1 },
-  { cmd: 'cockpit ws',                desc: 'lista workspaces', tier: 1 },
-  { cmd: 'cockpit ws use <name>',     desc: 'set workspace ativo (CLI)', tier: 1 },
-  { cmd: 'cockpit ws info [name]',    desc: 'detalhes do workspace', tier: 1 },
-  { cmd: 'cockpit board [ws]',        desc: 'ASCII kanban', tier: 1 },
-  { cmd: 'cockpit card list',         desc: 'lista cards (filtros: --type, --priority, --status, --ws)', tier: 1 },
-  { cmd: 'cockpit card show <#id>',   desc: 'ficha completa do card', tier: 1 },
-  { cmd: 'cockpit help [cmd]',        desc: 'ajuda', tier: 1 },
+const COMMANDS: Array<{ cmd: string; desc: string; group: string }> = [
+  // Status & info
+  { cmd: 'cockpit',                       desc: 'status overview global',                                     group: 'status' },
+  { cmd: 'cockpit doctor',                desc: 'health check (daemon, agents, projetos, gh)',                group: 'status' },
+  { cmd: 'cockpit metrics',               desc: 'dashboards de uso (cards, runs, velocity)',                  group: 'status' },
+  { cmd: 'cockpit help [cmd]',            desc: 'ajuda',                                                      group: 'status' },
 
-  // Tier 2 — write (TODO)
-  { cmd: 'cockpit card new "<title>"', desc: '[em breve] cria card novo', tier: 2 },
-  { cmd: 'cockpit card move <id> <col>', desc: '[em breve] move card de coluna', tier: 2 },
-  { cmd: 'cockpit card edit <id>',    desc: '[em breve] edita card no editor', tier: 2 },
+  // Workspaces
+  { cmd: 'cockpit ws',                    desc: 'lista workspaces',                                           group: 'ws' },
+  { cmd: 'cockpit ws use <name>',         desc: 'set workspace ativo (CLI)',                                  group: 'ws' },
+  { cmd: 'cockpit ws info [name]',        desc: 'detalhes do workspace',                                      group: 'ws' },
+  { cmd: 'cockpit ws new "<name>"',       desc: 'cria novo workspace (--color --desc)',                       group: 'ws' },
+  { cmd: 'cockpit ws delete <name>',      desc: 'exclui workspace (--force)',                                 group: 'ws' },
 
-  // Tier 3 — long-running (TODO)
-  { cmd: 'cockpit implement <id>',    desc: '[em breve] dispara implementacao', tier: 3 },
-  { cmd: 'cockpit watch <id>',        desc: '[em breve] tail live de execucao', tier: 3 },
-  { cmd: 'cockpit log <id>',          desc: '[em breve] historico de sessions', tier: 3 },
-  { cmd: 'cockpit ai <id>',           desc: '[em breve] AI chat interativo', tier: 3 },
+  // Board & cards
+  { cmd: 'cockpit board [ws]',            desc: 'ASCII kanban',                                               group: 'card' },
+  { cmd: 'cockpit card list',             desc: 'lista cards (--ws --type --priority --status --json)',       group: 'card' },
+  { cmd: 'cockpit card show <#id>',       desc: 'ficha completa do card',                                     group: 'card' },
+  { cmd: 'cockpit card new "<title>"',    desc: 'cria card (--type --prio --ws --col --desc)',                group: 'card' },
+  { cmd: 'cockpit card move <#id> <col>', desc: 'move card de coluna',                                        group: 'card' },
+  { cmd: 'cockpit card edit <#id>',       desc: 'edita campos (--title --type --prio --assignee --due)',      group: 'card' },
+  { cmd: 'cockpit card delete <#id>',     desc: 'exclui card (--force)',                                      group: 'card' },
 
-  // Tier 4
-  { cmd: 'cockpit metrics',           desc: '[em breve] dashboards de uso', tier: 4 },
-  { cmd: 'cockpit init',              desc: '[em breve] bootstrap .cockpit/ na pasta atual', tier: 4 },
-  { cmd: 'cockpit search "<q>"',      desc: '[em breve] busca em cards/specs/docs', tier: 4 },
+  // Long-running
+  { cmd: 'cockpit implement <#id>',       desc: 'dispara implementacao (--watch --feedback --no-pr)',         group: 'run' },
+  { cmd: 'cockpit watch <#id>',           desc: 'tail live de session (--action spec|implementation|chat)',  group: 'run' },
+  { cmd: 'cockpit log <#id>',             desc: 'historico de sessions (--last N --json)',                    group: 'run' },
+  { cmd: 'cockpit ai <#id>',              desc: 'AI chat interativo no terminal (REPL)',                      group: 'run' },
+
+  // Misc
+  { cmd: 'cockpit agent list',            desc: 'lista CLI agents detectados',                                group: 'misc' },
+  { cmd: 'cockpit agent test <name>',     desc: 'hello-world num agent (--prompt "...")',                     group: 'misc' },
+  { cmd: 'cockpit init',                  desc: 'bootstrap .cockpit/config.json na pasta atual (--ws)',       group: 'misc' },
+  { cmd: 'cockpit search "<q>"',          desc: 'busca em cards/specs/docs (--in cards|specs --limit N)',     group: 'misc' },
 ]
+
+const GROUP_LABELS: Record<string, string> = {
+  status: 'Status & info',
+  ws: 'Workspaces',
+  card: 'Board & cards',
+  run: 'Long-running',
+  misc: 'Misc',
+}
 
 export function help(commandName?: string): void {
   console.log(banner())
@@ -47,18 +62,19 @@ export function help(commandName?: string): void {
     return
   }
 
-  console.log(divider('CMDS', 'gray'))
+  console.log(divider('COMMANDS', 'gray'))
   console.log()
-  console.log(section('Tier 1 · disponiveis'))
-  for (const cmd of COMMANDS.filter((c) => c.tier === 1)) {
-    console.log(`  ${c.bold(cmd.cmd.padEnd(34))} ${c.dim(cmd.desc)}`)
+
+  for (const groupKey of Object.keys(GROUP_LABELS)) {
+    const groupCmds = COMMANDS.filter((cmd) => cmd.group === groupKey)
+    if (groupCmds.length === 0) continue
+    console.log(section(GROUP_LABELS[groupKey]))
+    for (const cmd of groupCmds) {
+      console.log(`  ${c.bold(cmd.cmd.padEnd(36))} ${c.dim(cmd.desc)}`)
+    }
+    console.log()
   }
-  console.log()
-  console.log(section('Tier 2-4 · em desenvolvimento'))
-  for (const cmd of COMMANDS.filter((c) => c.tier > 1)) {
-    console.log(`  ${c.dim(cmd.cmd.padEnd(34))} ${c.dim(cmd.desc)}`)
-  }
-  console.log()
+
   console.log(section('Flags globais'))
   console.log(`  ${c.bold('--json'.padEnd(34))} ${c.dim('output em JSON (machine readable)')}`)
   console.log(`  ${c.bold('--help, -h'.padEnd(34))} ${c.dim('ajuda do comando')}`)

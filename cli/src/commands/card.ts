@@ -1,8 +1,8 @@
-import { loadAll } from '../api/store'
+import { loadAll, addCard, moveCardToColumn, deleteCard, newCardId, updateCard } from '../api/store'
 import { api } from '../api/client'
 import { resolveCard, resolveWorkspace, shortId } from '../api/resolve'
 import { c, sym } from '../ui/colors'
-import { divider, section, box } from '../ui/box'
+import { divider, section } from '../ui/box'
 import { table } from '../ui/table'
 import { readConfigAsync } from '../config/daemon'
 
@@ -211,4 +211,181 @@ function phaseColor(p: string): (s: string) => string {
   if (p === 'done') return c.emerald
   if (p === 'error') return c.rose
   return c.amber
+}
+
+// ── Tier 2: write commands ──
+
+interface NewOpts {
+  type?: string
+  priority?: string
+  ws?: string
+  col?: string
+  description?: string
+}
+
+const VALID_TYPES = ['feature', 'bugfix', 'hotfix', 'discovery', 'chore', 'improvement']
+const VALID_PRIORITIES = ['critical', 'high', 'medium', 'low']
+
+export async function cardNew(title: string, opts: NewOpts = {}): Promise<void> {
+  if (!title || title.trim().length === 0) {
+    console.error(c.rose('✕ titulo obrigatorio'))
+    console.log(c.dim('  uso: cockpit card new "Titulo do card"'))
+    process.exit(1)
+  }
+
+  const { workspaces, columns } = await loadAll()
+  const cli = await readConfigAsync()
+
+  const ws = opts.ws
+    ? resolveWorkspace(opts.ws, workspaces)
+    : workspaces.find((w) => w.slug === cli.activeWorkspaceSlug)
+  if (!ws) {
+    console.error(c.rose('✕ workspace ativo nao definido'))
+    console.log(c.dim('  use: cockpit ws use <name> ou --ws <name>'))
+    process.exit(1)
+  }
+
+  // Type/priority validation
+  const type = (opts.type || 'feature').toLowerCase()
+  if (!VALID_TYPES.includes(type)) {
+    console.error(c.rose('✕ tipo invalido: ' + type))
+    console.log(c.dim('  validos: ' + VALID_TYPES.join(', ')))
+    process.exit(1)
+  }
+  const priority = (opts.priority || 'medium').toLowerCase()
+  if (!VALID_PRIORITIES.includes(priority)) {
+    console.error(c.rose('✕ prioridade invalida: ' + priority))
+    console.log(c.dim('  validas: ' + VALID_PRIORITIES.join(', ')))
+    process.exit(1)
+  }
+
+  // Column resolution: --col <slug>, ou primeira coluna
+  const wsCols = (columns[ws.id] || []).sort((a, b) => a.position - b.position)
+  if (wsCols.length === 0) {
+    console.error(c.rose('✕ workspace nao tem colunas'))
+    process.exit(1)
+  }
+  let column = wsCols[0]
+  if (opts.col) {
+    const found = wsCols.find((co) => co.slug === opts.col || co.name.toLowerCase() === opts.col!.toLowerCase())
+    if (!found) {
+      console.error(c.rose('✕ coluna nao encontrada: ' + opts.col))
+      console.log(c.dim('  disponiveis: ' + wsCols.map((co) => co.slug).join(', ')))
+      process.exit(1)
+    }
+    column = found
+  }
+
+  const cardId = newCardId()
+  const now = new Date().toISOString()
+  const newCard = {
+    id: cardId,
+    workspace_id: ws.id,
+    column_id: column.id,
+    project_id: null,
+    title: title.trim(),
+    description: opts.description?.trim() || null,
+    type,
+    priority,
+    position: 0,
+    assignee: null,
+    due_date: null,
+    spec_status: null,
+    spec_content: null,
+    interview_notes: null,
+    created_at: now,
+    updated_at: now,
+    labels: [],
+  }
+
+  await addCard(newCard as never)
+  console.log(`${c.emerald('✓')} card #${shortId(cardId)} criado`)
+  console.log(`  ${c.dim('em')} ${c.bold(ws.name)}/${column.slug} ${c.dim('· ' + type + ' · P:' + priority)}`)
+  console.log(`  ${c.dim('cockpit card show #' + shortId(cardId))}`)
+}
+
+export async function cardMove(ref: string, columnSlug: string): Promise<void> {
+  const { workspaces, cards, columns } = await loadAll()
+  const card = resolveCard(ref, cards)
+  if (!card) {
+    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    process.exit(1)
+  }
+
+  const wsCols = (columns[card.workspace_id] || []).sort((a, b) => a.position - b.position)
+  const target = wsCols.find((co) => co.slug === columnSlug || co.name.toLowerCase() === columnSlug.toLowerCase())
+  if (!target) {
+    console.error(c.rose('✕ coluna nao encontrada: ') + columnSlug)
+    console.log(c.dim('  disponiveis: ' + wsCols.map((co) => co.slug).join(', ')))
+    process.exit(1)
+  }
+
+  await moveCardToColumn(card.id, target.id)
+  const ws = workspaces.find((w) => w.id === card.workspace_id)
+  console.log(`${c.emerald('✓')} #${shortId(card.id)} movido para ${c.bold(target.name)} ${c.dim('em ' + (ws?.name || ''))}`)
+}
+
+export async function cardDelete(ref: string, force = false): Promise<void> {
+  const { cards } = await loadAll()
+  const card = resolveCard(ref, cards)
+  if (!card) {
+    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    process.exit(1)
+  }
+
+  if (!force) {
+    console.log(c.amber('⚠ vai excluir #' + shortId(card.id) + ': ') + c.bold(card.title))
+    console.log(c.dim('  use --force para confirmar (nao tem undo)'))
+    process.exit(0)
+  }
+
+  await deleteCard(card.id)
+  console.log(`${c.emerald('✓')} #${shortId(card.id)} excluido`)
+}
+
+interface EditOpts {
+  title?: string
+  type?: string
+  priority?: string
+  assignee?: string
+  due?: string
+}
+
+export async function cardEdit(ref: string, opts: EditOpts): Promise<void> {
+  const { cards } = await loadAll()
+  const card = resolveCard(ref, cards)
+  if (!card) {
+    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    process.exit(1)
+  }
+
+  const patch: Record<string, unknown> = {}
+  if (opts.title) patch.title = opts.title
+  if (opts.type) {
+    if (!VALID_TYPES.includes(opts.type)) {
+      console.error(c.rose('✕ tipo invalido: ' + opts.type))
+      process.exit(1)
+    }
+    patch.type = opts.type
+  }
+  if (opts.priority) {
+    if (!VALID_PRIORITIES.includes(opts.priority)) {
+      console.error(c.rose('✕ prioridade invalida: ' + opts.priority))
+      process.exit(1)
+    }
+    patch.priority = opts.priority
+  }
+  if (opts.assignee !== undefined) patch.assignee = opts.assignee || null
+  if (opts.due !== undefined) patch.due_date = opts.due || null
+
+  if (Object.keys(patch).length === 0) {
+    console.log(c.dim('nada a atualizar. flags: --title --type --priority --assignee --due'))
+    return
+  }
+
+  await updateCard(card.id, patch as never)
+  console.log(`${c.emerald('✓')} #${shortId(card.id)} atualizado`)
+  for (const [k, v] of Object.entries(patch)) {
+    console.log(`  ${c.dim(k)}: ${String(v)}`)
+  }
 }

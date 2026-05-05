@@ -71,13 +71,24 @@ async function main(): Promise<void> {
       case 'ws':
       case 'workspace':
       case 'workspaces': {
-        const { wsList, wsUse, wsInfo } = await import('./commands/ws')
+        const { wsList, wsUse, wsInfo, wsNew, wsDelete } = await import('./commands/ws')
         if (!sub || sub === 'list') return wsList(!!flags.json)
         if (sub === 'use') {
           if (!rest[0]) return errorExit('uso: cockpit ws use <name>')
           return wsUse(rest[0])
         }
         if (sub === 'info') return wsInfo(rest[0])
+        if (sub === 'new') {
+          if (!rest[0]) return errorExit('uso: cockpit ws new "<name>"')
+          return wsNew(rest[0], {
+            color: flags.color as string | undefined,
+            description: flags.desc as string | undefined,
+          })
+        }
+        if (sub === 'delete' || sub === 'rm') {
+          if (!rest[0]) return errorExit('uso: cockpit ws delete <name> [--force]')
+          return wsDelete(rest[0], !!flags.force)
+        }
         return errorExit(`subcomando ws nao reconhecido: ${sub}`)
       }
 
@@ -88,7 +99,7 @@ async function main(): Promise<void> {
 
       case 'card':
       case 'cards': {
-        const { cardList, cardShow } = await import('./commands/card')
+        const { cardList, cardShow, cardNew, cardMove, cardDelete, cardEdit } = await import('./commands/card')
         if (!sub || sub === 'list') {
           return cardList({
             ws: flags.ws as string | undefined,
@@ -102,23 +113,106 @@ async function main(): Promise<void> {
           if (!rest[0]) return errorExit('uso: cockpit card show <#id>')
           return cardShow(rest[0])
         }
-        return errorExit(`subcomando card nao implementado ainda: ${sub}\n  veja TODO_CLI.md`)
+        if (sub === 'new') {
+          if (!rest[0]) return errorExit('uso: cockpit card new "<title>"')
+          return cardNew(rest[0], {
+            type: flags.type as string | undefined,
+            priority: (flags.priority || flags.prio) as string | undefined,
+            ws: flags.ws as string | undefined,
+            col: (flags.col || flags.column) as string | undefined,
+            description: flags.desc as string | undefined,
+          })
+        }
+        if (sub === 'move' || sub === 'mv') {
+          if (!rest[0] || !rest[1]) return errorExit('uso: cockpit card move <#id> <column-slug>')
+          return cardMove(rest[0], rest[1])
+        }
+        if (sub === 'delete' || sub === 'rm') {
+          if (!rest[0]) return errorExit('uso: cockpit card delete <#id> [--force]')
+          return cardDelete(rest[0], !!flags.force)
+        }
+        if (sub === 'edit') {
+          if (!rest[0]) return errorExit('uso: cockpit card edit <#id> [--title ...]')
+          return cardEdit(rest[0], {
+            title: flags.title as string | undefined,
+            type: flags.type as string | undefined,
+            priority: (flags.priority || flags.prio) as string | undefined,
+            assignee: flags.assignee as string | undefined,
+            due: flags.due as string | undefined,
+          })
+        }
+        return errorExit(`subcomando card nao reconhecido: ${sub}`)
       }
 
-      // Tier 2-4 placeholder
-      case 'implement':
-      case 'spec':
-      case 'watch':
-      case 'log':
-      case 'ai':
-      case 'metrics':
+      case 'implement': {
+        const { implement } = await import('./commands/implement')
+        if (!sub) return errorExit('uso: cockpit implement <#id> [--watch] [--feedback "..."]')
+        return implement(sub, {
+          feedback: flags.feedback as string | undefined,
+          watch: !!flags.watch,
+          noPr: !!flags['no-pr'],
+        })
+      }
+
+      case 'watch': {
+        const { watch } = await import('./commands/watch')
+        if (!sub) return errorExit('uso: cockpit watch <#id> [--action spec|implementation|chat]')
+        return watch(sub, {
+          action: flags.action as 'spec' | 'implementation' | 'discovery' | 'chat' | undefined,
+        })
+      }
+
+      case 'log': {
+        const { log } = await import('./commands/log')
+        if (!sub) return errorExit('uso: cockpit log <#id>')
+        return log(sub, {
+          last: flags.last ? Number(flags.last) : undefined,
+          asJson: !!flags.json,
+        })
+      }
+
+      case 'ai': {
+        const { ai } = await import('./commands/ai')
+        if (!sub) return errorExit('uso: cockpit ai <#id>')
+        return ai(sub)
+      }
+
+      case 'metrics': {
+        const { metrics } = await import('./commands/metrics')
+        return metrics({ asJson: !!flags.json })
+      }
+
       case 'agent':
-      case 'init':
-      case 'search':
-        return errorExit(
-          `comando "${main}" ainda nao implementado.\n  ` +
-          `${c.dim('roadmap em TODO_CLI.md')} ${c.dim('— por enquanto use o web UI')}`,
-        )
+      case 'agents': {
+        const { agentList, agentTest } = await import('./commands/agent')
+        if (!sub || sub === 'list') return agentList(!!flags.json)
+        if (sub === 'test') {
+          if (!rest[0]) return errorExit('uso: cockpit agent test <name> [--prompt "..."]')
+          return agentTest(rest[0], { prompt: flags.prompt as string | undefined })
+        }
+        return errorExit(`subcomando agent nao reconhecido: ${sub}`)
+      }
+
+      case 'init': {
+        const { init } = await import('./commands/init')
+        return init({
+          ws: flags.ws as string | undefined,
+          name: flags.name as string | undefined,
+        })
+      }
+
+      case 'search': {
+        const { search } = await import('./commands/search')
+        if (!sub) return errorExit('uso: cockpit search "<query>"')
+        return search(sub, {
+          in: flags.in as string | undefined,
+          asJson: !!flags.json,
+          limit: flags.limit ? Number(flags.limit) : undefined,
+        })
+      }
+
+      case 'spec':
+        return errorExit(`comando "spec" planejado mas nao implementado.\n  ${c.dim('use o web UI por enquanto')}`)
 
       default:
         errorExit(`comando desconhecido: ${main}\n  use ${c.bold('cockpit help')} para listar`)

@@ -22,6 +22,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+// Direct fetch (sem JSON parse) — usado por SSE streams
+export async function rawFetch(path: string, init?: RequestInit): Promise<Response> {
+  return fetch(`${getDaemonUrl()}${path}`, init)
+}
+
 // ── Domain types (mirror do daemon) ──
 
 export interface Workspace {
@@ -104,6 +109,14 @@ export const api = {
 
   // Data stores (KV via persist adapter)
   getStore: <T = unknown>(name: string) => request<T>(`/api/data/${name}`),
+
+  // POST sobrescreve TODA a tabela do store (matching Zustand persist behavior).
+  // Usa-se: ler envelope inteiro → mutar state → escrever de volta.
+  setStore: <T = unknown>(name: string, payload: T) =>
+    request<{ ok: boolean }>(`/api/data/${name}`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
 
   // Tasks workspace
   getTaskFiles: (wsSlug: string, cardId: string) =>

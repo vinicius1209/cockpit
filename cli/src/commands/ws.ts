@@ -1,4 +1,4 @@
-import { loadAll } from '../api/store'
+import { loadAll, addWorkspace, deleteWorkspace, newWorkspaceId } from '../api/store'
 import { c, sym } from '../ui/colors'
 import { divider, section } from '../ui/box'
 import { table } from '../ui/table'
@@ -116,4 +116,67 @@ export async function wsInfo(ref?: string): Promise<void> {
     }
     console.log()
   }
+}
+
+const PALETTE = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#06b6d4', '#f97316']
+
+interface WsNewOpts {
+  color?: string
+  description?: string
+}
+
+export async function wsNew(name: string, opts: WsNewOpts = {}): Promise<void> {
+  if (!name || name.trim().length === 0) {
+    console.error(c.rose('✕ nome obrigatorio'))
+    console.log(c.dim('  uso: cockpit ws new "Nome"'))
+    process.exit(1)
+  }
+
+  const slug = name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
+  const { workspaces } = await loadAll()
+  if (workspaces.some((w) => w.slug === slug)) {
+    console.error(c.rose('✕ ja existe workspace com slug ' + slug))
+    process.exit(1)
+  }
+
+  const id = newWorkspaceId()
+  const color = opts.color || PALETTE[workspaces.length % PALETTE.length]
+  const ws = {
+    id,
+    name: name.trim(),
+    slug,
+    description: opts.description?.trim() || null,
+    color,
+    icon: null,
+    created_at: new Date().toISOString(),
+  }
+
+  await addWorkspace(ws as never)
+  await writeConfig({ activeWorkspaceSlug: slug })
+
+  console.log(`${c.emerald('✓')} workspace criado: ${c.bold(name)} ${c.dim('#' + slug)}`)
+  console.log(`  ${c.dim('cor:')} ${color}`)
+  console.log(`  ${c.dim('ja virou ativo (CLI). use:')}`)
+  console.log(`  ${c.dim('  cockpit board')} ${c.dim('— ver kanban')}`)
+  console.log(`  ${c.dim('  cockpit card new "Titulo"')} ${c.dim('— criar card')}`)
+}
+
+export async function wsDelete(ref: string, force = false): Promise<void> {
+  const { workspaces, cards } = await loadAll()
+  const ws = resolveWorkspace(ref, workspaces)
+  if (!ws) {
+    console.error(c.rose('✕ workspace nao encontrado: ') + ref)
+    process.exit(1)
+  }
+
+  const wsCards = cards.filter((c) => c.workspace_id === ws.id)
+  if (!force) {
+    console.log(c.amber('⚠ vai excluir workspace ' + c.bold(ws.name)))
+    console.log(c.dim(`  ${wsCards.length} card${wsCards.length === 1 ? '' : 's'} sera${wsCards.length === 1 ? '' : 'o'} removido${wsCards.length === 1 ? '' : 's'}`))
+    console.log(c.dim('  use --force para confirmar (nao tem undo)'))
+    process.exit(0)
+  }
+
+  await deleteWorkspace(ws.id)
+  console.log(`${c.emerald('✓')} workspace ${c.bold(ws.name)} excluido`)
 }

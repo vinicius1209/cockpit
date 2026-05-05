@@ -38,7 +38,7 @@ export function box(content: string | string[], opts: BoxOpts = {}): string {
 }
 
 // Divider mono uppercase
-export function divider(label?: string, color: 'cyan' | 'gray' | 'amber' = 'gray'): string {
+export function divider(label?: string, color: 'cyan' | 'gray' | 'amber' | 'emerald' | 'rose' = 'gray'): string {
   const colorize = COLOR_MAP[color]
   const w = (process.stdout.columns || 80) - 2
   if (!label) return colorize('━'.repeat(w))
