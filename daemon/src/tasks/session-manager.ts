@@ -284,12 +284,16 @@ export async function createAgentSession(data: {
 }
 
 // Append a stream chunk atomically. Used for spec/chat/discovery (text deltas).
+// Also bumps updated_at — used by the reaper to detect stale sessions.
 export async function appendChunk(sessionId: string, text: string): Promise<void> {
   getDB().query(`
-    UPDATE sessions SET chunks = json_insert(
-      CASE WHEN chunks IS NULL THEN '[]' ELSE chunks END,
-      '$[#]', ?
-    ) WHERE id = ?
+    UPDATE sessions SET
+      chunks = json_insert(
+        CASE WHEN chunks IS NULL THEN '[]' ELSE chunks END,
+        '$[#]', ?
+      ),
+      updated_at = datetime('now')
+    WHERE id = ?
   `).run(text, sessionId)
 }
 
@@ -298,8 +302,8 @@ export async function finishAgentSession(
   result: { phase: SessionPhase; error?: string | null; exitCode?: number | null },
 ): Promise<void> {
   const completedAt = new Date().toISOString()
-  const sets: string[] = ['phase = ?', 'completed_at = ?']
-  const values: unknown[] = [result.phase, completedAt]
+  const sets: string[] = ['phase = ?', 'completed_at = ?', 'updated_at = ?']
+  const values: unknown[] = [result.phase, completedAt, completedAt]
 
   if (result.error !== undefined) { sets.push('error = ?'); values.push(result.error) }
   if (result.exitCode !== undefined) { sets.push('exit_code = ?'); values.push(result.exitCode) }
@@ -314,6 +318,25 @@ export async function finishAgentSession(
 
   values.push(sessionId)
   getDB().query(`UPDATE sessions SET ${sets.join(', ')} WHERE id = ?`).run(...values)
+}
+
+// Reaper — marca como timeout sessions running ha mais de `staleAfterMin`
+// minutos sem updated_at. Chamado periodicamente pelo runtime do daemon.
+// Retorna o numero de sessions limpas.
+export async function reapStaleSessions(staleAfterMin = 30): Promise<number> {
+  const cutoffMin = Math.max(1, staleAfterMin)
+  // Usa COALESCE para sessoes sem updated_at (legado) — cai pra started_at
+  const result = getDB().query(`
+    UPDATE sessions
+    SET phase = 'error',
+        error = 'Sessao stale (sem atividade ha mais de ${cutoffMin}min — agent travou ou processo morreu)',
+        completed_at = datetime('now'),
+        updated_at = datetime('now')
+    WHERE phase NOT IN ('done', 'error')
+      AND completed_at IS NULL
+      AND COALESCE(updated_at, started_at) < datetime('now', '-${cutoffMin} minutes')
+  `).run() as { changes: number }
+  return result.changes
 }
 
 // Returns all sessions still running (phase NOT IN done/error). Used by frontend

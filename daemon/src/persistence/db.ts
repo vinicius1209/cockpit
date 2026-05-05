@@ -162,6 +162,19 @@ function runMigrations(): void {
     v = 2
     console.log('[db] Migration v2: sessions generalizada (action/model/chunks)')
   }
+
+  if (v < 3) {
+    // v3: updated_at — usado pelo reaper para detectar sessions "stale"
+    // (running ha mais de N minutos sem novos chunks → orfas em runtime).
+    db.exec(`
+      ALTER TABLE sessions ADD COLUMN updated_at TEXT;
+      UPDATE sessions SET updated_at = COALESCE(completed_at, started_at);
+      CREATE INDEX IF NOT EXISTS idx_sessions_updated ON sessions(updated_at);
+      PRAGMA user_version = 3;
+    `)
+    v = 3
+    console.log('[db] Migration v3: sessions.updated_at')
+  }
 }
 
 // ── Legacy JSON Import ──

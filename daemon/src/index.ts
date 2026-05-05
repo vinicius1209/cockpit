@@ -1,6 +1,7 @@
 import { handleRequest } from './routes/router'
 import { initPersistence } from './persistence'
 import { jsonResponse } from './http'
+import { reapStaleSessions } from './tasks/session-manager'
 
 const PORT = Number(process.env.COCKPIT_DAEMON_PORT || 4800)
 // Bind explicito em 127.0.0.1 (IPv4 loopback). Sem isso, Bun.serve em algumas
@@ -39,6 +40,22 @@ const server = Bun.serve({
 
 console.log(`[cockpit-daemon] Running on http://${HOST}:${server.port}`)
 
+// Reaper de sessoes stale — roda a cada 5min e marca como error sessions
+// que estao "running" ha mais de 30min sem update. Captura agents travados
+// ou crashes silenciosos sem precisar reiniciar o daemon.
+const REAPER_INTERVAL_MS = 5 * 60 * 1000
+const REAPER_STALE_MIN = 30
+const reaperTimer = setInterval(async () => {
+  try {
+    const reaped = await reapStaleSessions(REAPER_STALE_MIN)
+    if (reaped > 0) {
+      console.log(`[reaper] ${reaped} sessao(oes) stale marcada(s) como error`)
+    }
+  } catch (err) {
+    console.warn('[reaper] failed:', err)
+  }
+}, REAPER_INTERVAL_MS)
+
 const ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://localhost:4173',
@@ -58,6 +75,7 @@ function corsHeaders(req: Request): Record<string, string> {
 // Graceful shutdown
 function shutdown() {
   console.log('\n[cockpit-daemon] Shutting down...')
+  clearInterval(reaperTimer)
   server.stop()
   // SQLite WAL checkpoint happens automatically on close
   try { require('./persistence/db').getDB()?.close() } catch { /* ok */ }
