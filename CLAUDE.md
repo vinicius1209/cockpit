@@ -189,7 +189,7 @@ O Cockpit pode ser operado de **3 formas paralelas** que conversam com o mesmo d
 |---|---|---|
 | **Web UI** (port 5173) | Visão geral, kanban visual, dashboard, AI Chat com contexto rico | `src/` (React + Vite) |
 | **CLI `cockpit`** | Operações rápidas no terminal, scripts, watch live de execução, REPL ai | `cli/` (Bun standalone, zero deps) |
-| **MCP server `cockpit-mcp`** | Claude Code controla Cockpit pelo protocolo MCP (8 tools + 2 resources) | `mcp/` (Bun + `@modelcontextprotocol/sdk`) |
+| **MCP server `cockpit-mcp`** | Claude Code controla Cockpit pelo protocolo MCP (12 tools + 2 resources) | `mcp/` (Bun + `@modelcontextprotocol/sdk`) |
 
 Os 3 modos compartilham 100% do estado (mesmo SQLite, mesmas sessions, mesmas APIs). Não há "modo prioritário" — cada um serve um caso de uso.
 

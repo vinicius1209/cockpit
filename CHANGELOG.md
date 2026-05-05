@@ -163,4 +163,5 @@ Primeiro release público. Cockpit deixa de ser "interno" e ganha as três inter
 - MCP `cockpit_implement_async` é fire-and-forget (Claude Code UI não streama chunks live; use `cockpit watch` no terminal pra acompanhar)
 - Sem TUI fullscreen (`cockpit tui` planejado)
 
-[0.1.0]: https://github.com/anthropics/cockpit/releases/tag/v0.1.0
+[0.2.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.2.0
+[0.1.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.1.0

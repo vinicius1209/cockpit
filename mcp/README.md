@@ -139,14 +139,18 @@ Stack:
 - Bun runtime
 - HTTP fetch nativo
 
-## Tier 2 — Próximas ferramentas
+## Roadmap
 
-Veja `TODO_CLI.md` na raiz. Itens previstos:
-- `cockpit_implement_async` — dispara em background, retorna sessionId
-- `cockpit_get_session` — status de session em curso
-- `cockpit_set_active_workspace` — mudar workspace ativo
-- `cockpit_edit_card` — atualizar campos de card existente
+Implementadas em v0.2.0 (eram Tier 2):
+- ✅ `cockpit_implement_async` — dispara em background, retorna sessionId (com `isolation: lock|worktree`)
+- ✅ `cockpit_get_session` — status + tail de chunks
+- ✅ `cockpit_archive_card` / `cockpit_unarchive_card`
+
+Próximas (Tier 3):
+- `cockpit_set_active_workspace` — mudar workspace ativo (CLI state)
+- `cockpit_edit_card` — atualizar campos (title/type/priority/assignee/due) sem dialog
 - `cockpit_get_metrics_workspace` — métricas filtradas por ws
+- `cockpit_abort_session` — abortar session em curso pelo Claude Code
 
 ## Debugging
 
