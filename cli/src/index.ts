@@ -211,8 +211,35 @@ async function main(): Promise<void> {
         })
       }
 
-      case 'spec':
-        return errorExit(`comando "spec" planejado mas nao implementado.\n  ${c.dim('use o web UI por enquanto')}`)
+      case 'spec': {
+        const { specShow, specGen, specReady, specReset, specEdit, specSaveVault } = await import('./commands/spec')
+        if (!sub) return errorExit('uso: cockpit spec show|gen|edit|ready|reset|save-vault <id>')
+        if (sub === 'show') {
+          if (!rest[0]) return errorExit('uso: cockpit spec show <id>')
+          return specShow(rest[0])
+        }
+        if (sub === 'gen' || sub === 'generate') {
+          if (!rest[0]) return errorExit('uso: cockpit spec gen <id> [--watch]')
+          return specGen(rest[0], { watch: !!flags.watch })
+        }
+        if (sub === 'ready') {
+          if (!rest[0]) return errorExit('uso: cockpit spec ready <id>')
+          return specReady(rest[0])
+        }
+        if (sub === 'reset') {
+          if (!rest[0]) return errorExit('uso: cockpit spec reset <id> [--force]')
+          return specReset(rest[0], !!flags.force)
+        }
+        if (sub === 'edit') {
+          if (!rest[0]) return errorExit('uso: cockpit spec edit <id>')
+          return specEdit(rest[0])
+        }
+        if (sub === 'save-vault' || sub === 'vault') {
+          if (!rest[0]) return errorExit('uso: cockpit spec save-vault <id>')
+          return specSaveVault(rest[0])
+        }
+        return errorExit(`subcomando spec nao reconhecido: ${sub}`)
+      }
 
       default:
         errorExit(`comando desconhecido: ${main}\n  use ${c.bold('cockpit help')} para listar`)

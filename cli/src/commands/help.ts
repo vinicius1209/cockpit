@@ -25,6 +25,14 @@ const COMMANDS: Array<{ cmd: string; desc: string; group: string }> = [
   { cmd: 'cockpit card edit <id>',       desc: 'edita campos (--title --type --prio --assignee --due)',      group: 'card' },
   { cmd: 'cockpit card delete <id>',     desc: 'exclui card (--force)',                                      group: 'card' },
 
+  // Spec lifecycle
+  { cmd: 'cockpit spec show <id>',       desc: 'imprime markdown da spec',                                    group: 'spec' },
+  { cmd: 'cockpit spec gen <id>',        desc: 'gera spec via AI (--watch)',                                  group: 'spec' },
+  { cmd: 'cockpit spec edit <id>',       desc: 'abre $EDITOR (vim/nano/etc)',                                 group: 'spec' },
+  { cmd: 'cockpit spec ready <id>',      desc: 'aprova spec (draft → ready)',                                 group: 'spec' },
+  { cmd: 'cockpit spec reset <id>',      desc: 'apaga spec atual (--force)',                                  group: 'spec' },
+  { cmd: 'cockpit spec save-vault <id>', desc: 'copia spec para Docs Vault',                                  group: 'spec' },
+
   // Long-running
   { cmd: 'cockpit implement <id>',       desc: 'dispara implementacao (--watch --feedback --no-pr)',         group: 'run' },
   { cmd: 'cockpit watch <id>',           desc: 'tail live de session (--action spec|implementation|chat)',  group: 'run' },
@@ -42,6 +50,7 @@ const GROUP_LABELS: Record<string, string> = {
   status: 'Status & info',
   ws: 'Workspaces',
   card: 'Board & cards',
+  spec: 'Spec lifecycle',
   run: 'Long-running',
   misc: 'Misc',
 }

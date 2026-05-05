@@ -30,6 +30,28 @@ Veja exemplos vivos em:
 - `src/app/routes/workspace-settings.tsx` (settings page)
 - `src/features/spec-engine/spec-generation-overlay.tsx` (live transmission)
 
+## TL;DR para CLI
+
+O CLI `cockpit` espelha a aesthetic no terminal:
+
+1. **Boxes e dividers**: `╭─╮ ╰─╯` e `━━━ NAME ━━━` (helpers em `cli/src/ui/box.ts`)
+2. **Cores semânticas**: `c.emerald` (ok), `c.amber` (live/wip), `c.rose` (erro), `c.gray` (idle)
+3. **Pipeline LEDs no card show**: `[1] ●  [2] ○  [3] ●  [4] ●`
+4. **Mono identifiers**: `#SW78` em display, mas **`SW78` sem `#`** ao passar como argumento (zsh trata como comentário)
+5. **Streams**: usar `postSSE`/`getSSE` de `cli/src/api/sse.ts` + `renderChunk` de `ui/stream-render.ts`
+
+Comandos disponíveis via `cockpit help`. Implementação em `cli/src/commands/`.
+
+## Modos paralelos
+
+O Cockpit roda 3 modos sobre o **mesmo daemon** + SQLite:
+
+- **Web UI** (port 5173) — exploração visual, kanban
+- **CLI `cockpit`** — operações no terminal, scripts, watch live
+- **MCP server** (planejado) — Claude Code controla via protocolo
+
+Não há "modo principal". Mesmo state em todos. Detalhes em [CLAUDE.md#modos-de-uso](./CLAUDE.md#modos-de-uso-importante-para-llms).
+
 ## Comandos
 
 Detalhes em CLAUDE.md.
@@ -42,5 +64,8 @@ Detalhes em CLAUDE.md.
 | Helper de página/widget | `src/widgets/` |
 | Feature integrada | `src/features/<name>/` |
 | Store/entidade | `src/entities/<name>/` |
-| Rota daemon | `daemon/src/routes/<name>.ts` |
-| Novo CLI executor | `daemon/src/executor/agent-executor.ts` (KNOWN_AGENTS) |
+| Rota daemon | `daemon/src/routes/<name>.ts` (plugar em `routes/router.ts`) |
+| Novo CLI agent executor (claude-code/etc) | `daemon/src/executor/agent-executor.ts` (KNOWN_AGENTS) |
+| Migration SQLite | `daemon/src/persistence/db.ts` (`runMigrations()`) |
+| Novo comando CLI | `cli/src/commands/<name>.ts` (plugar em `cli/src/index.ts` + `commands/help.ts`) |
+| UI ANSI helper | `cli/src/ui/` (zero deps, cores via `colors.ts`) |

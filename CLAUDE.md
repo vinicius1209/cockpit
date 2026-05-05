@@ -181,10 +181,33 @@ global. Se for adicionar config-in-project, faça em `<projeto>/.cockpit/config.
 
 ---
 
+## Modos de uso (importante para LLMs)
+
+O Cockpit pode ser operado de **3 formas paralelas** que conversam com o mesmo daemon:
+
+| Modo | Quando usar | Onde fica o código |
+|---|---|---|
+| **Web UI** (port 5173) | Visão geral, kanban visual, dashboard, AI Chat com contexto rico | `src/` (React + Vite) |
+| **CLI `cockpit`** | Operações rápidas no terminal, scripts, watch live de execução, REPL ai | `cli/` (Bun standalone, zero deps) |
+| **MCP server** (planejado) | Claude Code controla Cockpit pelo protocolo MCP | (não implementado ainda) |
+
+Os 3 modos compartilham 100% do estado (mesmo SQLite, mesmas sessions, mesmas APIs). Não há "modo prioritário" — cada um serve um caso de uso.
+
+### Quando recomendar CLI vs Web
+
+- Implementação rápida + tail no terminal → `cockpit implement <id> --watch`
+- Triagem em massa + filtros via jq → `cockpit card list --json | jq ...`
+- Discussão livre com AI sobre um card → `cockpit ai <id>` (REPL)
+- Visualização de board em tela cheia → Web UI ou `cockpit board`
+- Configurar agentes/automações/templates → Web UI (workspace settings)
+
+Veja [`cli/README.md`](./cli/README.md) para a cheatsheet completa.
+
 ## Fluxo de dados
 
 ```
 Frontend (React + Zustand persist) ──HTTP──▶ Daemon (Bun + SQLite)
+CLI cockpit (Bun standalone)       ──HTTP──▶
                                               │
                                               ├──spawn──▶ claude-code CLI
                                               ├──spawn──▶ opencode CLI
@@ -209,13 +232,24 @@ Frontend (React + Zustand persist) ──HTTP──▶ Daemon (Bun + SQLite)
 ## Comandos úteis
 
 ```bash
-npm run dev              # frontend (Vite, port 5173)
-npm run test             # vitest run (24 tests, ~2s)
-npm run lint             # ESLint (alguns warnings pré-existentes em recharts/use-mobile)
-npm run build            # tsc -b && vite build
+# Frontend (Vite, port 5173)
+bun run dev
+bun run test                 # vitest (24 tests)
+bun run lint
+bun run build                # tsc -b && vite build
 
-cd daemon && bun run dev # daemon (Bun, port 4800)
-cd daemon && bun test    # 79 tests, ~200ms
+# Daemon (Bun + SQLite, port 4800)
+bun run dev:daemon
+cd daemon && bun test        # 79 tests
+
+# Tudo de uma vez
+bun run test:all             # frontend + daemon
+
+# CLI cockpit
+bun run cli:install          # symlinka ~/.local/bin/cockpit + ck
+bun run cli                  # roda local sem instalar (cli/src/index.ts)
+bun run cli:build            # bun build --compile produz binário standalone
+cd cli && bunx tsc --noEmit  # type check do CLI
 ```
 
 ## Architecture decision records (notas)
@@ -230,10 +264,24 @@ cd daemon && bun test    # 79 tests, ~200ms
 
 ## Onde colocar coisa nova
 
+### Frontend (`src/`)
 - **Novo componente UI reutilizável**: `src/components/ui/`
 - **Novo helper de página/widget**: `src/widgets/`
 - **Nova feature (verticalmente integrada)**: `src/features/<feature-name>/`
 - **Nova store/entidade**: `src/entities/<entity>/{types,store,presets}.ts`
-- **Nova rota daemon**: `daemon/src/routes/<route>.ts` + plugar em `daemon/src/index.ts`
-- **Novo executor de agente**: adicionar entry em `KNOWN_AGENTS` em
-  `daemon/src/executor/agent-executor.ts`
+
+### Daemon (`daemon/src/`)
+- **Nova rota**: `daemon/src/routes/<route>.ts` + plugar em `daemon/src/routes/router.ts`
+- **Novo executor de agente**: adicionar entry em `KNOWN_AGENTS` em `daemon/src/executor/agent-executor.ts`
+- **Migration SQLite**: `daemon/src/persistence/db.ts` em `runMigrations()`, incrementar `PRAGMA user_version`
+
+### CLI (`cli/src/`)
+- **Novo comando**: `cli/src/commands/<name>.ts` + plugar no router em `cli/src/index.ts` + adicionar entry em `cli/src/commands/help.ts` (`COMMANDS` array)
+- **Novo helper de UI ANSI**: `cli/src/ui/` (zero deps por convenção — cores via `colors.ts`)
+- **Nova chamada ao daemon**: `cli/src/api/client.ts` (request) ou `cli/src/api/store.ts` (mutation via persist envelope)
+- **SSE streaming**: usar `cli/src/api/sse.ts` (`postSSE` ou `getSSE`)
+
+### Documentação
+- **Roadmap do CLI**: `TODO_CLI.md`
+- **Backlog técnico geral**: `TODO_HUMAN_LLM.md`
+- **Tradeoffs / decisões arquiteturais**: este arquivo (CLAUDE.md)
