@@ -1,7 +1,7 @@
 import { executeAgentWithCallbacks, detectInstalledAgents } from '../executor/agent-executor'
 import { TaskWorkspace } from '../tasks/task-workspace'
 import { createPR } from '../git/pr-creator'
-import { createSession, updateSession, appendOutput, appendFile, type SessionFile } from '../tasks/session-manager'
+import { createSession, updateSession, appendOutput, appendFile, registerSessionAbort, unregisterSessionAbort, type SessionFile } from '../tasks/session-manager'
 import { peekActiveProjectLock, acquireProjectLock, releaseProjectLock, ProjectLockedError } from '../tasks/project-lock'
 import { createWorktree, removeWorktree, type WorktreeInfo } from '../git/worktree-manager'
 
@@ -336,6 +336,12 @@ export async function runImplementation(
   const seenFiles = new Set<string>()
   let stopWatcher: (() => void) | null = null
   let heartbeatInterval: ReturnType<typeof setInterval> | null = null
+  // F-MCP-T3 — AbortController pra suportar abort externo via /agents/sessions/<id>/abort.
+  // Quando registerSessionAbort(sessionId, fn) e chamado de fora, fn dispara abortCtrl.abort().
+  const abortCtrl = new AbortController()
+  if (sessionId) {
+    registerSessionAbort(sessionId, () => abortCtrl.abort())
+  }
 
   try {
 
@@ -414,6 +420,7 @@ export async function runImplementation(
           }
         }
       },
+      abortCtrl.signal,
     )
 
     // Save full log to task workspace
@@ -474,24 +481,31 @@ export async function runImplementation(
       }
     }
 
-    // Finalize session
+    // Finalize session — detecta abort via signal.aborted (exitCode varia por OS/agent)
+    const wasAborted = abortCtrl.signal.aborted
+    const finalPhase = wasAborted ? 'error' : 'done'
     if (wsSlug && cId && sessionId) {
       await updateSession(wsSlug, cId, sessionId, {
-        phase: 'done',
+        phase: finalPhase,
         exitCode: result.exitCode,
         completedAt: new Date().toISOString(),
         duration: Math.round(result.duration / 1000),
         summary,
         output: allOutputLines,
+        error: wasAborted ? 'session abortada via cockpit_abort_session ou Web UI' : undefined,
       })
     }
 
-    emit({
-      phase: 'done',
-      message: `${agentName} concluido (${Math.round(result.duration / 1000)}s)`,
-      summary,
-      exitCode: result.exitCode,
-    })
+    if (wasAborted) {
+      emit({ phase: 'error', message: 'session abortada' })
+    } else {
+      emit({
+        phase: 'done',
+        message: `${agentName} concluido (${Math.round(result.duration / 1000)}s)`,
+        summary,
+        exitCode: result.exitCode,
+      })
+    }
   } catch (err) {
     // Finalize session with error
     if (wsSlug && cId && sessionId) {
@@ -510,6 +524,8 @@ export async function runImplementation(
     // Guaranteed cleanup of intervals regardless of success/error path
     if (heartbeatInterval) clearInterval(heartbeatInterval)
     stopWatcher?.()
+    // F-MCP-T3 — desregistra abort handler (registry vira no-op se chamado de novo)
+    if (sessionId) unregisterSessionAbort(sessionId)
     // F9-A — libera o lock do projeto. Idempotente; nao falha se ja foi
     // liberado ou se nunca foi adquirido (worktree mode pula acquire).
     if (sessionId && !isWorktreeMode) releaseProjectLock(origProjectPath, sessionId)

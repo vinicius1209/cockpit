@@ -188,6 +188,54 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
+      name: 'cockpit_edit_card',
+      description:
+        'Atualiza campos de um card existente (titulo, tipo, prioridade, descricao, assignee, due_date). ' +
+        'Use quando o usuario pede pra mudar info de um card sem precisar abrir o dialog. Apenas campos ' +
+        'incluidos sao alterados — campos omitidos ficam como estao.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          card_id: { type: 'string', description: 'Card short ID (SW78) ou full ID' },
+          title: { type: 'string' },
+          type: { type: 'string', enum: ['feature', 'bugfix', 'hotfix', 'discovery', 'chore', 'improvement'] },
+          priority: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
+          description: { type: 'string' },
+          assignee: { type: 'string', description: 'use string vazia "" para limpar' },
+          due_date: { type: 'string', description: 'YYYY-MM-DD ou string vazia "" para limpar' },
+        },
+        required: ['card_id'],
+      },
+    },
+    {
+      name: 'cockpit_set_active_workspace',
+      description:
+        'Muda o workspace ativo (compartilhado entre CLI e MCP via ~/.cockpit/cli.json). ' +
+        'Afeta o "default workspace" usado por cockpit_create_card e por comandos CLI sem --ws. ' +
+        'O Web UI tem seu proprio active workspace (sidebar) que nao e afetado.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspace: { type: 'string', description: 'Workspace slug ou nome' },
+        },
+        required: ['workspace'],
+      },
+    },
+    {
+      name: 'cockpit_abort_session',
+      description:
+        'Aborta uma session em curso (mata o processo do agent, marca phase=error). ' +
+        'Use quando o usuario pede pra parar uma implementacao que esta andando errada ou demorando demais. ' +
+        'Idempotente — se a session ja terminou, retorna o estado atual sem erro.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          session_id: { type: 'string', description: 'Session id retornado por cockpit_implement_async' },
+        },
+        required: ['session_id'],
+      },
+    },
+    {
       name: 'cockpit_get_session',
       description:
         'Get status of an agent session by id. Returns phase (analyzing/implementing/done/error), agent, model, ' +
@@ -223,6 +271,9 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'cockpit_unarchive_card': return ok(await toolUnarchiveCard(args as { card_id: string }))
       case 'cockpit_search':       return ok(await toolSearch(args as { query: string; in?: string; limit?: number }))
       case 'cockpit_metrics':      return ok(await toolMetrics())
+      case 'cockpit_edit_card':    return ok(await toolEditCard(args as unknown as EditCardArgs))
+      case 'cockpit_set_active_workspace': return ok(await toolSetActiveWorkspace(args as { workspace: string }))
+      case 'cockpit_abort_session':  return ok(await toolAbortSession(args as { session_id: string }))
       case 'cockpit_implement_async': return ok(await toolImplementAsync(args as unknown as ImplementAsyncArgs))
       case 'cockpit_get_session':  return ok(await toolGetSession(args as { session_id: string; tail_chunks?: number }))
       default: throw new Error(`unknown tool: ${name}`)
@@ -448,6 +499,91 @@ async function toolUnarchiveCard(args: { card_id: string }): Promise<unknown> {
     ),
   }))
   return { id: shortId(card.id), title: card.title, status: 'active' }
+}
+
+interface EditCardArgs {
+  card_id: string
+  title?: string
+  type?: string
+  priority?: string
+  description?: string
+  assignee?: string
+  due_date?: string
+}
+
+async function toolEditCard(args: EditCardArgs): Promise<unknown> {
+  const cards = await loadCards()
+  const card = resolveCard(args.card_id, cards)
+  if (!card) throw new Error(`card not found: ${args.card_id}`)
+
+  const patch: Partial<typeof card> = {}
+  if (args.title !== undefined) patch.title = args.title
+  if (args.type !== undefined) patch.type = args.type
+  if (args.priority !== undefined) patch.priority = args.priority
+  if (args.description !== undefined) patch.description = args.description || null
+  if (args.assignee !== undefined) patch.assignee = args.assignee === '' ? null : args.assignee
+  if (args.due_date !== undefined) patch.due_date = args.due_date === '' ? null : args.due_date
+
+  if (Object.keys(patch).length === 0) {
+    return { id: shortId(card.id), changed: false, message: 'nenhum campo para atualizar' }
+  }
+
+  const now = new Date().toISOString()
+  await patchCardsStore<{ cards: typeof cards }>((s) => ({
+    ...s,
+    cards: (s.cards || []).map((c) =>
+      c.id === card.id ? { ...c, ...patch, updated_at: now } : c,
+    ),
+  }))
+
+  return {
+    id: shortId(card.id),
+    changed: true,
+    fields: Object.keys(patch),
+    title: patch.title ?? card.title,
+  }
+}
+
+async function toolSetActiveWorkspace(args: { workspace: string }): Promise<unknown> {
+  const workspaces = await loadWorkspaces()
+  const ws = resolveWorkspace(args.workspace, workspaces)
+  if (!ws) {
+    throw new Error(`workspace nao encontrado: ${args.workspace}. Disponiveis: ${workspaces.map((w) => w.slug).join(', ')}`)
+  }
+
+  // Escreve em ~/.cockpit/cli.json (mesmo arquivo que o CLI usa)
+  const { homedir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { existsSync, readFileSync } = await import('node:fs')
+  const file = join(homedir(), '.cockpit', 'cli.json')
+  let cur: Record<string, unknown> = {}
+  if (existsSync(file)) {
+    try { cur = JSON.parse(readFileSync(file, 'utf-8')) } catch { cur = {} }
+  }
+  cur.activeWorkspaceSlug = ws.slug
+  await Bun.write(file, JSON.stringify(cur, null, 2))
+
+  return {
+    active_workspace: { slug: ws.slug, name: ws.name },
+    persisted_at: file,
+    note: 'compartilhado entre CLI e MCP. Web UI tem state separado (sidebar).',
+  }
+}
+
+async function toolAbortSession(args: { session_id: string }): Promise<unknown> {
+  const res = await fetch(`${DAEMON_HINT}/agents/sessions/${args.session_id}/abort`, {
+    method: 'POST',
+  })
+  const data = await res.json().catch(() => null) as Record<string, unknown> | null
+  if (res.status === 404) {
+    throw new Error(`session nao encontrada: ${args.session_id}`)
+  }
+  return {
+    session_id: args.session_id,
+    aborted: data?.aborted ?? false,
+    reason: data?.reason ?? (res.ok ? 'ok' : 'falha'),
+    phase: data?.phase,
+  }
 }
 
 async function toolMoveCard(args: { card_id: string; column_slug: string }): Promise<unknown> {

@@ -1,5 +1,5 @@
 import { jsonResponse } from '../http'
-import { listRunningSessions, getAgentSession, getLatestAgentSession, type SessionAction } from '../tasks/session-manager'
+import { listRunningSessions, getAgentSession, getLatestAgentSession, abortSession, type SessionAction } from '../tasks/session-manager'
 import { subscribe as subscribeSession } from '../tasks/session-broker'
 
 // /agents/sessions — read + stream endpoints for session reconciliation (N3/N8).
@@ -127,6 +127,19 @@ export async function handleSessionRoutes(req: Request, url: URL): Promise<Respo
         'X-Accel-Buffering': 'no',
       },
     })
+  }
+
+  // POST /agents/sessions/<id>/abort — F-MCP-T3 abort externo
+  const abortMatch = path.match(/^\/agents\/sessions\/([^/]+)\/abort$/)
+  if (abortMatch && req.method === 'POST') {
+    const [, id] = abortMatch
+    const session = await getAgentSession(id)
+    if (!session) return jsonResponse({ error: 'Session not found' }, 404)
+    if (session.completedAt || session.phase === 'done' || session.phase === 'error') {
+      return jsonResponse({ aborted: false, reason: 'session ja terminou', phase: session.phase }, 200)
+    }
+    const result = abortSession(id)
+    return jsonResponse({ ...result, sessionId: id }, result.aborted ? 200 : 409)
   }
 
   // /agents/sessions/<id>

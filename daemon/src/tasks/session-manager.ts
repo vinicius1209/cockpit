@@ -320,6 +320,35 @@ export async function finishAgentSession(
   getDB().query(`UPDATE sessions SET ${sets.join(', ')} WHERE id = ?`).run(...values)
 }
 
+// ── Session abort registry (F-MCP-T3) ──
+//
+// runImplementation registra uma funcao de abort por sessionId. O endpoint
+// POST /agents/sessions/<id>/abort lookup + chama. Se nao registrado (ja
+// terminou ou daemon reiniciou), abort e no-op idempotente.
+const abortRegistry = new Map<string, () => void>()
+
+export function registerSessionAbort(sessionId: string, fn: () => void): void {
+  abortRegistry.set(sessionId, fn)
+}
+
+export function unregisterSessionAbort(sessionId: string): void {
+  abortRegistry.delete(sessionId)
+}
+
+export function abortSession(sessionId: string): { aborted: boolean; reason: string } {
+  const fn = abortRegistry.get(sessionId)
+  if (!fn) {
+    return { aborted: false, reason: 'session nao esta sendo executada por este daemon (ja terminou ou daemon reiniciou)' }
+  }
+  try {
+    fn()
+    abortRegistry.delete(sessionId)
+    return { aborted: true, reason: 'abort signal enviado' }
+  } catch (err) {
+    return { aborted: false, reason: `falha ao abortar: ${(err as Error).message}` }
+  }
+}
+
 // Reaper — marca como timeout sessions running ha mais de `staleAfterMin`
 // minutos sem updated_at. Chamado periodicamente pelo runtime do daemon.
 // Retorna o numero de sessions limpas.

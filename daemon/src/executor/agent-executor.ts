@@ -440,6 +440,7 @@ export async function executeAgent(request: AgentExecRequest): Promise<AgentExec
 export async function executeAgentWithCallbacks(
   request: AgentExecRequest,
   onChunk: (text: string) => void,
+  signal?: AbortSignal,
 ): Promise<AgentExecResult> {
   const agentDef = KNOWN_AGENTS.find((a) => a.name === request.agent)
   if (!agentDef) {
@@ -467,12 +468,23 @@ export async function executeAgentWithCallbacks(
       env: { ...process.env, NO_COLOR: '1' },
     })
 
+    // F-MCP-T3 — abort externo (via cockpit_abort_session): mata o processo
+    // do agent. O codigo abaixo trata exitCode=143 (SIGTERM) como abort sinal.
+    const onAbort = () => {
+      try { proc?.kill() } catch { /* ignore */ }
+    }
+    if (signal) {
+      if (signal.aborted) onAbort()
+      else signal.addEventListener('abort', onAbort, { once: true })
+    }
+
     if (usePipe && proc.stdin) {
       try {
         await writePromptToStdin(proc.stdin, request.prompt)
       } catch (err) {
         proc.kill()
         const msg = err instanceof Error ? err.message : String(err)
+        if (signal) signal.removeEventListener('abort', onAbort)
         return { agent: request.agent, output: `Failed to write prompt to stdin: ${msg}`, exitCode: 1, duration: Date.now() - startTime }
       }
     }
