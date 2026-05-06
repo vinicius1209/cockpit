@@ -4,6 +4,7 @@ import { createPR } from '../git/pr-creator'
 import { createSession, updateSession, appendOutput, appendFile, registerSessionAbort, unregisterSessionAbort, type SessionFile } from '../tasks/session-manager'
 import { peekActiveProjectLock, acquireProjectLock, releaseProjectLock, ProjectLockedError } from '../tasks/project-lock'
 import { createWorktree, removeWorktree, type WorktreeInfo } from '../git/worktree-manager'
+import { runHook, formatHookResultLine, type HookContext } from '../hooks/hook-runner'
 
 export interface ImplementConfig {
   cardTitle: string
@@ -399,6 +400,33 @@ export async function runImplementation(
     emit({ phase: 'heartbeat', silenceSeconds })
   }, 5000)
 
+  // 6.5. before_implement hook — gate. Exit != 0 aborta o implement.
+  if (config.workspaceSlug && config.cardId && sessionId) {
+    const baseHookCtx: HookContext = {
+      card_id: config.cardId,
+      session_id: sessionId,
+      workspace_slug: config.workspaceSlug,
+      workspace_name: config.workspaceSlug,  // sem lookup do nome real, usa slug
+      branch: branchName || undefined,
+      project_path: activeProjectPath,
+      agent: agentName,
+    }
+    const before = await runHook('before_implement', baseHookCtx)
+    if (before.ran) {
+      emit({ phase: 'implementing', message: formatHookResultLine('before_implement', before) })
+      if (before.stdout) emit({ phase: 'output', text: before.stdout })
+      if (before.exitCode !== 0) {
+        emit({ phase: 'error', message: `before_implement abortou (exit=${before.exitCode}). Stderr: ${before.stderr.slice(0, 200)}` })
+        await updateSession(config.workspaceSlug, config.cardId, sessionId, {
+          phase: 'error',
+          error: `before_implement abortou (exit=${before.exitCode})`,
+          completedAt: new Date().toISOString(),
+        }).catch(() => {})
+        return
+      }
+    }
+  }
+
   // 7. Execute agent
   try {
     const result = await executeAgentWithCallbacks(
@@ -458,6 +486,24 @@ export async function runImplementation(
       filesModified: number; filesCreated: number; filesDeleted: number; branch: string | null; prUrl?: string; prNumber?: number
     }
 
+    // Hook after_implement — informativo (nao para fluxo). Roda antes de PR.
+    if (config.workspaceSlug && config.cardId && sessionId && result.exitCode === 0) {
+      const after = await runHook('after_implement', {
+        card_id: config.cardId,
+        session_id: sessionId,
+        workspace_slug: config.workspaceSlug,
+        workspace_name: config.workspaceSlug,
+        branch: branchName || undefined,
+        project_path: activeProjectPath,
+        agent: agentName,
+        summary_json: JSON.stringify(summary),
+      })
+      if (after.ran) {
+        emit({ phase: 'implementing', message: formatHookResultLine('after_implement', after) })
+        if (after.stdout) emit({ phase: 'output', text: after.stdout })
+      }
+    }
+
     // Auto-PR: create draft PR if enabled and implementation succeeded
     if (config.autoPR && branchName && result.exitCode === 0) {
       emit({ phase: 'creating-pr', message: 'Criando Pull Request...' })
@@ -484,6 +530,26 @@ export async function runImplementation(
             await updateCardPrUrl(config.cardId, pr.url)
           } catch (e) {
             console.warn('[implement] falha ao salvar pr_url no card:', e)
+          }
+        }
+
+        // Hook after_pr — informativo. Slack notify, deploy preview, etc.
+        if (config.workspaceSlug && config.cardId && sessionId) {
+          const afterPr = await runHook('after_pr', {
+            card_id: config.cardId,
+            session_id: sessionId,
+            workspace_slug: config.workspaceSlug,
+            workspace_name: config.workspaceSlug,
+            branch: branchName || undefined,
+            project_path: activeProjectPath,
+            agent: agentName,
+            pr_url: pr.url,
+            pr_number: String(pr.number),
+            summary_json: JSON.stringify(summary),
+          })
+          if (afterPr.ran) {
+            emit({ phase: 'creating-pr', message: formatHookResultLine('after_pr', afterPr) })
+            if (afterPr.stdout) emit({ phase: 'output', text: afterPr.stdout })
           }
         }
       } catch (prErr) {

@@ -13,12 +13,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Trash2, Plus, X, FolderOpen, Search, Loader2, CheckCircle2, AlertCircle, GitBranch, GitPullRequest, FileCode, Bot, Wand2, Settings, Tag, Columns3 } from 'lucide-react'
+import { ArrowLeft, Trash2, Plus, X, FolderOpen, Search, Loader2, CheckCircle2, AlertCircle, GitBranch, GitPullRequest, FileCode, Bot, Wand2, Settings, Tag, Columns3, Terminal } from 'lucide-react'
 import { AUTOMATION_ACTION_LABELS } from '@/entities/card/types'
 import { daemonClient } from '@/shared/lib/daemon-client'
 import type { InstalledAgent, ScanResult } from '@/entities/card/project-types'
 import { toast } from 'sonner'
 import { AgentsSettingsPanel } from '@/features/workspace-mgmt/agents-settings-panel'
+import { HooksPanel } from '@/features/workspace-mgmt/hooks-panel'
 import { InfoHint } from '@/components/ui/info-hint'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#06b6d4', '#f97316']
@@ -313,6 +314,11 @@ export function WorkspaceSettingsPage() {
             <span className="mr-1.5 text-muted-foreground tabular-nums">[4]</span>
             <Columns3 className="h-3 w-3 mr-1" />
             Board
+          </TabsTrigger>
+          <TabsTrigger value="hooks">
+            <span className="mr-1.5 text-muted-foreground tabular-nums">[5]</span>
+            <Terminal className="h-3 w-3 mr-1" />
+            Hooks
           </TabsTrigger>
         </TabsList>
 
@@ -748,6 +754,14 @@ export function WorkspaceSettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ─── HOOKS — shell scripts plugados no ciclo de implementacao ─── */}
+        <TabsContent value="hooks" className="space-y-4">
+          <HooksPanel
+            workspace={workspace}
+            onSave={(hooks) => updateWorkspace(workspace.id, { hooks })}
+          />
         </TabsContent>
       </Tabs>
     </div>
