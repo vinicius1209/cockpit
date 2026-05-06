@@ -632,7 +632,7 @@ async function toolSetActiveWorkspace(args: { workspace: string }): Promise<unkn
 }
 
 async function toolAbortSession(args: { session_id: string }): Promise<unknown> {
-  const res = await fetch(`${DAEMON_HINT}/agents/sessions/${args.session_id}/abort`, {
+  const res = await fetch(`${daemonHint()}/agents/sessions/${args.session_id}/abort`, {
     method: 'POST',
   })
   const data = await res.json().catch(() => null) as Record<string, unknown> | null
@@ -1001,7 +1001,7 @@ async function toolImplementAsync(args: ImplementAsyncArgs): Promise<unknown> {
     project: project.name,
     follow_up: {
       poll: `cockpit_get_session({ session_id: "${res.sessionId}" })`,
-      sse: `${DAEMON_HINT}/agents/sessions/${res.sessionId}/stream`,
+      sse: `${daemonHint()}/agents/sessions/${res.sessionId}/stream`,
     },
   }
 }
@@ -1036,7 +1036,11 @@ async function toolGetSession(args: { session_id: string; tail_chunks?: number }
   }
 }
 
-const DAEMON_HINT = process.env.COCKPIT_DAEMON_URL || 'http://127.0.0.1:4800'
+// Resolve daemon URL lazy (cada call) pra permitir que testes sobrescrevam
+// COCKPIT_DAEMON_URL via beforeAll. Capturar no load congela o valor.
+function daemonHint(): string {
+  return process.env.COCKPIT_DAEMON_URL || 'http://127.0.0.1:4800'
+}
 
 function extractExcerpt(text: string, q: string, ctx = 60): string {
   const lower = text.toLowerCase()

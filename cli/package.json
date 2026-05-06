@@ -11,7 +11,9 @@
   "scripts": {
     "dev": "bun run src/index.ts",
     "build": "bun build src/index.ts --compile --outfile=dist/cockpit",
-    "link": "bun link"
+    "link": "bun link",
+    "test": "bun test src/__tests__/",
+    "test:watch": "bun test --watch src/__tests__/"
   },
   "dependencies": {},
   "devDependencies": {

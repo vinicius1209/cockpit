@@ -9,7 +9,9 @@
   },
   "scripts": {
     "dev": "bun run src/index.ts",
-    "build": "bun build src/index.ts --compile --outfile=dist/cockpit-mcp"
+    "build": "bun build src/index.ts --compile --outfile=dist/cockpit-mcp",
+    "test": "bun test src/__tests__/",
+    "test:watch": "bun test --watch src/__tests__/"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4"

@@ -1,9 +1,13 @@
 // HTTP client minimo para o daemon. Reutiliza mesma URL que o CLI usa.
 
-const DAEMON_URL = process.env.COCKPIT_DAEMON_URL || 'http://127.0.0.1:4800'
+// Resolve URL no momento da chamada (nao no load) — permite testes
+// sobrescreverem COCKPIT_DAEMON_URL via beforeAll.
+export function getDaemonUrl(): string {
+  return process.env.COCKPIT_DAEMON_URL || 'http://127.0.0.1:4800'
+}
 
 export async function daemonGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${DAEMON_URL}${path}`)
+  const res = await fetch(`${getDaemonUrl()}${path}`)
   if (!res.ok) throw new Error(`daemon ${res.status}: ${res.statusText}`)
   return res.json() as Promise<T>
 }
@@ -34,7 +38,7 @@ export class ProjectLockedError extends Error {
 }
 
 export async function daemonPost<T>(path: string, body: unknown): Promise<T> {
-  const res = await fetch(`${DAEMON_URL}${path}`, {
+  const res = await fetch(`${getDaemonUrl()}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
