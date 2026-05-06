@@ -234,6 +234,7 @@ CLI cockpit (Bun standalone)       ──HTTP──▶
 - **Tests**: `bun test src/__tests__/` em cada package (cli, mcp, daemon, frontend usa vitest). Total v0.5.0: 175 tests.
 - **Spec gen async** (`daemon/src/spec/spec-runner.ts`): `startSpecGenAsync({cardId, workspaceSlug, projectPath?})` — cria session 'spec', spawna agent com cwd=projectPath (Read/Glob real do codigo), persiste chunks, ao final salva `card.spec_content` direto no kv_stores. Endpoint: `POST /agents/spec/async`. MCP: `cockpit_spec_gen_async`.
 - **Hooks** (`daemon/src/hooks/hook-runner.ts`): `runHook(name, ctx)` carrega script do workspace.hooks no kv_stores e executa em `/bin/sh -c` com env vars. Integrado em `runImplementation` em 3 pontos: `before_implement` (gate, exit != 0 aborta), `after_implement` (apos agent, antes do PR), `after_pr` (apos PR criado). UI em workspace settings tab Hooks.
+- **Atomic kv_stores writes** (`daemon/src/persistence/atomic-store.ts`): TODO write em store passa por `atomicMutate(name, mutator)` (BEGIN IMMEDIATE transaction) ou `writeStoreIfVersion(name, data, expectedVersion)` (optimistic locking via 409). Migration v5 adicionou kv_stores.version. CLI/MCP retry auto em 409 (5 tentativas, backoff). Frontend ainda em compat mode (force-write); v0.8 migrara.
 - **Agent execution**: `daemon/src/executor/agent-executor.ts` — abstrai
   CLI agents (claude-code, opencode, gemini-cli) com `KNOWN_AGENTS` registry.
   - **claude-code precisa de `--permission-mode bypassPermissions`** em modo

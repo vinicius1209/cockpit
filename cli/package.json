@@ -1,6 +1,6 @@
 {
   "name": "cockpit-cli",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Cockpit CLI — orchestrate workspaces, cards and agents from your terminal",
   "type": "module",
   "private": true,

@@ -2,6 +2,72 @@
 
 Todas as mudanças notáveis do Cockpit. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.7.0] — 2026-05-06
+
+Foco: **`cockpit doctor` virou observabilidade séria** + **fix C1 do code review (Lost Update)** — release de hardening, sem novas features de produto.
+
+### Fixed — C1: Lost Update em todas as escritas do `kv_stores` 🔴
+
+**Bug crítico identificado em code review.** 4 callsites faziam SELECT → JSON.parse → mutate → INSERT OR REPLACE sem proteção. Dois writes concorrentes ao mesmo store → segundo sobrescrevia o primeiro silenciosamente.
+
+Solução em 2 camadas:
+
+1. **`atomicMutate<T>(name, mutator)`** — `daemon/src/persistence/atomic-store.ts`. Usa `db.transaction(BEGIN IMMEDIATE)` pra serializar writes do mesmo store. Usado por todo código daemon-internal.
+2. **Optimistic locking** — `writeStoreIfVersion(name, data, expectedVersion)`. Cliente envia o `version` recebido no GET; mismatch retorna `409 version_conflict` com snapshot atual. Cliente refetch + retry.
+
+Migration v5: `ALTER TABLE kv_stores ADD COLUMN version INTEGER NOT NULL DEFAULT 1`.
+
+Retrofit:
+- `daemon/updateCardPrUrl` e `daemon/updateCardSpecContent` → `atomicMutate`
+- `mcp/patchCardsStore` → GET com version, POST com mesmo, retry auto em 409 (max 5, exponential backoff)
+- `cli/readAndPatch` → idem MCP, usa `DaemonError.status === 409`
+- HTTP `POST /api/data/:store` aceita `version` opcional. Sem version → force-write (compat backward com Zustand persist do frontend; documentado pra migrar em v0.8)
+
+Bug pré-existente também corrigido: `mcp daemonPost` consumia body 2x em 409 path → ReadableStream locked. Agora lê uma vez como text + parse defensivo.
+
+Tests (`daemon/src/__tests__/atomic-store.test.ts`, 11 novos):
+- `Promise.all` de 50 mutates incrementa todos sem perda (regressão direta do C1)
+- Mutates concorrentes em campos diferentes preservam todos
+- Optimistic locking: ok, stale, force=-1, concorrência (1 success / N-1 conflicts)
+
+Total daemon: 90 tests (era 79). Total Cockpit: **186 tests**.
+
+### Added — `cockpit doctor` expandido (5 checks novos + severidade + JSON)
+
+Refactor com Issue model (`severity: critical/warning/info`, `fix?` opcional). Output agrupa por severidade.
+
+Novos endpoints daemon (`daemon/src/routes/maintenance.ts`):
+- `GET /maintenance/worktrees?projectPath=` — lista worktrees em `<proj>.cockpit-worktrees/` marcando órfãos. Retorna `sizeBytes`.
+- `POST /maintenance/cleanup-worktrees` — remove dirs órfãos
+- `GET /system/info` — version source, paths e sizes recursivos de `~/.cockpit/{data,tasks,logs}` (cap 10k entries)
+
+5 checks novos:
+1. **Daemon version drift** — daemon rodando ≠ source code (após git pull sem restart). Fix: `cockpit daemon restart`
+2. **Worktrees abandonados** — soma órfãos de todos projects, mostra disk freed. Auto-fix.
+3. **Hooks inválidos** — `sh -n` parse-only em cada hook. Mostra workspace+hook+erro.
+4. **MCP config drift** — `~/.claude.json` aponta pra path real. Fix manual: `bun run mcp:install`
+5. **Disk usage** — alerta `>1GB` total ou `>500MB` em `~/.cockpit/tasks/`
+
+Modos:
+- `--fix` — executa todos auto-fixes disponíveis
+- `--json` — machine-readable (status: ok/warnings/degraded, issues array)
+
+### Code review — relatório registrado
+
+Triangulação com 3 agentes paralelos (daemon, frontend, CLI/MCP/TUI). Resultados:
+- **6 CRITICAL** — C1 Lost Update FIXED em v0.7. Restantes (C2 path traversal, C3 cli.json races, C4 TUI cleanup, C5 paths in MCP, C6 lock TOCTOU) ficam pra v0.8.
+- **11 IMPORTANT** — EventSource leak, PR badge dedup, proc órfão, prompt injection, etc.
+- **11 MODERATE** — refactor de componentes grandes, type casts, A11y.
+
+### Changed
+
+- Daemon `/health` reporta `version: 0.7.0`
+- `SqliteJsonStore` wrapper agora delega `.update()` pro `atomicMutate`. Removeu cache em memória (era fonte de bugs sutis). `get()` agora lê do DB cada chamada.
+
+### Migration
+
+SQLite migration v5 (auto-aplicada no boot). Stores existentes ganham `version=1` default. Nenhuma quebra pra clientes antigos — força default usa `expectedVersion=-1`.
+
 ## [0.6.0] — 2026-05-06
 
 Foco: **fechar o ciclo MCP** (spec gen via chat) + **extensibilidade via hooks** + **mobile responsive**. Cockpit agora roda end-to-end pelo Claude Code e pode ser usado do celular.
@@ -390,6 +456,7 @@ Primeiro release público. Cockpit deixa de ser "interno" e ganha as três inter
 - MCP `cockpit_implement_async` é fire-and-forget (Claude Code UI não streama chunks live; use `cockpit watch` no terminal pra acompanhar)
 - Sem TUI fullscreen (`cockpit tui` planejado)
 
+[0.7.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.7.0
 [0.6.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.6.0
 [0.5.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.5.0
 [0.4.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.4.0
