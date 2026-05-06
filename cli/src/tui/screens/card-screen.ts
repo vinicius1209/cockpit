@@ -6,8 +6,8 @@ import type { Key } from '../keys'
 import { c } from '../../ui/colors'
 import { padRight, clip } from '../layout'
 import { loadAll } from '../../api/store'
-import { api } from '../../api/client'
-import type { Card, Workspace, AgentSession } from '../../api/client'
+import { api, rawFetch } from '../../api/client'
+import type { Card, Workspace, AgentSession, Project } from '../../api/client'
 
 type Tab = 'details' | 'spec' | 'interview' | 'sessions'
 const TABS: Array<{ id: Tab; label: string; key: string }> = [
@@ -21,10 +21,13 @@ export class CardScreen implements Screen {
   name = 'card'
   private card: Card | null = null
   private ws: Workspace | null = null
+  private project: Project | null = null
   private sessions: AgentSession[] = []
   private tab: Tab = 'details'
   private err: string | null = null
   private scroll = 0
+  /** Mensagem flash apos uma acao (i/s/x) — exibida 3s no rodape */
+  private flash: { text: string; kind: 'ok' | 'err' | 'info'; until: number } | null = null
 
   constructor(private cardId: string, private onChange: () => void | Promise<void>) {}
 
@@ -42,14 +45,36 @@ export class CardScreen implements Screen {
       }
       this.card = card
       this.ws = all.workspaces.find((w) => w.id === card.workspace_id) || null
+      // Resolve projeto: se card tem project_id, esse; senao primeiro do workspace
+      const wsProjects = all.projects.filter((p) => p.workspace_id === card.workspace_id)
+      this.project = card.project_id
+        ? wsProjects.find((p) => p.id === card.project_id) || null
+        : (wsProjects[0] || null)
 
       // Pega sessions do card
       try {
-        const all = await api.listRunningSessions()
-        this.sessions = all.sessions.filter((s) => s.cardId === card.id)
+        const r = await api.listRunningSessions()
+        this.sessions = r.sessions.filter((s) => s.cardId === card.id)
       } catch { this.sessions = [] }
     } catch (err) {
       this.err = (err as Error).message
+    }
+  }
+
+  private setFlash(text: string, kind: 'ok' | 'err' | 'info' = 'info'): void {
+    this.flash = { text, kind, until: Date.now() + 3000 }
+  }
+
+  async tick(): Promise<void> {
+    // Limpa flash expirado e refresh sessions periodico
+    if (this.flash && Date.now() > this.flash.until) {
+      this.flash = null
+    }
+    if (this.sessions.length > 0) {
+      try {
+        const r = await api.listRunningSessions()
+        this.sessions = r.sessions.filter((s) => s.cardId === this.cardId)
+      } catch { /* keep stale */ }
     }
   }
 
@@ -88,25 +113,118 @@ export class CardScreen implements Screen {
 
     if (key.name === 'a' && this.card) {
       // archive/unarchive (sem confirm — TUI atalho power-user)
-      const { archiveCard, unarchiveCard } = await import('../../api/store').then((m) => ({
-        archiveCard: m.updateCard,
-        unarchiveCard: m.updateCard,
-      }))
-      const isArchived = !!this.card.archived_at
-      // updateCard signature: (id, fields)
-      // archived_at is a Card field — type allows it
-      void archiveCard
-      void unarchiveCard
       const { updateCard } = await import('../../api/store')
+      const isArchived = !!this.card.archived_at
       await updateCard(this.card.id, {
         archived_at: isArchived ? null : new Date().toISOString(),
       } as never)
+      this.setFlash(isArchived ? 'reativado' : 'descartado', 'ok')
       await this.refresh()
       await this.onChange()
       return { kind: 'consumed' }
     }
 
+    // ── Actions: i = implement (lock), I (shift+i) = implement worktree ──
+    if ((key.name === 'i') && this.card) {
+      const isolation = key.shift ? 'worktree' : 'lock'
+      await this.runImplement(isolation)
+      return { kind: 'consumed' }
+    }
+
+    // ── s = spec gen async ──
+    if (key.name === 's' && this.card) {
+      await this.runSpecGen()
+      return { kind: 'consumed' }
+    }
+
+    // ── x = abort active session deste card ──
+    if (key.name === 'x' && this.card) {
+      await this.abortActiveSession()
+      return { kind: 'consumed' }
+    }
+
     return { kind: 'consumed' }
+  }
+
+  private async runImplement(isolation: 'lock' | 'worktree'): Promise<void> {
+    if (!this.card || !this.ws) {
+      this.setFlash('card ou workspace nao disponivel', 'err')
+      return
+    }
+    if (!this.card.spec_content) {
+      this.setFlash('card sem spec — pressione s pra gerar', 'err')
+      return
+    }
+    if (!this.project) {
+      this.setFlash('workspace sem projeto vinculado', 'err')
+      return
+    }
+    try {
+      const res = await rawFetch('/agents/implement/async', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cardTitle: this.card.title,
+          cardType: this.card.type,
+          cardId: this.card.id,
+          workspaceSlug: this.ws.slug,
+          spec: this.card.spec_content,
+          interviewNotes: this.card.interview_notes || undefined,
+          projectPath: this.project.path,
+          createBranch: true,
+          autoPR: false,  // TUI defaulta sem PR — usuario aciona pelo Web UI
+          attempt: 1,
+          isolation,
+        }),
+      })
+      if (res.status === 409) {
+        const data = await res.json().catch(() => null) as { held_by?: { card_id?: string } } | null
+        const cardId = data?.held_by?.card_id
+        this.setFlash(`projeto ja em uso${cardId ? ' por #' + cardId.slice(-4).toUpperCase() : ''} — tente --isolation worktree (Shift+I)`, 'err')
+        return
+      }
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        this.setFlash(`falha (${res.status}): ${text.slice(0, 50)}`, 'err')
+        return
+      }
+      const data = await res.json() as { sessionId: string }
+      this.setFlash(`session ${data.sessionId.slice(-6)} iniciada (${isolation})`, 'ok')
+      await this.refresh()
+    } catch (err) {
+      this.setFlash(`erro: ${(err as Error).message.slice(0, 50)}`, 'err')
+    }
+  }
+
+  private async runSpecGen(): Promise<void> {
+    if (!this.card || !this.ws) {
+      this.setFlash('card/ws nao disponivel', 'err')
+      return
+    }
+    // Endpoint: o daemon tem agents/spec ou similar. Vou usar rawFetch
+    // direto pra /agents/run com action=spec se existir, senao mensagem.
+    // Por enquanto: mensagem de hint pro usuario.
+    this.setFlash('use cockpit spec gen ' + this.card.id.slice(-4).toUpperCase() + ' (TUI vai expor em breve)', 'info')
+  }
+
+  private async abortActiveSession(): Promise<void> {
+    if (this.sessions.length === 0) {
+      this.setFlash('nenhuma session ativa pra abortar', 'info')
+      return
+    }
+    const session = this.sessions[0]  // primeira ativa
+    try {
+      const res = await rawFetch(`/agents/sessions/${session.id}/abort`, { method: 'POST' })
+      if (res.ok) {
+        this.setFlash(`session ${session.id.slice(-6)} abortada`, 'ok')
+        await this.refresh()
+      } else {
+        const text = await res.text().catch(() => '')
+        this.setFlash(`abort falhou: ${text.slice(0, 50)}`, 'err')
+      }
+    } catch (err) {
+      this.setFlash(`erro: ${(err as Error).message.slice(0, 50)}`, 'err')
+    }
   }
 
   render(width: number, height: number): string {
@@ -142,9 +260,19 @@ export class CardScreen implements Screen {
     const visible = body.slice(this.scroll, this.scroll + (height - 8))
     for (const l of visible) lines.push('  ' + l)
 
+    // Flash (1 linha acima do footer)
+    while (lines.length < height - 2) lines.push('')
+    if (this.flash && Date.now() < this.flash.until) {
+      const colorize = this.flash.kind === 'ok' ? c.emerald : this.flash.kind === 'err' ? c.rose : c.amber
+      lines[height - 2] = clip(`  ${colorize('●')} ${this.flash.text}`, width - 1)
+    } else {
+      lines[height - 2] = ''
+    }
+
     // Footer
-    while (lines.length < height - 1) lines.push('')
-    const footer = `${c.dim('1/2/3/4')} tab · ${c.dim('↑/↓')} scroll · ${c.dim('a')} ${card.archived_at ? 'reativar' : 'descartar'} · ${c.dim('r')} refresh · ${c.dim('esc')} voltar`
+    const isLive = this.sessions.length > 0
+    const liveTag = isLive ? c.amber('● live · ') : ''
+    const footer = `${liveTag}${c.dim('1/2/3/4')} tab · ${c.dim('↑/↓')} scroll · ${c.dim('i')} implementar · ${c.dim('I')} worktree · ${c.dim('s')} spec · ${c.dim('a')} ${card.archived_at ? 'reativar' : 'descartar'} · ${c.dim('x')} abortar · ${c.dim('r')} refresh · ${c.dim('esc')} voltar`
     lines[height - 1] = clip(' ' + footer, width - 1)
 
     return lines.join('\n')

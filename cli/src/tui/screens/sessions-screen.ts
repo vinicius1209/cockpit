@@ -5,7 +5,7 @@ import type { Screen, KeyResult } from '../engine'
 import type { Key } from '../keys'
 import { c } from '../../ui/colors'
 import { padRight, clip } from '../layout'
-import { api } from '../../api/client'
+import { api, rawFetch } from '../../api/client'
 import type { AgentSession, Card } from '../../api/client'
 import { loadAll } from '../../api/store'
 import { SessionTailScreen } from './session-tail-screen'
@@ -68,6 +68,16 @@ export class SessionsScreen implements Screen {
         return { kind: 'push', screen: new SessionTailScreen(session.id, session.cardId) }
       }
     }
+    if (key.name === 'x') {
+      const session = this.sessions[this.selected]
+      if (session) {
+        try {
+          await rawFetch(`/agents/sessions/${session.id}/abort`, { method: 'POST' })
+          await this.refresh()
+        } catch { /* ignore */ }
+      }
+      return { kind: 'consumed' }
+    }
     return { kind: 'consumed' }
   }
 
@@ -109,7 +119,7 @@ export class SessionsScreen implements Screen {
     }
 
     while (lines.length < height - 1) lines.push('')
-    const footer = `${c.dim('↑/↓')} navegar · ${c.dim('enter')} live tail · ${c.dim('r')} refresh · ${c.dim('tab/esc')} voltar pro board · ${c.dim('q')} sair`
+    const footer = `${c.dim('↑/↓')} navegar · ${c.dim('enter')} live tail · ${c.dim('x')} abortar · ${c.dim('r')} refresh · ${c.dim('tab/esc')} voltar · ${c.dim('q')} sair`
     lines[height - 1] = clip(' ' + footer, width - 1)
     return lines.join('\n')
   }
