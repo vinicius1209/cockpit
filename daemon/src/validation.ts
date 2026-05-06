@@ -74,6 +74,23 @@ export function sanitizeFilename(name: string): string | null {
 }
 
 /**
+ * Validate a session id — formato gerado por createSession e demais fontes.
+ * Pattern: 'session-<digits>-<base36>' ou 'sess-<digits>-<base36>'.
+ * Rejeita qualquer coisa com slash, dot, espaco, ou control char.
+ *
+ * Critico em paths que usam sessionId pra construir caminho de filesystem
+ * (ex: cleanup-worktrees faz `rm -rf <root>/<sessionId>` — sessionId
+ * malicioso permitiria path traversal).
+ */
+export function validateSessionId(id: string): string | null {
+  if (!id || typeof id !== 'string') return null
+  if (id.length > 128) return null
+  // Apenas alfanumericos e hifens. Cobre 'session-<ts>-<rand>' e variantes.
+  if (!/^[a-zA-Z0-9-]+$/.test(id)) return null
+  return id
+}
+
+/**
  * Validate a data store name against whitelist.
  */
 export function validateStoreName(name: string): string | null {

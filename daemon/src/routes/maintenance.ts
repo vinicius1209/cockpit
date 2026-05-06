@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs'
 import { readdir, rm, stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import { homedir } from 'node:os'
-import { validateProjectPath } from '../validation'
+import { validateProjectPath, validateSessionId } from '../validation'
 
 export async function handleMaintenanceRoutes(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
@@ -95,6 +95,13 @@ export async function handleMaintenanceRoutes(req: Request, url: URL): Promise<R
     let removed = 0
     const errors: string[] = []
     for (const sessionId of entries) {
+      // C2 fix: rejeita qualquer entry com path traversal/special char antes
+      // de construir o path. Linha de defesa contra DB corrompido ou symlinks
+      // injetados em <projectPath>.cockpit-worktrees/.
+      if (!validateSessionId(sessionId)) {
+        errors.push(`${sessionId}: rejeitado por validateSessionId (caracter invalido / path traversal)`)
+        continue
+      }
       if (activeIds.has(sessionId)) continue  // pula vivos
       const wtPath = join(root, sessionId)
       try {

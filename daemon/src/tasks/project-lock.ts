@@ -56,51 +56,82 @@ function rowToInfo(row: LockRow): ProjectLockInfo {
  * Tenta adquirir lock para um projeto. Lanca ProjectLockedError se ja tomado
  * por outra session ATIVA. Locks orfaos (cuja session ja terminou) sao
  * automaticamente liberados antes da tentativa.
+ *
+ * C6 fix — versao atomica via SQLite transaction. Antes era:
+ *   INSERT (fail on UNIQUE) → SELECT → getAgentSession (async!) → DELETE → recursao.
+ * Entre o SELECT e o DELETE, outra request podia adquirir o lock recem-liberado.
+ * Agora: a transacao serializa o caminho de "checa orfao + substitui",
+ * eliminando a janela de race. Sem recursao.
  */
 export async function acquireProjectLock(
   path: string,
   sessionId: string,
   kind: LockKind = 'implement',
 ): Promise<void> {
-  // 1. Tenta INSERT (sucesso → temos o lock)
   const db = getDB()
-  try {
-    db.query(`
-      INSERT INTO project_locks (path, session_id, kind, acquired_at)
-      VALUES (?, ?, ?, datetime('now'))
-    `).run(path, sessionId, kind)
-    return
-  } catch (err) {
-    // PK conflict — alguem ja tem o lock. Verifica se eh orfao.
-    const msg = (err as Error).message
-    if (!msg.includes('UNIQUE') && !msg.includes('constraint')) throw err
+
+  // Loop com max 3 tentativas — cobre o caso raro onde o lock muda de mao
+  // entre o SELECT e o UPDATE (dentro do mesmo attempt) ou entre attempts.
+  // Sem recursao infinita.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    // PASSO 1: le lock atual sob transacao
+    const currentLock: LockRow | null = (
+      db.query('SELECT * FROM project_locks WHERE path = ?').get(path) as LockRow | null
+    )
+
+    if (!currentLock) {
+      // Sem lock — tenta INSERT atomico. UNIQUE constraint resolve race
+      // contra outro acquire concorrente: apenas um INSERT bem-sucedido.
+      try {
+        db.query(`
+          INSERT INTO project_locks (path, session_id, kind, acquired_at)
+          VALUES (?, ?, ?, datetime('now'))
+        `).run(path, sessionId, kind)
+        return  // adquirimos
+      } catch (err) {
+        const msg = (err as Error).message
+        if (!msg.includes('UNIQUE') && !msg.includes('constraint')) throw err
+        // alguem inseriu antes de nos — proxima iteracao do loop le o estado novo
+        continue
+      }
+    }
+
+    // Ha lock. Cheka se holding session ainda esta ativa (await async aqui
+    // — fora da transacao SQLite, intencional pra nao bloquear DB com I/O).
+    const holdingSession = await getAgentSession(currentLock.session_id)
+    const stillActive = holdingSession
+      && !holdingSession.completedAt
+      && holdingSession.phase !== 'done'
+      && holdingSession.phase !== 'error'
+
+    if (stillActive) {
+      // Lock legitimamente held por outro — propaga erro com info rica
+      const info = rowToInfo(currentLock)
+      info.cardId = holdingSession.cardId
+      info.workspaceSlug = holdingSession.workspaceSlug
+      info.agent = holdingSession.agent
+      throw new ProjectLockedError(path, info)
+    }
+
+    // Lock orfao — substitui ATOMICAMENTE em uma unica transacao.
+    // ON CONFLICT garante que se outra request adquiriu nesse meio-tempo,
+    // nao fazemos overwrite cego: apenas substituimos se ainda for o
+    // mesmo orfao. Caso contrario, proxima iteracao re-avalia.
+    const orphanSessionId = currentLock.session_id
+    const replaceResult = db.query(`
+      UPDATE project_locks
+      SET session_id = ?, kind = ?, acquired_at = datetime('now')
+      WHERE path = ? AND session_id = ?
+    `).run(sessionId, kind, path, orphanSessionId) as { changes: number }
+
+    if (replaceResult.changes === 1) {
+      console.warn(`[project-lock] replaced orphan lock on ${path} (was ${orphanSessionId}, now ${sessionId})`)
+      return
+    }
+    // changes=0: alguem adquiriu o lock entre nosso SELECT e UPDATE — re-loop
   }
 
-  // 2. Lock existe — verifica se a session que tomou ainda esta viva
-  const row = db.query('SELECT * FROM project_locks WHERE path = ?').get(path) as LockRow | null
-  if (!row) {
-    // Race rara: lock foi liberado entre o INSERT e o SELECT. Tenta de novo.
-    return acquireProjectLock(path, sessionId, kind)
-  }
-
-  const holdingSession = await getAgentSession(row.session_id)
-  const stillActive = holdingSession
-    && !holdingSession.completedAt
-    && holdingSession.phase !== 'done'
-    && holdingSession.phase !== 'error'
-
-  if (stillActive) {
-    const info = rowToInfo(row)
-    info.cardId = holdingSession.cardId
-    info.workspaceSlug = holdingSession.workspaceSlug
-    info.agent = holdingSession.agent
-    throw new ProjectLockedError(path, info)
-  }
-
-  // 3. Lock orfao — libera e tenta de novo
-  console.warn(`[project-lock] cleaning orphan lock on ${path} (session ${row.session_id} terminated)`)
-  db.query('DELETE FROM project_locks WHERE path = ?').run(path)
-  return acquireProjectLock(path, sessionId, kind)
+  throw new Error(`acquireProjectLock(${path}): max retries exceeded — lock altamente disputado`)
 }
 
 /**

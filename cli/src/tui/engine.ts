@@ -92,6 +92,13 @@ export class TuiEngine {
   private tickInterval: ReturnType<typeof setInterval> | null = null
   private resizeListener: (() => void) | null = null
   private signalListener: (() => void) | null = null
+  // C4 fix — handlers globais pra restaurar terminal mesmo em paths
+  // anomalos (uncaughtException, unhandledRejection, exit normal).
+  // cleanupDone garante idempotencia (nao restaura 2x).
+  private cleanupDone = false
+  private uncaughtHandler: ((err: Error) => void) | null = null
+  private rejectionHandler: ((reason: unknown) => void) | null = null
+  private exitHandler: (() => void) | null = null
 
   constructor(private root: Screen) {}
 
@@ -116,6 +123,33 @@ export class TuiEngine {
     this.signalListener = () => { this.quit = true }
     process.on('SIGINT', this.signalListener)
     process.on('SIGTERM', this.signalListener)
+
+    // C4 fix — fallbacks pra cenarios anomalos onde o for-await loop
+    // nao volta normalmente: exception nao tratada, rejection nao tratada,
+    // ou processo sendo killed (SIGKILL nao captura, mas SIGTERM/exit sim).
+    //
+    // Comportamento: imprime stack-trace e sai com restore do terminal.
+    // Se nao restaurar: usuario fica com terminal em raw mode (sem echo,
+    // alt screen ativo) — irrecuperavel sem `reset`.
+    this.uncaughtHandler = (err: Error) => {
+      this.cleanupSync()
+      // Imprime apos restaurar terminal pra mensagem ser visivel
+      console.error('\n[tui] uncaught exception:', err.message)
+      console.error(err.stack)
+      process.exit(1)
+    }
+    this.rejectionHandler = (reason: unknown) => {
+      this.cleanupSync()
+      console.error('\n[tui] unhandled rejection:', reason)
+      process.exit(1)
+    }
+    // 'exit' handler — last resort. Roda sync, sem async ops possiveis.
+    this.exitHandler = () => {
+      this.cleanupSync()
+    }
+    process.on('uncaughtException', this.uncaughtHandler)
+    process.on('unhandledRejection', this.rejectionHandler)
+    process.on('exit', this.exitHandler)
 
     // Tick a cada 500ms — chamada nas screens pra refreshes leves (ex:
     // re-render counter de chunks ao vivo). Cada screen gerencia se tem
@@ -234,12 +268,19 @@ export class TuiEngine {
   }
 
   private async cleanup(): Promise<void> {
+    if (this.cleanupDone) return
+    this.cleanupDone = true
+
     if (this.tickInterval) clearInterval(this.tickInterval)
     if (this.resizeListener) process.stdout.off('resize', this.resizeListener)
     if (this.signalListener) {
       process.off('SIGINT', this.signalListener)
       process.off('SIGTERM', this.signalListener)
     }
+    if (this.uncaughtHandler) process.off('uncaughtException', this.uncaughtHandler)
+    if (this.rejectionHandler) process.off('unhandledRejection', this.rejectionHandler)
+    if (this.exitHandler) process.off('exit', this.exitHandler)
+
     // Pop all screens (run onLeave handlers)
     while (this.stack.length > 0) {
       const s = this.stack.pop()!
@@ -247,8 +288,31 @@ export class TuiEngine {
         try { await s.onLeave() } catch { /* ignore */ }
       }
     }
-    process.stdout.write(ANSI.showCursor + ANSI.exitAltScreen + ANSI.reset)
-    process.stdin.setRawMode(false)
-    process.stdin.pause()
+    this.restoreTerminal()
+  }
+
+  /**
+   * C4 fix — restoreTerminal sync, sem awaits. Usado por handlers de
+   * uncaughtException, unhandledRejection e 'exit' onde nao podemos
+   * fazer async ops. Idempotente via cleanupDone.
+   */
+  private cleanupSync(): void {
+    if (this.cleanupDone) return
+    this.cleanupDone = true
+    if (this.tickInterval) clearInterval(this.tickInterval)
+    if (this.resizeListener) {
+      try { process.stdout.off('resize', this.resizeListener) } catch { /* ignore */ }
+    }
+    this.restoreTerminal()
+  }
+
+  private restoreTerminal(): void {
+    try {
+      process.stdout.write(ANSI.showCursor + ANSI.exitAltScreen + ANSI.reset)
+    } catch { /* stdout pode estar fechado */ }
+    try {
+      if (process.stdin.isTTY) process.stdin.setRawMode(false)
+    } catch { /* nao TTY ou ja restored */ }
+    try { process.stdin.pause() } catch { /* ignore */ }
   }
 }

@@ -6,6 +6,7 @@ import {
   validateStoreName,
   sanitizeGhUser,
   validatePositiveNumber,
+  validateSessionId,
 } from '../validation'
 import { homedir } from 'node:os'
 
@@ -182,5 +183,40 @@ describe('validatePositiveNumber', () => {
   test('rejects above max', () => {
     expect(validatePositiveNumber(20000)).toBeNull()
     expect(validatePositiveNumber(200, 0.1, 100)).toBeNull()
+  })
+})
+
+// ── validateSessionId (C2 fix — path traversal protection) ──
+
+describe('validateSessionId', () => {
+  test('aceita ids gerados normalmente', () => {
+    expect(validateSessionId('session-1759934567890-sw78')).toBe('session-1759934567890-sw78')
+    expect(validateSessionId('sess-abc123')).toBe('sess-abc123')
+    expect(validateSessionId('SESSION-UPPER-OK')).toBe('SESSION-UPPER-OK')
+  })
+
+  test('REJEITA path traversal', () => {
+    expect(validateSessionId('../etc/passwd')).toBeNull()
+    expect(validateSessionId('..')).toBeNull()
+    expect(validateSessionId('foo/bar')).toBeNull()
+    expect(validateSessionId('foo\\bar')).toBeNull()
+  })
+
+  test('REJEITA caracteres especiais', () => {
+    expect(validateSessionId('foo bar')).toBeNull()  // espaco
+    expect(validateSessionId('foo.bar')).toBeNull()  // ponto
+    expect(validateSessionId('foo\0bar')).toBeNull()  // null byte
+    expect(validateSessionId('foo;rm -rf /')).toBeNull()  // shell injection attempt
+  })
+
+  test('rejeita vazio e tipos errados', () => {
+    expect(validateSessionId('')).toBeNull()
+    expect(validateSessionId(null as unknown as string)).toBeNull()
+    expect(validateSessionId(undefined as unknown as string)).toBeNull()
+  })
+
+  test('rejeita strings excessivamente longas', () => {
+    expect(validateSessionId('a'.repeat(129))).toBeNull()
+    expect(validateSessionId('a'.repeat(128))).toBe('a'.repeat(128))  // exato 128 ok
   })
 })

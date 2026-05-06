@@ -2,7 +2,7 @@
 // proprios — duplicacao consciente porque cada package tem sua versao.
 
 import { describe, test, expect } from 'bun:test'
-import { shortId, resolveCard, resolveWorkspace, newCardId, ProjectLockedError } from '../api'
+import { shortId, resolveCard, resolveWorkspace, newCardId, ProjectLockedError, redactPath } from '../api'
 import type { Card, Workspace } from '../api'
 
 const baseCard = {
@@ -134,5 +134,45 @@ describe('ProjectLockedError', () => {
   test('hints default vazio', () => {
     const err = new ProjectLockedError('/tmp', { session_id: 'x', acquired_at: '' })
     expect(err.hints).toEqual([])
+  })
+})
+
+describe('redactPath (C5 fix — homedir privacy)', () => {
+  test('redact macOS /Users/<user>/', () => {
+    expect(redactPath('/Users/vinicius1209/projetos/foo')).toBe('~/projetos/foo')
+    expect(redactPath('/Users/joao.silva/code/bar')).toBe('~/code/bar')
+  })
+
+  test('redact Linux /home/<user>/', () => {
+    expect(redactPath('/home/vinicius/projetos/foo')).toBe('~/projetos/foo')
+    expect(redactPath('/home/dev01/code')).toBe('~/code')
+  })
+
+  test('paths fora do homedir nao sao alterados', () => {
+    expect(redactPath('/tmp/foo')).toBe('/tmp/foo')
+    expect(redactPath('/opt/cockpit')).toBe('/opt/cockpit')
+    expect(redactPath('/var/log/something')).toBe('/var/log/something')
+  })
+
+  test('path ja redacted (~/) nao quebra', () => {
+    expect(redactPath('~/projetos/foo')).toBe('~/projetos/foo')
+  })
+
+  test('null/undefined retorna null', () => {
+    expect(redactPath(null)).toBeNull()
+    expect(redactPath(undefined)).toBeNull()
+    expect(redactPath('')).toBeNull()
+  })
+
+  test('trunca paths >200 chars', () => {
+    const long = '/Users/x/' + 'a'.repeat(300)
+    const out = redactPath(long)!
+    expect(out.length).toBeLessThanOrEqual(200)
+    expect(out.endsWith('...')).toBe(true)
+  })
+
+  test('path com multiplos /Users/ apenas redacta o primeiro', () => {
+    // edge case raro mas vale validar
+    expect(redactPath('/Users/me/project/Users/other/sub')).toBe('~/project/Users/other/sub')
   })
 })

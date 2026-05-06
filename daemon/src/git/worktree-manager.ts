@@ -117,6 +117,11 @@ export async function removeWorktree(
   sessionId: string,
   opts: { forceRemove?: boolean } = {},
 ): Promise<void> {
+  // C2 fix: nunca aceitar sessionId com path traversal. Mesmo se chamado
+  // com input do DB, validamos antes de construir o path (defense-in-depth).
+  if (!/^[a-zA-Z0-9-]+$/.test(sessionId) || sessionId.length > 128) {
+    throw new Error(`sessionId invalido (path traversal protection): ${sessionId.slice(0, 50)}`)
+  }
   const wtPath = worktreePath(projectPath, sessionId)
   if (!existsSync(wtPath)) return
 

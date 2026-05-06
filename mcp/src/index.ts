@@ -30,7 +30,7 @@ import {
 import {
   loadWorkspaces, loadCards, loadColumns, loadProjects,
   patchCardsStore, daemonGet, daemonPost,
-  resolveCard, resolveWorkspace, shortId, newCardId,
+  resolveCard, resolveWorkspace, shortId, newCardId, redactPath,
   ProjectLockedError,
   type AgentSession,
 } from './api'
@@ -477,7 +477,7 @@ async function toolShowCard(args: { card_id: string }): Promise<unknown> {
     interview_notes: card.interview_notes,
     workspace: { name: ws?.name, slug: ws?.slug },
     column: col?.slug,
-    project: project ? { name: project.name, path: project.path } : null,
+    project: project ? { name: project.name, path: redactPath(project.path) } : null,
     assignee: card.assignee,
     due_date: card.due_date,
     created_at: card.created_at,
@@ -632,17 +632,28 @@ async function toolSetActiveWorkspace(args: { workspace: string }): Promise<unkn
     throw new Error(`workspace nao encontrado: ${args.workspace}. Disponiveis: ${workspaces.map((w) => w.slug).join(', ')}`)
   }
 
-  // Escreve em ~/.cockpit/cli.json (mesmo arquivo que o CLI usa)
+  // C3 fix — escreve atomic via write-to-temp + rename. CLI tambem escreve
+  // neste arquivo; sem o atomic, escritas concorrentes corrompiam o JSON.
   const { homedir } = await import('node:os')
-  const { join } = await import('node:path')
-  const { existsSync, readFileSync } = await import('node:fs')
+  const { join, dirname } = await import('node:path')
+  const fs = await import('node:fs')
   const file = join(homedir(), '.cockpit', 'cli.json')
   let cur: Record<string, unknown> = {}
-  if (existsSync(file)) {
-    try { cur = JSON.parse(readFileSync(file, 'utf-8')) } catch { cur = {} }
+  if (fs.existsSync(file)) {
+    try { cur = JSON.parse(fs.readFileSync(file, 'utf-8')) } catch { cur = {} }
   }
   cur.activeWorkspaceSlug = ws.slug
-  await Bun.write(file, JSON.stringify(cur, null, 2))
+
+  const dir = dirname(file)
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
+  const tmp = `${file}.tmp.${process.pid}.${Date.now()}.${Math.random().toString(36).slice(2, 7)}`
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(cur, null, 2), 'utf-8')
+    fs.renameSync(tmp, file)
+  } catch (err) {
+    try { fs.unlinkSync(tmp) } catch { /* ignore */ }
+    throw err
+  }
 
   return {
     active_workspace: { slug: ws.slug, name: ws.name },
@@ -743,7 +754,7 @@ async function toolListProjects(args: { workspace?: string }): Promise<unknown> 
     return {
       id: p.id,
       name: p.name,
-      path: p.path,
+      path: redactPath(p.path),
       auto_pr: p.auto_pr ?? false,
       workspace: ws ? { slug: ws.slug, name: ws.name } : null,
     }
@@ -833,7 +844,7 @@ async function toolLinkProject(args: LinkProjectArgs): Promise<unknown> {
     id,
     workspace: ws.slug,
     name: project.name,
-    path: project.path,
+    path: redactPath(project.path),
     auto_pr: project.auto_pr,
   }
 }
@@ -863,7 +874,7 @@ async function toolSetCardProject(args: { card_id: string; project_id: string })
 
   return {
     id: shortId(card.id),
-    project: project ? { id: project.id, name: project.name, path: project.path } : null,
+    project: project ? { id: project.id, name: project.name, path: redactPath(project.path) } : null,
     unlinked: !project,
   }
 }

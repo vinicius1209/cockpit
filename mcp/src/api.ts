@@ -207,6 +207,32 @@ export async function patchCardsStore<T extends { cards: Card[] }>(
 
 // ── Helpers ──
 
+/**
+ * C5 fix — redact paths absolutos antes de retornar ao LLM.
+ * Substitui /Users/<user>/ por ~/, /home/<user>/ por ~/.
+ * Tambem trunca paths muito longos (rare mas defensivo).
+ *
+ * Por que: tools como cockpit_show_card, list_projects, link_project
+ * antes retornavam paths brutos tipo /Users/vinicius1209/projetos/foo —
+ * LLM podia logar isso em respostas, training data, etc, vazando
+ * homedir e estrutura de pastas pessoais.
+ *
+ * Mantemos path absoluto INTERNAMENTE quando precisamos passar pra
+ * implementacoes (link_project, implement_async). Aqui soh sanitizamos
+ * o que sai pro lado do cliente MCP.
+ */
+export function redactPath(path: string | null | undefined): string | null {
+  if (!path) return null
+  if (typeof path !== 'string') return null
+  // Mac: /Users/<user>/ → ~/
+  let out = path.replace(/^\/Users\/[^/]+\//, '~/')
+  // Linux: /home/<user>/ → ~/
+  out = out.replace(/^\/home\/[^/]+\//, '~/')
+  // Trunca paths absurdamente longos
+  if (out.length > 200) out = out.slice(0, 197) + '...'
+  return out
+}
+
 export function shortId(id: string): string {
   return id.replace(/[^a-z0-9]/gi, '').slice(-4).toUpperCase()
 }
