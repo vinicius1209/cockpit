@@ -205,6 +205,62 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
+      name: 'cockpit_create_workspace',
+      description:
+        'Cria um workspace novo. Use quando o usuario fala "novo workspace pra X" ou quer organizar trabalho de um cliente/projeto novo. ' +
+        'Workspaces sao a unidade de organizacao topo: agrupam cards + projetos + colunas/automacoes proprias.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Nome humano (ex: "Cliente XPTO", "Side projects")' },
+          slug: { type: 'string', description: 'Slug curto, lowercase, sem espacos. Default: derivado do nome.' },
+          description: { type: 'string', description: 'Descricao opcional (1 linha)' },
+          color: { type: 'string', description: 'Cor hex (ex: #3b82f6). Default: azul.' },
+        },
+        required: ['name'],
+      },
+    },
+    {
+      name: 'cockpit_list_projects',
+      description: 'Lista projetos vinculados a um ou todos workspaces. Util pra ver onde os cards podem rodar implementacoes.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspace: { type: 'string', description: 'Workspace slug ou nome (opcional — sem filter mostra todos)' },
+        },
+      },
+    },
+    {
+      name: 'cockpit_link_project',
+      description:
+        'Vincula um diretorio local como projeto a um workspace. Path deve existir. Use quando usuario fala ' +
+        '"vincula o projeto /path ao workspace X" ou "esse repo aqui em /Users/.../foo agora roda no workspace X".',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          workspace: { type: 'string', description: 'Workspace slug ou nome (default: workspace ativo)' },
+          name: { type: 'string', description: 'Nome do projeto (default: basename do path)' },
+          path: { type: 'string', description: 'Path absoluto do diretorio local (precisa existir)' },
+          auto_pr: { type: 'boolean', description: 'Cria PR automatico ao final do implement (precisa de gh autenticado)', default: false },
+        },
+        required: ['path'],
+      },
+    },
+    {
+      name: 'cockpit_set_card_project',
+      description:
+        'Atribui um projeto especifico a um card. Use quando o workspace tem N projetos e voce quer garantir que ' +
+        'o card vai implementar no projeto certo (em vez de pegar o primeiro). Passe project_id="" pra desvincular.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          card_id: { type: 'string' },
+          project_id: { type: 'string', description: 'ID do projeto. Use lista_projects pra descobrir. "" desvincula.' },
+        },
+        required: ['card_id', 'project_id'],
+      },
+    },
+    {
       name: 'cockpit_set_active_workspace',
       description:
         'Muda o workspace ativo (compartilhado entre CLI e MCP via ~/.cockpit/cli.json). ' +
@@ -269,6 +325,10 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'cockpit_search':       return ok(await toolSearch(args as { query: string; in?: string; limit?: number }))
       case 'cockpit_metrics':      return ok(await toolMetrics())
       case 'cockpit_edit_card':    return ok(await toolEditCard(args as unknown as EditCardArgs))
+      case 'cockpit_create_workspace': return ok(await toolCreateWorkspace(args as unknown as CreateWorkspaceArgs))
+      case 'cockpit_list_projects': return ok(await toolListProjects(args as { workspace?: string }))
+      case 'cockpit_link_project':  return ok(await toolLinkProject(args as unknown as LinkProjectArgs))
+      case 'cockpit_set_card_project': return ok(await toolSetCardProject(args as { card_id: string; project_id: string }))
       case 'cockpit_set_active_workspace': return ok(await toolSetActiveWorkspace(args as { workspace: string }))
       case 'cockpit_abort_session':  return ok(await toolAbortSession(args as { session_id: string }))
       case 'cockpit_implement_async': return ok(await toolImplementAsync(args as unknown as ImplementAsyncArgs))
@@ -580,6 +640,207 @@ async function toolAbortSession(args: { session_id: string }): Promise<unknown> 
     aborted: data?.aborted ?? false,
     reason: data?.reason ?? (res.ok ? 'ok' : 'falha'),
     phase: data?.phase,
+  }
+}
+
+// ── Workspace / Project bootstrap (Tier 4) ──
+
+interface CreateWorkspaceArgs {
+  name: string
+  slug?: string
+  description?: string
+  color?: string
+}
+
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFKD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40) || 'workspace'
+}
+
+async function toolCreateWorkspace(args: CreateWorkspaceArgs): Promise<unknown> {
+  const workspaces = await loadWorkspaces()
+  const slug = args.slug ? slugify(args.slug) : slugify(args.name)
+  if (workspaces.some((w) => w.slug === slug)) {
+    throw new Error(`workspace com slug "${slug}" ja existe. Use slug diferente ou cockpit_show_card pra ver os existentes.`)
+  }
+
+  const id = `ws-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
+  const now = new Date().toISOString()
+  const workspace = {
+    id,
+    name: args.name.trim(),
+    slug,
+    description: args.description?.trim() || null,
+    color: args.color || '#3b82f6',
+    icon: null,
+    created_at: now,
+    updated_at: now,
+  }
+
+  // Workspaces store usa um envelope diferente — vamos GET, mutate, POST
+  const env = await daemonGet<{ state?: { workspaces: typeof workspace[] }; version?: number; _ts?: number }>('/api/data/workspaces')
+  const next = {
+    ...env,
+    state: {
+      ...(env?.state || {}),
+      workspaces: [...(env?.state?.workspaces || []), workspace],
+    },
+    _ts: Date.now(),
+  }
+  await daemonPost('/api/data/workspaces', next)
+
+  return {
+    id,
+    slug,
+    name: workspace.name,
+    description: workspace.description,
+    next_steps: [
+      'cockpit_set_active_workspace pra usar este como default',
+      'cockpit_link_project pra vincular um projeto local',
+      'cockpit_create_card pra criar primeiro card aqui',
+    ],
+  }
+}
+
+async function toolListProjects(args: { workspace?: string }): Promise<unknown> {
+  const [workspaces, projects] = await Promise.all([loadWorkspaces(), loadProjects()])
+  let filtered = projects
+  if (args.workspace) {
+    const ws = resolveWorkspace(args.workspace, workspaces)
+    if (!ws) throw new Error(`workspace not found: ${args.workspace}`)
+    filtered = filtered.filter((p) => p.workspace_id === ws.id)
+  }
+  return filtered.map((p) => {
+    const ws = workspaces.find((w) => w.id === p.workspace_id)
+    return {
+      id: p.id,
+      name: p.name,
+      path: p.path,
+      auto_pr: p.auto_pr ?? false,
+      workspace: ws ? { slug: ws.slug, name: ws.name } : null,
+    }
+  })
+}
+
+interface LinkProjectArgs {
+  workspace?: string
+  name?: string
+  path: string
+  auto_pr?: boolean
+}
+
+async function toolLinkProject(args: LinkProjectArgs): Promise<unknown> {
+  // Valida path: precisa existir
+  const { existsSync } = await import('node:fs')
+  const { stat } = await import('node:fs/promises')
+  const { basename } = await import('node:path')
+  if (!existsSync(args.path)) {
+    throw new Error(`path nao existe: ${args.path}`)
+  }
+  const st = await stat(args.path)
+  if (!st.isDirectory()) {
+    throw new Error(`path nao e diretorio: ${args.path}`)
+  }
+
+  const workspaces = await loadWorkspaces()
+  let ws
+  if (args.workspace) {
+    ws = resolveWorkspace(args.workspace, workspaces)
+    if (!ws) throw new Error(`workspace not found: ${args.workspace}`)
+  } else {
+    // Usa active workspace do cli.json
+    const { homedir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { readFileSync } = await import('node:fs')
+    const cliFile = join(homedir(), '.cockpit', 'cli.json')
+    let activeSlug: string | undefined
+    if (existsSync(cliFile)) {
+      try { activeSlug = (JSON.parse(readFileSync(cliFile, 'utf-8')) as { activeWorkspaceSlug?: string }).activeWorkspaceSlug } catch { /* ignore */ }
+    }
+    ws = activeSlug ? workspaces.find((w) => w.slug === activeSlug) : workspaces[0]
+    if (!ws) throw new Error('nenhum workspace encontrado — passe workspace explicitamente ou crie um com cockpit_create_workspace')
+  }
+
+  const projects = await loadProjects()
+  // Dedup por path absoluto dentro do mesmo workspace
+  const existing = projects.find((p) => p.workspace_id === ws.id && p.path === args.path)
+  if (existing) {
+    return {
+      id: existing.id,
+      already_linked: true,
+      workspace: ws.slug,
+      name: existing.name,
+      path: existing.path,
+    }
+  }
+
+  const id = `proj-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
+  const project = {
+    id,
+    workspace_id: ws.id,
+    name: args.name?.trim() || basename(args.path),
+    path: args.path,
+    auto_pr: !!args.auto_pr,
+    last_scan_at: null,
+  }
+
+  // Projects store: workspace-scoped envelope
+  type ProjectsState = { projects: Record<string, typeof project[]> }
+  const env = await daemonGet<{ state?: ProjectsState; version?: number; _ts?: number }>('/api/data/projects')
+  const cur = env?.state?.projects || {}
+  const next = {
+    ...env,
+    state: {
+      ...(env?.state || {}),
+      projects: {
+        ...cur,
+        [ws.id]: [...(cur[ws.id] || []), project],
+      },
+    },
+    _ts: Date.now(),
+  }
+  await daemonPost('/api/data/projects', next)
+
+  return {
+    id,
+    workspace: ws.slug,
+    name: project.name,
+    path: project.path,
+    auto_pr: project.auto_pr,
+  }
+}
+
+async function toolSetCardProject(args: { card_id: string; project_id: string }): Promise<unknown> {
+  const cards = await loadCards()
+  const card = resolveCard(args.card_id, cards)
+  if (!card) throw new Error(`card not found: ${args.card_id}`)
+
+  let project = null
+  if (args.project_id !== '') {
+    const projects = await loadProjects()
+    project = projects.find((p) => p.id === args.project_id)
+    if (!project) throw new Error(`project not found: ${args.project_id}. Use cockpit_list_projects pra ver disponiveis.`)
+    if (project.workspace_id !== card.workspace_id) {
+      throw new Error('projeto pertence a workspace diferente do card. Cards e projetos precisam estar no mesmo workspace.')
+    }
+  }
+
+  const now = new Date().toISOString()
+  await patchCardsStore<{ cards: typeof cards }>((s) => ({
+    ...s,
+    cards: (s.cards || []).map((c) =>
+      c.id === card.id ? { ...c, project_id: args.project_id || null, updated_at: now } : c,
+    ),
+  }))
+
+  return {
+    id: shortId(card.id),
+    project: project ? { id: project.id, name: project.name, path: project.path } : null,
+    unlinked: !project,
   }
 }
 
