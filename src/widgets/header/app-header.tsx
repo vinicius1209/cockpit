@@ -34,6 +34,17 @@ export function AppHeader() {
       </div>
 
       <div className="flex items-center gap-2">
+        <button
+          type="button"
+          className="hidden md:flex items-center gap-2 rounded-md border border-border/60 bg-background/80 px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted/40 hover:text-foreground transition-colors font-mono"
+          onClick={() => {
+            window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))
+          }}
+          title="Command Palette"
+        >
+          <span className="opacity-60">buscar / ir para</span>
+          <kbd className="rounded-sm bg-muted px-1 py-0 text-[10px] tracking-wider opacity-70">⌘K</kbd>
+        </button>
         {activeWorkspace && (
           <Button
             variant="ghost"

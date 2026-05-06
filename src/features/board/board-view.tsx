@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo, useRef } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   DndContext,
   DragOverlay,
@@ -163,6 +164,38 @@ export function BoardView() {
     setDefaultColumnId(columnId)
     setDialogOpen(true)
   }, [])
+
+  // Command Palette / Live Agents podem navegar com ?cardId=... ?new=1 ?archived=1
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const cardIdParam = searchParams.get('cardId')
+    const newParam = searchParams.get('new')
+    const archivedParam = searchParams.get('archived')
+    if (cardIdParam) {
+      const card = cards.find((c) => c.id === cardIdParam)
+      if (card) {
+        setSelectedCard(card)
+        setDefaultColumnId(undefined)
+        setDialogOpen(true)
+      }
+      // Limpa param pra esc poder fechar sem reabrir
+      const next = new URLSearchParams(searchParams)
+      next.delete('cardId')
+      setSearchParams(next, { replace: true })
+    } else if (newParam === '1') {
+      setSelectedCard(null)
+      setDefaultColumnId(undefined)
+      setDialogOpen(true)
+      const next = new URLSearchParams(searchParams)
+      next.delete('new')
+      setSearchParams(next, { replace: true })
+    } else if (archivedParam === '1') {
+      setFilters((prev) => ({ ...prev, includeArchived: true }))
+      const next = new URLSearchParams(searchParams)
+      next.delete('archived')
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, setSearchParams, cards])
 
   return (
     <div className="flex h-full flex-col">
