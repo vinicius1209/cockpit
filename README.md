@@ -3,7 +3,7 @@
 > Cabine de comando pra orquestrar code agents (Claude Code, OpenCode, Gemini CLI, Aider) em workspaces multi-projeto.
 
 ```
-▰▰▰▰▰  COCKPIT v0.7.0
+▰▰▰▰▰  COCKPIT v0.8.0
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ━ ACTIVE WORKSPACE
@@ -233,9 +233,9 @@ cockpit tui
 | **PR status sync** (badge live no card detail e Live Agents) | ✅ |
 | **First-run wizard** (4-step guiado pra primeiro uso) | ✅ |
 | **Empty states** + tooltips em jargão técnico (InfoHint) | ✅ |
-| **Tests** — 186 tests no total (24 frontend + 90 daemon + 74 cli + 22 mcp; +11 atomic-store regression) | ✅ |
-| **Atomic kv_stores writes** (C1 do code review — Lost Update fix via SQLite transactions + optimistic locking) | ✅ |
-| **`cockpit doctor` com severidade + JSON + 5 checks novos** | ✅ |
+| **Tests** — 235 tests no total (24 frontend + 102 daemon + 80 cli + 29 mcp) | ✅ |
+| **6/6 CRITICAL do code review fechados** (Lost Update, path traversal, file races, TUI cleanup, MCP path redaction, lock TOCTOU) | ✅ |
+| **`cockpit doctor` com severidade + JSON + 5 checks** | ✅ |
 | **Spec gen via chat** (`cockpit_spec_gen_async`) — 20 tools no total | ✅ |
 | **Hooks** (`before_implement`, `after_implement`, `after_pr` shell scripts) | ✅ |
 | **Mobile responsive** Web UI (board swipe, card full-screen, heatmap stack) | ✅ |

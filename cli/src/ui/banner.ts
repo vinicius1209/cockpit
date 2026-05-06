@@ -1,6 +1,6 @@
 import { c } from './colors'
 
-const VERSION = '0.7.0'
+const VERSION = '0.8.0'
 
 // Banner compact mostrado em comandos top-level. Usa block chars pra remeter
 // ao logo aviônico. NUNCA bloquear muita altura — 2 linhas máximo.

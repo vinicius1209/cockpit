@@ -2,6 +2,76 @@
 
 Todas as mudanças notáveis do Cockpit. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.8.0] — 2026-05-06
+
+Foco: **fechar 100% dos críticos do code review**. C1 já era v0.7. C2-C6 entregues nesta release com 25 tests de regressão. Hardening completo da fundação antes de retomar features.
+
+### Fixed — C2: path traversal via `sessionId` em cleanup-worktrees 🔴
+
+`maintenance.ts cleanup-worktrees` fazia `rm -rf <root>/<sessionId>` com `sessionId` vindo de `readdir()`. Se DB ou filesystem fosse comprometido (registro com `..`, symlink injetado), `rm` foge do escopo.
+
+- Novo `validateSessionId()` em `validation.ts` (regex `/^[a-zA-Z0-9-]+$/` + max 128)
+- Aplicado em `maintenance.ts` cleanup-worktrees (linha de defesa antes de `rm`)
+- Defense-in-depth: `worktree-manager.removeWorktree` também valida (mesmo input vindo do daemon-internal)
+- 5 tests cobrindo `../etc/passwd`, null byte, shell injection, espaços, length cap
+
+### Fixed — C3: `~/.cockpit/cli.json` races 🔴
+
+CLI e MCP escreviam ambos com `Bun.write()` sem lock → arquivo podia ficar **truncado** (escrita parcial visível pra readers).
+
+- Novo `atomicWriteJson(path, data)` em `cli/src/config/daemon.ts`: write-to-temp + `fs.renameSync()` (POSIX rename(2) é atômico — readers nunca veem JSON parcial)
+- `writeConfig()` delega ao helper; MCP `toolSetActiveWorkspace` usa o mesmo padrão inline (evita cross-package dep)
+- 6 tests: basics + concorrência (20 paralelos sem corromper) + 100 sequenciais sem leak de tmp files
+
+### Fixed — C4: TUI cleanup em SIGKILL/uncaughtException 🔴
+
+Engine só restaurava terminal no exit normal do `for await` loop. Em `uncaughtException`, `unhandledRejection`, ou crash do daemon (que mata stdin) → terminal ficava em **raw mode permanente** com cursor escondido, alt screen ativo. Usuário tinha que rodar `reset`.
+
+- Engine adiciona handlers pra `uncaughtException`, `unhandledRejection`, `'exit'`
+- `cleanupSync()` (sem await) restaura terminal mesmo em paths sem async possível (handler `'exit'`)
+- Idempotente via `cleanupDone` flag — não restaura 2x
+- `restoreTerminal()` isolado com try/catch defensivo (stdout pode estar fechado, stdin pode não ser TTY)
+
+### Fixed — C5: paths absolutos vazando pra LLM via MCP 🔴
+
+`cockpit_show_card`, `cockpit_list_projects`, `cockpit_link_project`, `cockpit_set_card_project` retornavam `project.path` absoluto (`/Users/vinicius1209/projetos/foo`) → LLM podia logar/ecoar isso, vazando homedir + estrutura de pastas.
+
+- Novo `redactPath()` em `mcp/api.ts`: `/Users/<user>/` → `~/`, `/home/<user>/` → `~/`, trunca >200 chars
+- Aplicado em todos returns que expunham path
+- Path absoluto preservado **internamente** quando precisa (request body pra `daemon /agents/implement/async` ainda envia real)
+- 8 tests cobrindo macOS, Linux, paths fora do homedir, edge cases
+
+### Fixed — C6: `acquireProjectLock` TOCTOU 🔴
+
+Lógica antiga: `INSERT (fail UNIQUE) → SELECT → getAgentSession() (async!) → DELETE → recursão`. Janela de race entre SELECT e DELETE permitia outra request adquirir o lock recém-liberado.
+
+- Reescrita: loop max 3 attempts, sem recursão
+- Branch sem lock → `INSERT` atômico (UNIQUE constraint serializa)
+- Branch com lock órfão → `UPDATE WHERE session_id = orphan` (atomic compare-and-swap)
+- Branch com lock ativo → throw imediato com info rica
+- 7 tests: basics + held-by-active + orphan replacement + 10 acquires paralelos (apenas 1 succeeds, 9 conflict como esperado)
+
+### Tests
+
+| Package | v0.7 | v0.8 |
+|---|---|---|
+| Frontend | 24 | 24 |
+| Daemon | 90 | **102** (+12) |
+| CLI | 74 | **80** (+6) |
+| MCP | 22 | **29** (+7) |
+| **Total** | 210 | **235** |
+
+### Code review status
+
+✅ C1 (Lost Update kv_stores) — v0.7
+✅ C2 (path traversal sessionId) — v0.8
+✅ C3 (cli.json races) — v0.8
+✅ C4 (TUI SIGKILL cleanup) — v0.8
+✅ C5 (paths absolutos MCP) — v0.8
+✅ C6 (acquireProjectLock TOCTOU) — v0.8
+
+**100% dos CRITICAL fechados.** Restam IMPORTANT (11) e MODERATE (11) — backlog evolutivo.
+
 ## [0.7.0] — 2026-05-06
 
 Foco: **`cockpit doctor` virou observabilidade séria** + **fix C1 do code review (Lost Update)** — release de hardening, sem novas features de produto.
@@ -456,6 +526,7 @@ Primeiro release público. Cockpit deixa de ser "interno" e ganha as três inter
 - MCP `cockpit_implement_async` é fire-and-forget (Claude Code UI não streama chunks live; use `cockpit watch` no terminal pra acompanhar)
 - Sem TUI fullscreen (`cockpit tui` planejado)
 
+[0.8.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.8.0
 [0.7.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.7.0
 [0.6.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.6.0
 [0.5.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.5.0
