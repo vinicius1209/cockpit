@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Activity, RefreshCw, FileEdit, Pause, AlertCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { PrStatusBadge } from '@/features/board/pr-status-badge'
+import { InfoHint } from '@/components/ui/info-hint'
 
 interface LaneState {
   sessionId: string
@@ -402,7 +403,14 @@ function FileHeatmap({ files }: { files: Array<{ path: string; count: number; se
         )}
       </div>
       <div className="px-3 py-2 border-t text-[10px] text-muted-foreground space-y-0.5">
-        <div className="font-mono uppercase tracking-wider">guia</div>
+        <div className="font-mono uppercase tracking-wider flex items-center gap-1.5">
+          <span>guia</span>
+          <InfoHint
+            text="Quando 2 sessions tocam o mesmo arquivo, voce pode acabar com conflitos de merge."
+            detail="O modo --isolation worktree (CLI ou MCP) cria um working tree separado por session — paralelismo real, sem stomping. Custo: full checkout duplicado e node_modules separado."
+            side="left"
+          />
+        </div>
         <div>• <span className="text-rose-500">conflict</span>: 2+ sessions tocaram o mesmo arquivo</div>
         <div>• use <code className="text-amber-500">--isolation worktree</code> pra paralelismo seguro</div>
       </div>

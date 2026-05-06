@@ -18,6 +18,7 @@ import { MessageResponse } from '@/components/ai-elements/message'
 import { useState } from 'react'
 import { Plus, X, FileText, BookOpen, User, Bot, Eye, Pencil } from 'lucide-react'
 import { PrStatusBadge } from './pr-status-badge'
+import { InfoHint } from '@/components/ui/info-hint'
 
 const LABEL_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
 
@@ -260,7 +261,13 @@ export function CardDetailsPanel({
         {/* ─── TELEMETRIA ─── (read-only, somente edicao) */}
         {isEditing && card && (
           <SectionBlock label="Telemetria">
-            <TelemetryRow label="Spec">
+            <TelemetryRow
+              label="Spec"
+              hint={{
+                text: 'Estado da especificacao tecnica do card',
+                detail: 'draft = rascunho · ready = aprovada · in_progress = sendo implementada · review = aguardando revisao · done = concluida',
+              }}
+            >
               {card.spec_status ? (
                 <Badge variant="outline" className="text-[10px] h-4 px-1.5">{card.spec_status}</Badge>
               ) : <span className="text-muted-foreground/60">—</span>}
@@ -311,10 +318,17 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
   )
 }
 
-function TelemetryRow({ label, children }: { label: string; children: React.ReactNode }) {
+function TelemetryRow({ label, children, hint }: {
+  label: string
+  children: React.ReactNode
+  hint?: { text: string; detail?: string }
+}) {
   return (
     <div className="flex items-center justify-between text-[11px]">
-      <span className="font-mono uppercase tracking-[0.12em] text-muted-foreground">{label}</span>
+      <span className="font-mono uppercase tracking-[0.12em] text-muted-foreground inline-flex items-center gap-1">
+        {label}
+        {hint && <InfoHint text={hint.text} detail={hint.detail} />}
+      </span>
       <span className="text-right">{children}</span>
     </div>
   )

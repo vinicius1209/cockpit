@@ -19,6 +19,7 @@ import { daemonClient } from '@/shared/lib/daemon-client'
 import type { InstalledAgent, ScanResult } from '@/entities/card/project-types'
 import { toast } from 'sonner'
 import { AgentsSettingsPanel } from '@/features/workspace-mgmt/agents-settings-panel'
+import { InfoHint } from '@/components/ui/info-hint'
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#ec4899', '#06b6d4', '#f97316']
 const LABEL_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
@@ -613,6 +614,10 @@ export function WorkspaceSettingsPage() {
                         <span className="flex items-center gap-2 text-xs">
                           <GitPullRequest className="h-3.5 w-3.5 text-muted-foreground" />
                           Auto PR apos implementacao
+                          <InfoHint
+                            text="Cria PR automaticamente no GitHub quando o agent termina."
+                            detail='Precisa de "gh" CLI autenticado. PR vira em modo draft. Desligue se voce prefere revisar local antes de publicar.'
+                          />
                         </span>
                         <Switch
                           checked={proj.auto_pr ?? false}
