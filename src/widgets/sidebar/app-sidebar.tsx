@@ -39,11 +39,12 @@ export function AppSidebar() {
   }
 
   const generalNav = [
-    { path: '/',          label: 'Dashboard',     icon: LayoutDashboard, mono: 'DSH' },
-    { path: '/discovery', label: 'Discovery',     icon: Sparkles,        mono: 'DSC' },
-    { path: '/metrics',   label: 'Metricas',      icon: BarChart3,       mono: 'MTR' },
-    { path: '/docs',      label: 'Docs Vault',    icon: BookOpen,        mono: 'DOC' },
-    { path: '/settings',  label: 'Configuracoes', icon: Settings,        mono: 'CFG' },
+    { path: '/',             label: 'Dashboard',     icon: LayoutDashboard, mono: 'DSH' },
+    { path: '/live-agents',  label: 'Live Agents',   icon: Activity,        mono: 'LIV' },
+    { path: '/discovery',    label: 'Discovery',     icon: Sparkles,        mono: 'DSC' },
+    { path: '/metrics',      label: 'Metricas',      icon: BarChart3,       mono: 'MTR' },
+    { path: '/docs',         label: 'Docs Vault',    icon: BookOpen,        mono: 'DOC' },
+    { path: '/settings',     label: 'Configuracoes', icon: Settings,        mono: 'CFG' },
   ]
 
   return (

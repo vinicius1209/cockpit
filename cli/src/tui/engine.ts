@@ -147,8 +147,8 @@ export class TuiEngine {
           const result = await top.onKey(key)
           await this.handleResult(result)
         } catch (err) {
-          // Render error overlay e segue
-          process.stdout.write(ANSI.moveTo(1, 1) + `\x1b[91merror in screen ${top.name}: ${(err as Error).message}\x1b[0m\n`)
+          // Render error inline na linha 1 (sera sobrescrita no proximo draw)
+          process.stdout.write(ANSI.moveTo(1, 1) + ANSI.clearLine + `\x1b[91merror in ${top.name}: ${(err as Error).message}\x1b[0m`)
         }
       }
       if (this.quit) break
@@ -204,7 +204,25 @@ export class TuiEngine {
     const top = this.stack[this.stack.length - 1]
     if (!top) return
     const frame = top.render(cols, rows)
-    process.stdout.write(ANSI.home + frame)
+
+    // Em raw mode, '\n' faz line feed mas NAO carriage return — cursor fica
+    // na coluna onde a linha anterior terminou, criando staircase. Solucao:
+    // escrever cada linha posicionando o cursor explicitamente (moveTo) e
+    // limpando a linha (clearLine) antes do conteudo.
+    const lines = frame.split('\n')
+    const maxLines = Math.min(lines.length, rows)
+    let out = ''
+    for (let i = 0; i < maxLines; i++) {
+      out += ANSI.moveTo(i + 1, 1) + ANSI.clearLine + lines[i]
+    }
+    // Limpa qualquer linha residual (frame anterior com mais linhas que o atual)
+    for (let i = maxLines; i < rows; i++) {
+      out += ANSI.moveTo(i + 1, 1) + ANSI.clearLine
+    }
+    // Parqueia o cursor no canto direito da ultima linha pra evitar piscar
+    // no meio do conteudo enquanto o proximo frame e construido.
+    out += ANSI.moveTo(rows, cols)
+    process.stdout.write(out)
     this.dirty = false
   }
 
