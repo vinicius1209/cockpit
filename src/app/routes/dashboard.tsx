@@ -31,6 +31,45 @@ export function DashboardPage() {
         ]}
       />
 
+      {/* ── EMPTY STATE: zero cards ── */}
+      {totalCards === 0 && (
+        <div className="rounded-md border border-dashed bg-muted/10 p-8 text-center space-y-4 mb-6">
+          <div className="text-3xl">🛫</div>
+          <div className="space-y-1.5">
+            <h2 className="text-lg font-semibold">Nada decolando ainda</h2>
+            <p className="text-sm text-muted-foreground max-w-md mx-auto">
+              Crie seu primeiro card num workspace pra comecar.
+              Voce pode digitar diretamente, ou pedir pro Claude Code via MCP:{' '}
+              <code className="font-mono text-foreground/80 text-[11px] bg-background px-1.5 py-0.5 rounded">
+                "cria um card pra X no workspace Y"
+              </code>
+            </p>
+          </div>
+          <div className="flex flex-wrap justify-center gap-2 pt-1">
+            {workspaces.length > 0 && (
+              <button
+                className="text-xs rounded-md bg-primary text-primary-foreground px-3 py-1.5 hover:opacity-90 transition-opacity"
+                onClick={() => navigate(`/workspace/${workspaces[0].id}?new=1`)}
+              >
+                Novo card em {workspaces[0].name} →
+              </button>
+            )}
+            <button
+              className="text-xs rounded-md border bg-background px-3 py-1.5 hover:bg-muted/40 transition-colors font-mono"
+              onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+            >
+              ⌘K abrir busca
+            </button>
+            <button
+              className="text-xs rounded-md border bg-background px-3 py-1.5 hover:bg-muted/40 transition-colors"
+              onClick={() => navigate('/settings')}
+            >
+              Configurar daemon / agents
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* ── KPI HUD ── */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         <KpiTile
