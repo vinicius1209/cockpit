@@ -11,6 +11,7 @@ import { handleDataRoutes } from './data'
 import { handleTaskRoutes } from './tasks'
 import { handleGitRoutes } from './git'
 import { handleMetricsRoutes } from './metrics'
+import { handleMaintenanceRoutes } from './maintenance'
 
 export async function handleRequest(req: Request): Promise<Response> {
   const url = new URL(req.url)
@@ -65,6 +66,11 @@ export async function handleRequest(req: Request): Promise<Response> {
   // Metrics
   if (path === '/api/metrics') {
     return handleMetricsRoutes(req, url)
+  }
+
+  // Maintenance (doctor --fix)
+  if (path.startsWith('/maintenance')) {
+    return handleMaintenanceRoutes(req, url)
   }
 
   // Data persistence routes

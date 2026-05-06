@@ -64,7 +64,7 @@ async function main(): Promise<void> {
 
       case 'doctor': {
         const { doctor } = await import('./commands/doctor')
-        await doctor()
+        await doctor({ fix: !!flags.fix })
         return
       }
 
