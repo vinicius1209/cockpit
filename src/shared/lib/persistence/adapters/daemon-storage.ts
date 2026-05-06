@@ -94,7 +94,23 @@ export function createDaemonStorageAdapter(storeName: string): StorageAdapter {
       // Save to localStorage immediately (fast)
       window.localStorage.setItem(name, stamped)
 
-      // Save to daemon (persistent)
+      // Save to daemon (persistent).
+      //
+      // NOTA: Em v0.7+, o daemon suporta optimistic locking via campo
+      // `version` no payload. Aqui ainda mandamos sem version → daemon
+      // faz force-write (expectedVersion=-1, sem check). Isto significa
+      // que se o daemon escrever via atomicMutate (ex: updateCardPrUrl)
+      // entre nosso GET e POST, aquela mutation pode ser sobrescrita.
+      //
+      // Mitigação atual: frontend bate o daemon a cada few ms via
+      // Zustand persist, então o gap real é minúsculo. Cenários reais
+      // problemáticos: (1) implement em background atualizar pr_url
+      // enquanto user edita o card no Web — pr_url é overwritten.
+      //
+      // Fix completo (v0.8?): rastrear `version` retornada pelo GET
+      // (linha 47 ja recebe), incluir em POST → daemon trata 409 e
+      // frontend re-fetch. Implica refatorar Zustand persist signature
+      // ou usar zustand/middleware/persist com merge custom.
       fetch(`${DAEMON_URL}/api/data/${storeName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

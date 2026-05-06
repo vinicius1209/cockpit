@@ -196,6 +196,19 @@ function runMigrations(): void {
     v = 4
     console.log('[db] Migration v4: project_locks')
   }
+
+  if (v < 5) {
+    // v5: kv_stores ganha coluna 'version' (optimistic concurrency control).
+    // Cada write incrementa a versao. POST /api/data/:store agora aceita
+    // expectedVersion no envelope; mismatch retorna 409 → caller refetch+retry.
+    // Resolve o Lost Update bug em CLI/MCP/daemon-internal write paths.
+    db.exec(`
+      ALTER TABLE kv_stores ADD COLUMN version INTEGER NOT NULL DEFAULT 1;
+      PRAGMA user_version = 5;
+    `)
+    v = 5
+    console.log('[db] Migration v5: kv_stores.version (optimistic concurrency)')
+  }
 }
 
 // ── Legacy JSON Import ──

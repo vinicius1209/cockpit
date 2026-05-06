@@ -17,6 +17,7 @@
 import { executeAgentWithCallbacks, detectInstalledAgents } from '../executor/agent-executor'
 import { createSession, updateSession, registerSessionAbort, unregisterSessionAbort } from '../tasks/session-manager'
 import { getDB } from '../persistence/db'
+import { atomicMutate } from '../persistence/atomic-store'
 
 export interface SpecGenConfig {
   cardId: string
@@ -108,25 +109,26 @@ function buildUserMessage(card: CardRow): string {
 }
 
 function updateCardSpecContent(cardId: string, specContent: string): void {
-  const db = getDB()
-  const row = db.query('SELECT data FROM kv_stores WHERE store_name = ?').get('cards') as { data: string } | null
-  if (!row) return
-  const env = JSON.parse(row.data) as { state?: { cards?: Record<string, unknown>[] }; version?: number; _ts?: number }
-  if (!env.state?.cards) return
-  const now = new Date().toISOString()
-  let changed = false
-  env.state.cards = env.state.cards.map((c) => {
-    if (c.id === cardId) {
-      changed = true
-      return { ...c, spec_content: specContent, spec_status: 'draft', updated_at: now }
-    }
-    return c
-  })
-  if (!changed) return
-  env._ts = Date.now()
-  db.query(
-    'INSERT OR REPLACE INTO kv_stores (store_name, data, updated_at) VALUES (?, ?, ?)',
-  ).run('cards', JSON.stringify(env), now)
+  // Atomic via SQLite transaction — fix Lost Update C1.
+  type CardsEnv = { state?: { cards?: Array<Record<string, unknown>> }; _ts?: number }
+  try {
+    atomicMutate<CardsEnv>('cards', (env) => {
+      if (!env?.state?.cards) return env
+      const now = new Date().toISOString()
+      let changed = false
+      const cards = env.state.cards.map((c) => {
+        if (c.id === cardId) {
+          changed = true
+          return { ...c, spec_content: specContent, spec_status: 'draft', updated_at: now }
+        }
+        return c
+      })
+      if (!changed) return env
+      return { ...env, state: { ...env.state, cards }, _ts: Date.now() }
+    })
+  } catch (err) {
+    console.warn('[updateCardSpecContent] falhou:', err)
+  }
 }
 
 /**

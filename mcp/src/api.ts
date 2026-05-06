@@ -44,19 +44,18 @@ export async function daemonPost<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   })
   if (!res.ok) {
+    // Le body uma vez como text, parse defensivo (pre-existing bug fix:
+    // antes a 409 path consumia o body com .json() e o fallback .text()
+    // estourava ReadableStream locked).
+    const rawText = await res.text().catch(() => res.statusText)
     if (res.status === 409) {
-      const data = await res.json().catch(() => null) as {
-        error?: string
-        project_path?: string
-        held_by?: LockHeldBy
-        hints?: string[]
-      } | null
+      let data: { error?: string; project_path?: string; held_by?: LockHeldBy; hints?: string[] } | null = null
+      try { data = JSON.parse(rawText) } catch { /* nao json */ }
       if (data?.error === 'project_locked' && data.held_by && data.project_path) {
         throw new ProjectLockedError(data.project_path, data.held_by, data.hints || [])
       }
     }
-    const text = await res.text().catch(() => res.statusText)
-    throw new Error(`daemon ${res.status}: ${text.slice(0, 200)}`)
+    throw new Error(`daemon ${res.status}: ${rawText.slice(0, 200)}`)
   }
   return res.json() as Promise<T>
 }
@@ -157,15 +156,53 @@ export async function loadProjects(): Promise<Project[]> {
   return Object.values(all).flat()
 }
 
-// ── Mutations (read-modify-write como CLI) ──
+// ── Mutations com optimistic locking (fix C1 do code review) ──
+//
+// daemonPost hoje detecta 409 'version_conflict' e devolve erro generico.
+// patchCardsStore captura isso e re-tenta automaticamente: refetch + remute
+// + repost. Limite de tentativas pra evitar livelock.
+
+const MAX_RETRY_ATTEMPTS = 5
+
+interface VersionConflictResponse {
+  error: string
+  current_version?: number
+}
 
 export async function patchCardsStore<T extends { cards: Card[] }>(
   mutate: (state: T) => T,
 ): Promise<void> {
-  const env = await daemonGet<PersistEnvelope<T>>('/api/data/cards')
-  if (!env?.state) throw new Error('cards store nao inicializado')
-  const next = { ...env, state: mutate(env.state), _ts: Date.now() }
-  await daemonPost('/api/data/cards', next)
+  let lastErr: Error | null = null
+  for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+    const envWithVersion = await daemonGet<PersistEnvelope<T> & { version?: number }>('/api/data/cards')
+    if (!envWithVersion?.state) throw new Error('cards store nao inicializado')
+
+    const { version, ...envOnly } = envWithVersion
+    const next = {
+      ...envOnly,
+      state: mutate(envOnly.state as T),
+      _ts: Date.now(),
+      version,  // re-attach pra POST checar
+    }
+
+    try {
+      await daemonPost('/api/data/cards', next)
+      return  // sucesso
+    } catch (err) {
+      const e = err as Error
+      // Detect 409 'version_conflict' — re-fetch e re-tenta
+      if (e.message.includes('409') && e.message.includes('version_conflict')) {
+        lastErr = e
+        // Backoff exponencial leve: 0ms, 50ms, 100ms, 200ms, 400ms
+        if (attempt < MAX_RETRY_ATTEMPTS) {
+          await new Promise((r) => setTimeout(r, 50 * Math.pow(2, attempt - 1)))
+        }
+        continue
+      }
+      throw e  // outros erros — propaga sem retry
+    }
+  }
+  throw new Error(`patchCardsStore: ${MAX_RETRY_ATTEMPTS} tentativas falharam por version_conflict — store muito disputado. Ultimo erro: ${lastErr?.message}`)
 }
 
 // ── Helpers ──

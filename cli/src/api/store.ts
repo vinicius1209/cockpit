@@ -1,4 +1,4 @@
-import { api } from './client'
+import { api, DaemonError } from './client'
 import type { Card, Workspace, BoardColumn, Project } from './client'
 
 // O daemon armazena os Zustand stores em /api/data/<name> com payload
@@ -84,17 +84,41 @@ interface PersistEnvelope2<S> {
   _ts?: number
 }
 
+// Optimistic locking: GET retorna `version`, POST envia o mesmo version.
+// Daemon retorna 409 se foi modificado entre o GET e o POST. Aqui captamos
+// o erro e re-tentamos (refetch + remute + repost). Fix C1 do code review.
+
+const MAX_RETRY_ATTEMPTS = 5
+
 async function readAndPatch<S>(name: string, mutate: (state: S) => S): Promise<void> {
-  const env = await api.getStore<PersistEnvelope2<S>>(name)
-  if (!env || !env.state) {
-    throw new Error(`Store "${name}" nao encontrado ou vazio. Crie pelo web UI primeiro.`)
+  let lastErr: Error | null = null
+  for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
+    const env = await api.getStore<PersistEnvelope2<S>>(name)
+    if (!env || !env.state) {
+      throw new Error(`Store "${name}" nao encontrado ou vazio. Crie pelo web UI primeiro.`)
+    }
+    const patched: PersistEnvelope2<S> = {
+      ...env,
+      state: mutate(env.state),
+      _ts: Date.now(),
+    }
+    try {
+      await api.setStore(name, patched)
+      return
+    } catch (err) {
+      // 409 version_conflict: outro cliente escreveu entre nosso GET e POST.
+      // Refetch e remute.
+      if (err instanceof DaemonError && err.status === 409 && err.message.includes('version_conflict')) {
+        lastErr = err
+        if (attempt < MAX_RETRY_ATTEMPTS) {
+          await new Promise((r) => setTimeout(r, 50 * Math.pow(2, attempt - 1)))
+        }
+        continue
+      }
+      throw err
+    }
   }
-  const patched: PersistEnvelope2<S> = {
-    ...env,
-    state: mutate(env.state),
-    _ts: Date.now(),
-  }
-  await api.setStore(name, patched)
+  throw new Error(`readAndPatch(${name}): ${MAX_RETRY_ATTEMPTS} tentativas falharam. Ultimo erro: ${lastErr?.message}`)
 }
 
 export function newCardId(): string {

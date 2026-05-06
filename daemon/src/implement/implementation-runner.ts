@@ -618,27 +618,28 @@ export async function runImplementation(
   }
 }
 
-// F-PR — atualiza Card.pr_url no kv_stores. Read-modify-write via daemon
-// (mesmo padrao que CLI/MCP usam externamente, mas aqui acessa direto o DB).
+// F-PR — atualiza Card.pr_url no kv_stores. Usa atomicMutate (BEGIN
+// IMMEDIATE transaction) — fix C1 do code review. Antes era SELECT →
+// JSON.parse → mutate → INSERT OR REPLACE com Lost Update window.
 async function updateCardPrUrl(cardId: string, prUrl: string): Promise<void> {
-  const { getDB } = await import('../persistence/db')
-  const db = getDB()
-  const row = db.query('SELECT data FROM kv_stores WHERE store_name = ?').get('cards') as { data: string } | null
-  if (!row) return
-  const env = JSON.parse(row.data) as { state?: { cards?: Array<Record<string, unknown>> }; version?: number; _ts?: number }
-  if (!env.state?.cards) return
-  const now = new Date().toISOString()
-  let changed = false
-  env.state.cards = env.state.cards.map((c) => {
-    if (c.id === cardId) {
-      changed = true
-      return { ...c, pr_url: prUrl, updated_at: now }
-    }
-    return c
-  })
-  if (!changed) return
-  env._ts = Date.now()
-  db.query(
-    'INSERT OR REPLACE INTO kv_stores (store_name, data, updated_at) VALUES (?, ?, ?)',
-  ).run('cards', JSON.stringify(env), now)
+  const { atomicMutate } = await import('../persistence/atomic-store')
+  type CardsEnv = { state?: { cards?: Array<Record<string, unknown>> }; _ts?: number }
+  try {
+    atomicMutate<CardsEnv>('cards', (env) => {
+      if (!env?.state?.cards) return env
+      const now = new Date().toISOString()
+      let changed = false
+      const cards = env.state.cards.map((c) => {
+        if (c.id === cardId) {
+          changed = true
+          return { ...c, pr_url: prUrl, updated_at: now }
+        }
+        return c
+      })
+      if (!changed) return env  // sem mudanca real — atomicMutate ainda incrementa version (safe)
+      return { ...env, state: { ...env.state, cards }, _ts: Date.now() }
+    })
+  } catch (err) {
+    console.warn('[updateCardPrUrl] falhou:', err)
+  }
 }
