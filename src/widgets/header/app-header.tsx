@@ -23,7 +23,7 @@ export function AppHeader() {
               className="h-3 w-3 rounded-full"
               style={{ backgroundColor: activeWorkspace.color }}
             />
-            <h1 className="text-sm font-semibold">{activeWorkspace.name}</h1>
+            <h1 className="text-sm font-semibold truncate max-w-[140px] sm:max-w-none">{activeWorkspace.name}</h1>
             {activeWorkspace.description && (
               <span className="text-xs text-muted-foreground hidden sm:inline">
                 — {activeWorkspace.description}

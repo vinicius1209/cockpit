@@ -214,8 +214,15 @@ export function BoardView() {
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex-1 overflow-x-auto overflow-y-hidden">
-          <div className="flex gap-4 p-4 h-full">
+        {columns.length > 1 && (
+          <div className="sm:hidden px-3 pt-1 pb-1 text-[10px] font-mono text-muted-foreground/70 uppercase tracking-wider flex items-center gap-1">
+            <span>swipe</span>
+            <span aria-hidden>← →</span>
+            <span className="ml-auto tabular-nums">{columns.length} colunas</span>
+          </div>
+        )}
+        <div className="flex-1 overflow-x-auto overflow-y-hidden snap-x snap-mandatory sm:snap-none">
+          <div className="flex gap-3 sm:gap-4 p-3 sm:p-4 h-full">
             {columns.map((column, idx) => {
               const columnCards = filterCards(columnCardsFor(column.id))
               return (

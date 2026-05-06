@@ -75,7 +75,7 @@ export function CardDetailsPanel({
   const isLabelActive = (labelId: string) => card?.labels.some((cl) => cl.label_id === labelId) ?? false
 
   return (
-    <div className="flex gap-4 overflow-y-auto flex-1 min-h-0 pt-1">
+    <div className="flex flex-col lg:flex-row gap-4 overflow-y-auto flex-1 min-h-0 pt-1">
       {/* Left: Main content */}
       <div className="flex-1 min-w-0 flex flex-col gap-2">
         {/* Title */}
@@ -151,8 +151,8 @@ export function CardDetailsPanel({
         )}
       </div>
 
-      {/* Right: cockpit sidebar — agrupado em IDENTIFICAÇÃO / ROTEAMENTO / TELEMETRIA */}
-      <div className="w-52 shrink-0 space-y-4 border-l pl-4">
+      {/* Right (lg+) / Bottom (mobile): cockpit sidebar — IDENTIFICAÇÃO / ROTEAMENTO / TELEMETRIA */}
+      <div className="lg:w-52 shrink-0 space-y-4 lg:border-l lg:pl-4 border-t lg:border-t-0 pt-3 lg:pt-0">
 
         {/* ─── IDENTIFICAÇÃO ─── */}
         <SectionBlock label="Identificacao">

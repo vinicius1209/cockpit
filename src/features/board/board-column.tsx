@@ -27,7 +27,7 @@ export function BoardColumn({ column, cards, onCardClick, onAddCard, index, tota
 
   return (
     <section
-      className={`flex h-full w-72 shrink-0 flex-col rounded-lg border bg-muted/20 transition-colors ${
+      className={`flex h-full w-[85vw] sm:w-72 shrink-0 flex-col rounded-lg border bg-muted/20 transition-colors snap-center sm:snap-none ${
         isOver ? 'border-primary bg-accent/30' : 'border-border/60'
       }`}
       role="region"

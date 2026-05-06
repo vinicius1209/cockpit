@@ -273,7 +273,7 @@ export function LiveAgentsPage() {
         }
       />
 
-      <div className="flex-1 min-h-0 overflow-hidden grid gap-4 p-4 grid-cols-1 lg:grid-cols-[1fr_320px]">
+      <div className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden grid gap-4 p-3 sm:p-4 grid-cols-1 lg:grid-cols-[1fr_320px]">
         {/* LANES (esquerda) */}
         <div className="overflow-y-auto space-y-3 pr-1">
           {loading && <div className="text-sm text-muted-foreground">carregando...</div>}
@@ -312,7 +312,7 @@ function Lane({ lane }: { lane: LaneState }) {
       ? (lane.phase === 'error' ? 'border-rose-500/30 opacity-80' : 'border-emerald-500/20 opacity-70')
       : 'border-amber-500/40 shadow-[0_0_20px_-8px_rgba(245,158,11,0.3)]'}`}>
       {/* Lane header */}
-      <div className="flex items-center gap-3 px-3 py-2 border-b font-mono text-[10px] uppercase tracking-[0.12em]">
+      <div className="flex items-center gap-2 sm:gap-3 px-3 py-2 border-b font-mono text-[10px] uppercase tracking-[0.12em] flex-wrap">
         <span className={`${phaseColor} text-base leading-none`}>{led}</span>
         <Link to={cardLink} className="flex items-center gap-1.5 hover:text-primary transition-colors">
           <span className="rounded-sm bg-muted px-1.5 py-0.5 tabular-nums text-foreground">#{shortId}</span>

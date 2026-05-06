@@ -176,7 +176,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
     <>
       {confirmDialog}
       <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-        <DialogContent className={`sm:max-w-4xl ${isEditing ? 'h-[88vh]' : 'h-auto'} flex flex-col p-0 gap-0 overflow-hidden`}>
+        <DialogContent className={`sm:max-w-4xl ${isEditing ? 'h-[100dvh] sm:h-[88vh]' : 'h-auto'} max-w-full sm:max-w-4xl rounded-none sm:rounded-lg flex flex-col p-0 gap-0 overflow-hidden`}>
           {/* ──── FLIGHT STRIP HEADER ──── */}
           <DialogHeader className="border-b px-4 py-3 space-y-1.5 shrink-0">
             <CardFlightStrip card={card} isEditing={isEditing} />
