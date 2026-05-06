@@ -19,7 +19,7 @@ export async function handleRequest(req: Request): Promise<Response> {
 
   // Health check
   if (path === '/health') {
-    return jsonResponse({ status: 'ok', version: '0.3.0' })
+    return jsonResponse({ status: 'ok', version: '0.4.0' })
   }
 
   // Project routes

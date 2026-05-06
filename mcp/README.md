@@ -60,6 +60,10 @@ O instalador:
 | `cockpit_implement_async` | Dispara `implement` em background, retorna sessionId | card_id*, feedback, no_pr, **isolation** (`lock`/`worktree`) |
 | `cockpit_get_session` | Status de uma session (phase + últimas chunks) | session_id*, tail_chunks |
 | `cockpit_abort_session` | Aborta session em curso (mata processo, marca error, libera lock/worktree) | session_id* |
+| `cockpit_create_workspace` | Cria workspace novo (slug auto-derivado se omitido) | name*, slug, description, color |
+| `cockpit_list_projects` | Lista projetos vinculados a um/todos workspaces | workspace |
+| `cockpit_link_project` | Vincula diretorio local como projeto (path precisa existir) | path*, workspace, name, auto_pr |
+| `cockpit_set_card_project` | Atribui projeto especifico a um card (ou desvincula com "") | card_id*, project_id* |
 
 ## Resources
 
@@ -154,10 +158,16 @@ Implementadas em v0.3.0 (Tier 3):
 - ✅ `cockpit_set_active_workspace` — compartilhado entre CLI e MCP
 - ✅ `cockpit_abort_session` — mata processo do agent + cleanup
 
-Próximas (Tier 4):
+Implementadas em v0.4.0 (Tier 4):
+- ✅ `cockpit_create_workspace` — bootstrap workspace
+- ✅ `cockpit_list_projects` — descobrir projetos
+- ✅ `cockpit_link_project` — vincular diretorio local
+- ✅ `cockpit_set_card_project` — atribuir projeto a card
+
+Próximas (Tier 5):
+- `cockpit_spec_gen_async` — gerar spec via chat (precisa fluxo AI dedicado no daemon)
 - `cockpit_get_metrics_workspace` — métricas filtradas por ws
-- `cockpit_create_workspace` / `cockpit_link_project` — bootstrap completo via chat
-- `cockpit_spec_gen_async` — gerar spec sem precisar abrir Web UI
+- `cockpit_pr_status` — atalho pra surface PR sem chamar /git/pr-status manualmente
 
 ## Debugging
 

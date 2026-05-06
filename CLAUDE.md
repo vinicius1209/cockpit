@@ -189,7 +189,7 @@ O Cockpit pode ser operado de **3 formas paralelas** que conversam com o mesmo d
 |---|---|---|
 | **Web UI** (port 5173) | Visão geral, kanban visual, dashboard, AI Chat com contexto rico | `src/` (React + Vite) |
 | **CLI `cockpit`** | Operações rápidas no terminal, scripts, watch live de execução, REPL ai | `cli/` (Bun standalone, zero deps) |
-| **MCP server `cockpit-mcp`** | Claude Code controla Cockpit pelo protocolo MCP (15 tools + 2 resources, inclui implement_async + abort_session + edit_card) | `mcp/` (Bun + `@modelcontextprotocol/sdk`) |
+| **MCP server `cockpit-mcp`** | Claude Code controla Cockpit pelo protocolo MCP (19 tools + 2 resources, bootstrap completo: create_workspace + link_project + set_card_project) | `mcp/` (Bun + `@modelcontextprotocol/sdk`) |
 
 Os 3 modos compartilham 100% do estado (mesmo SQLite, mesmas sessions, mesmas APIs). Não há "modo prioritário" — cada um serve um caso de uso.
 
@@ -227,6 +227,8 @@ CLI cockpit (Bun standalone)       ──HTTP──▶
 - **Session abort (F-MCP-T3)**: `daemon/src/tasks/session-manager.ts` exporta `registerSessionAbort/unregisterSessionAbort/abortSession`. `executeAgentWithCallbacks` aceita `AbortSignal` opcional. `runImplementation` registra/desregistra automaticamente. Endpoint `POST /agents/sessions/<id>/abort`.
 - **Live Agents Panel** (`src/app/routes/live-agents.tsx`): visao cross-workspace de sessions ativas. SSE per-session. File heatmap detecta conflito (2+ sessions tocando mesmo path → sugestao de worktree).
 - **Maintenance** (`daemon/src/routes/maintenance.ts`): endpoints pro `cockpit doctor --fix` chamar (`reap-locks`, `reap-sessions`, listagem).
+- **Command Palette** (`src/widgets/command-palette/command-palette.tsx`): cmdk-based, ⌘K global. `useCommandPalette` hook tambem instala atalhos sequenciais `g d/g a/g b/g m/g s` (Vim-style, fora de input). `workspace.tsx` + `board-view.tsx` escutam `?cardId/?new=1/?archived=1` pra integrar com palette + Live Agents links.
+- **PR status** (`src/features/board/pr-status-badge.tsx` + `daemon/src/routes/git.ts`): live status via `gh pr view --json` no daemon (cache 30s). Card.pr_url salvo automaticamente quando `runImplementation` cria PR. Badge usado no card detail (full) e Live Agents lane (compact).
 - **Agent execution**: `daemon/src/executor/agent-executor.ts` — abstrai
   CLI agents (claude-code, opencode, gemini-cli) com `KNOWN_AGENTS` registry.
   - **claude-code precisa de `--permission-mode bypassPermissions`** em modo

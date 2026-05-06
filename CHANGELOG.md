@@ -2,6 +2,58 @@
 
 Todas as mudanças notáveis do Cockpit. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.4.0] — 2026-05-05
+
+Foco: **bootstrap completo via Claude Code**, **navegação ⌘K na Web**, **PR status ao vivo no card**. Cockpit fecha o loop "ideia → spec → implement → PR" sem precisar trocar de ferramenta.
+
+### Added — MCP Tier 4 (19 tools no total)
+
+4 tools novas que cobrem 100% do bootstrap via chat:
+
+- **`cockpit_create_workspace`**: cria workspace novo (name, slug auto-derivado, description, color). Dedup por slug. Retorna `next_steps` pra guiar o LLM
+- **`cockpit_list_projects`**: lista projetos vinculados (filtrável por workspace) — útil pro LLM saber `project_id` antes de `set_card_project`
+- **`cockpit_link_project`**: vincula diretório local como projeto. Valida path existe + é diretório. Aceita `auto_pr`. Default workspace = ativo (cli.json) ou primeiro
+- **`cockpit_set_card_project`**: atribui projeto específico a card. Valida workspace match. `project_id=""` desvincula
+
+```
+[Você] "cria workspace 'Cliente XPTO', vincula meu repo /Users/x/foo,
+        e cria card pra implementar OAuth"
+[Claude] → 4 tools sequenciais. Bootstrap zero-friction, zero Web UI.
+```
+
+### Added — Web UI Command Palette (⌘K)
+
+cmdk-based palette global. Abre com **⌘K** (Mac) / **Ctrl+K** (Win/Linux). Atalhos sequenciais estilo Vim sem modifiers, fora de input:
+
+- `g d` → Dashboard, `g a` → Live Agents, `g b` → Board, `g m` → Métricas, `g s` → Settings
+
+Conteúdo:
+- Cards do workspace ativo (top 12 por updated_at) — uso mais comum no topo
+- Cards cross-workspace aparecem só com search digitado
+- Workspaces (todos, marca o ativo)
+- Ações: Novo card, Ver descartados
+- Navegar com shortcuts visíveis em mono à direita
+
+UX: AppHeader ganha botão `buscar / ir para [⌘K]` (descobribilidade pra novato). `workspace.tsx` + `board-view.tsx` escutam `?cardId=...` / `?new=1` / `?archived=1` pra abrir card / criar / mostrar archived direto. Live Agents links agora funcionam end-to-end.
+
+### Added — PR status sync (gh integration)
+
+Loop card → PR fechado dentro do Cockpit.
+
+- Daemon: `GET /git/pr-status?url=<prUrl>` roda `gh pr view --json state,isDraft,mergedAt,...`. Cache 30s in-memory.
+- Schema: `Card.pr_url: string | null` (Web/CLI/MCP). `updateCardPrUrl` no daemon escreve direto no `kv_stores` quando PR é criado pelo `runImplementation`
+- UI: `<PrStatusBadge>` com modos compact (Live Agents lane) e full (card detail). Estados `DRAFT/OPEN/MERGED/CLOSED` com cores semânticas (amber/emerald/violet/rose). Refresh 60s. Fallback gracioso quando gh offline ou repo privado
+- Card detail ganha bloco "PULL REQUEST" quando há `pr_url` setado
+
+### Fixed
+
+- Daemon `/health` reporta `version: 0.4.0`
+- CLI banner / MCP server identifier sincronizados
+
+### Migration
+
+Sem mudança breaking de schema (campo `pr_url` é opcional, default null em cards existentes).
+
 ## [0.3.0] — 2026-05-05
 
 Foco: **observabilidade cross-workspace**, **controle pelo Claude Code via MCP**, **TUI deixa de ser viewer e vira controlador**, **doctor com auto-fix**.
@@ -229,6 +281,7 @@ Primeiro release público. Cockpit deixa de ser "interno" e ganha as três inter
 - MCP `cockpit_implement_async` é fire-and-forget (Claude Code UI não streama chunks live; use `cockpit watch` no terminal pra acompanhar)
 - Sem TUI fullscreen (`cockpit tui` planejado)
 
+[0.4.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.4.0
 [0.3.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.3.0
 [0.2.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.2.0
 [0.1.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.1.0
