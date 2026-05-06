@@ -476,6 +476,16 @@ export async function runImplementation(
         summary.prUrl = pr.url
         summary.prNumber = pr.number
         emit({ phase: 'creating-pr', message: `PR #${pr.number} criada: ${pr.url}` })
+
+        // F-PR — atualiza Card.pr_url no kv_stores pra UI (Card detail,
+        // Live Agents) poder fetch status sem ter que olhar a session.
+        if (config.cardId) {
+          try {
+            await updateCardPrUrl(config.cardId, pr.url)
+          } catch (e) {
+            console.warn('[implement] falha ao salvar pr_url no card:', e)
+          }
+        }
       } catch (prErr) {
         emit({ phase: 'creating-pr', message: `PR falhou: ${prErr instanceof Error ? prErr.message : 'erro'}` })
       }
@@ -540,4 +550,29 @@ export async function runImplementation(
       }
     }
   }
+}
+
+// F-PR — atualiza Card.pr_url no kv_stores. Read-modify-write via daemon
+// (mesmo padrao que CLI/MCP usam externamente, mas aqui acessa direto o DB).
+async function updateCardPrUrl(cardId: string, prUrl: string): Promise<void> {
+  const { getDB } = await import('../persistence/db')
+  const db = getDB()
+  const row = db.query('SELECT data FROM kv_stores WHERE store_name = ?').get('cards') as { data: string } | null
+  if (!row) return
+  const env = JSON.parse(row.data) as { state?: { cards?: Array<Record<string, unknown>> }; version?: number; _ts?: number }
+  if (!env.state?.cards) return
+  const now = new Date().toISOString()
+  let changed = false
+  env.state.cards = env.state.cards.map((c) => {
+    if (c.id === cardId) {
+      changed = true
+      return { ...c, pr_url: prUrl, updated_at: now }
+    }
+    return c
+  })
+  if (!changed) return
+  env._ts = Date.now()
+  db.query(
+    'INSERT OR REPLACE INTO kv_stores (store_name, data, updated_at) VALUES (?, ?, ?)',
+  ).run('cards', JSON.stringify(env), now)
 }

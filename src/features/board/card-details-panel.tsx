@@ -17,6 +17,7 @@ import { useDocStore } from '@/entities/docs/store'
 import { MessageResponse } from '@/components/ai-elements/message'
 import { useState } from 'react'
 import { Plus, X, FileText, BookOpen, User, Bot, Eye, Pencil } from 'lucide-react'
+import { PrStatusBadge } from './pr-status-badge'
 
 const LABEL_COLORS = ['#ef4444', '#f97316', '#f59e0b', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899']
 
@@ -273,6 +274,13 @@ export function CardDetailsPanel({
             <TelemetryRow label="Atualizado">
               <span className="font-mono">{new Date(card.updated_at).toLocaleDateString('pt-BR')}</span>
             </TelemetryRow>
+          </SectionBlock>
+        )}
+
+        {/* ─── PULL REQUEST ─── (live status via gh CLI) */}
+        {isEditing && card?.pr_url && (
+          <SectionBlock label="Pull Request">
+            <PrStatusBadge url={card.pr_url} />
           </SectionBlock>
         )}
       </div>

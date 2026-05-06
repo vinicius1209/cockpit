@@ -95,6 +95,7 @@ export interface Card {
   created_at: string
   updated_at: string
   archived_at: string | null
+  pr_url: string | null
   labels?: Array<{ label_id: string }>
 }
 

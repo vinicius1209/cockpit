@@ -71,6 +71,7 @@ export const useCardStore = create<CardState>()(
           id,
           labels: [],
           archived_at: null,
+          pr_url: null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }

@@ -13,11 +13,13 @@ import { CockpitPageHeader } from '@/widgets/cockpit-page-header'
 import { Button } from '@/components/ui/button'
 import { Activity, RefreshCw, FileEdit, Pause, AlertCircle } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { PrStatusBadge } from '@/features/board/pr-status-badge'
 
 interface LaneState {
   sessionId: string
   cardId: string
   cardTitle: string
+  cardPrUrl: string | null
   workspaceSlug: string
   workspaceName: string
   agent: string
@@ -117,6 +119,7 @@ export function LiveAgentsPage() {
       sessionId: s.id,
       cardId: s.cardId,
       cardTitle: card?.title || '(sem titulo)',
+      cardPrUrl: card?.pr_url || null,
       workspaceSlug: s.workspaceSlug,
       workspaceName: ws?.name || s.workspaceSlug,
       agent: s.agent,
@@ -326,8 +329,11 @@ function Lane({ lane }: { lane: LaneState }) {
         <span className="ml-auto text-muted-foreground tabular-nums">{lane.liveChunks.length} chunks</span>
       </div>
 
-      {/* Title */}
-      <div className="px-3 pt-2 text-sm font-medium line-clamp-1">{lane.cardTitle}</div>
+      {/* Title + PR badge */}
+      <div className="px-3 pt-2 flex items-center gap-2">
+        <span className="text-sm font-medium line-clamp-1 flex-1">{lane.cardTitle}</span>
+        {lane.cardPrUrl && <PrStatusBadge url={lane.cardPrUrl} compact />}
+      </div>
 
       {/* Live tail */}
       <div className="px-3 py-2 font-mono text-[11px] text-muted-foreground space-y-0.5 max-h-48 overflow-y-auto">

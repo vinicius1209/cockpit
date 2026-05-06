@@ -73,6 +73,9 @@ export interface Card {
   /** F10 — quando setado, card foi descartado. Mantido no DB pra historico/busca,
    *  filtrado fora do board por padrao. ISO timestamp. null = ativo. */
   archived_at: string | null
+  /** F-PR — URL do ultimo PR criado pra este card. Atualizado pelo daemon
+   *  ao final do `implement` (auto_pr). UI usa pra fetch live status. */
+  pr_url: string | null
 }
 
 export interface Label {
@@ -88,5 +91,5 @@ export interface CardLabel {
   label?: Label
 }
 
-export type CardInsert = Omit<Card, 'id' | 'created_at' | 'updated_at' | 'labels' | 'archived_at'>
+export type CardInsert = Omit<Card, 'id' | 'created_at' | 'updated_at' | 'labels' | 'archived_at' | 'pr_url'>
 export type CardUpdate = Partial<CardInsert>

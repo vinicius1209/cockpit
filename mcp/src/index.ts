@@ -505,6 +505,7 @@ async function toolCreateCard(args: CreateCardArgs): Promise<unknown> {
     created_at: now,
     updated_at: now,
     archived_at: null as string | null,
+    pr_url: null as string | null,
     labels: [],
   }
 
