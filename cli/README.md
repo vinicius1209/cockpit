@@ -140,7 +140,7 @@ cockpit log SW79 --json | jq       # processar com jq
 |---|---|
 | `cockpit` | status overview global (active ws, live runs, other ws) |
 | `cockpit tui` | TUI fullscreen — kanban interativo + sessions live |
-| `cockpit doctor` | health check (daemon, agents CLI, workspaces, projetos, gh) |
+| `cockpit doctor [--fix]` | health check + manutenção (auto-fix de locks órfãos, sessions zumbis) |
 | `cockpit metrics [--json]` | KPIs + sparklines + velocity |
 | `cockpit help [cmd]` | ajuda |
 

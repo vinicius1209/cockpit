@@ -5,15 +5,12 @@
 // Communication: stdio (JSON-RPC 2.0). Auto-launched by the client.
 // Backend: HTTP requests to the local daemon (127.0.0.1:4800).
 //
-// Tools exposed:
-//   - cockpit_list_workspaces
-//   - cockpit_list_cards
-//   - cockpit_show_card
-//   - cockpit_create_card
-//   - cockpit_move_card
-//   - cockpit_search
-//   - cockpit_metrics
-//   - cockpit_health
+// Tools exposed (15 total — v0.3.0):
+//   READ:  cockpit_health, cockpit_list_workspaces, cockpit_list_cards,
+//          cockpit_show_card, cockpit_search, cockpit_metrics, cockpit_get_session
+//   WRITE: cockpit_create_card, cockpit_edit_card, cockpit_move_card,
+//          cockpit_archive_card, cockpit_unarchive_card, cockpit_set_active_workspace
+//   RUN:   cockpit_implement_async, cockpit_abort_session
 //
 // Resources:
 //   - cockpit://card/<id>     → markdown completo do card
@@ -35,7 +32,7 @@ import {
   type AgentSession,
 } from './api'
 
-const VERSION = '0.2.0'
+const VERSION = '0.3.0'
 
 const server = new Server(
   { name: 'cockpit', version: VERSION },

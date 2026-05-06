@@ -53,10 +53,13 @@ O instalador:
 | `cockpit_move_card` | Move entre colunas | card_id*, column_slug* |
 | `cockpit_search` | Busca substring cross-workspace | query*, in (cards/specs/all), limit |
 | `cockpit_metrics` | KPIs globais | — |
+| `cockpit_edit_card` | Atualiza campos do card (title/type/priority/desc/assignee/due_date) | card_id*, ...campos |
 | `cockpit_archive_card` | Descarta card (preserva spec/sessions) | card_id* |
 | `cockpit_unarchive_card` | Reativa card descartado | card_id* |
+| `cockpit_set_active_workspace` | Muda workspace ativo (compartilhado CLI+MCP via cli.json) | workspace* |
 | `cockpit_implement_async` | Dispara `implement` em background, retorna sessionId | card_id*, feedback, no_pr, **isolation** (`lock`/`worktree`) |
 | `cockpit_get_session` | Status de uma session (phase + últimas chunks) | session_id*, tail_chunks |
+| `cockpit_abort_session` | Aborta session em curso (mata processo, marca error, libera lock/worktree) | session_id* |
 
 ## Resources
 
@@ -141,16 +144,20 @@ Stack:
 
 ## Roadmap
 
-Implementadas em v0.2.0 (eram Tier 2):
-- ✅ `cockpit_implement_async` — dispara em background, retorna sessionId (com `isolation: lock|worktree`)
-- ✅ `cockpit_get_session` — status + tail de chunks
+Implementadas em v0.2.0:
+- ✅ `cockpit_implement_async` (com `isolation: lock|worktree`)
+- ✅ `cockpit_get_session`
 - ✅ `cockpit_archive_card` / `cockpit_unarchive_card`
 
-Próximas (Tier 3):
-- `cockpit_set_active_workspace` — mudar workspace ativo (CLI state)
-- `cockpit_edit_card` — atualizar campos (title/type/priority/assignee/due) sem dialog
+Implementadas em v0.3.0 (Tier 3):
+- ✅ `cockpit_edit_card` — patch de campos
+- ✅ `cockpit_set_active_workspace` — compartilhado entre CLI e MCP
+- ✅ `cockpit_abort_session` — mata processo do agent + cleanup
+
+Próximas (Tier 4):
 - `cockpit_get_metrics_workspace` — métricas filtradas por ws
-- `cockpit_abort_session` — abortar session em curso pelo Claude Code
+- `cockpit_create_workspace` / `cockpit_link_project` — bootstrap completo via chat
+- `cockpit_spec_gen_async` — gerar spec sem precisar abrir Web UI
 
 ## Debugging
 

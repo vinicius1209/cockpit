@@ -3,7 +3,7 @@
 > Cabine de comando pra orquestrar code agents (Claude Code, OpenCode, Gemini CLI, Aider) em workspaces multi-projeto.
 
 ```
-▰▰▰▰▰  COCKPIT v0.2.0
+▰▰▰▰▰  COCKPIT v0.3.0
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ━ ACTIVE WORKSPACE
@@ -63,7 +63,7 @@ bun run mcp:install                # registra em ~/.claude.json
 [Claude] → cockpit_create_card(title='...', type='chore') → ✓ #SW82
 ```
 
-Tools expostas: `cockpit_health`, `cockpit_list_workspaces`, `cockpit_list_cards`, `cockpit_show_card`, `cockpit_create_card`, `cockpit_move_card`, `cockpit_archive_card`, `cockpit_unarchive_card`, `cockpit_search`, `cockpit_metrics`, `cockpit_implement_async`, `cockpit_get_session`. Resources: `cockpit://card/<id>`, `cockpit://board/<workspace>`.
+Tools expostas (15): `cockpit_health`, `cockpit_list_workspaces`, `cockpit_list_cards`, `cockpit_show_card`, `cockpit_create_card`, `cockpit_edit_card`, `cockpit_move_card`, `cockpit_archive_card`, `cockpit_unarchive_card`, `cockpit_search`, `cockpit_metrics`, `cockpit_set_active_workspace`, `cockpit_implement_async`, `cockpit_get_session`, `cockpit_abort_session`. Resources: `cockpit://card/<id>`, `cockpit://board/<workspace>`.
 
 ## Quickstart
 
@@ -228,11 +228,13 @@ cockpit tui
 | **Multi-agent** (claude-code, opencode, gemini, aider) | ✅ |
 | **CLI Tier 1-4** (read, write, long-running, misc) | ✅ |
 | **`cockpit spec` lifecycle** | ✅ |
-| **MCP server** (12 tools + 2 resources, inclui `implement_async`, `archive_card`) | ✅ |
+| **MCP server** (15 tools + 2 resources, inclui `implement_async`, `archive_card`, `abort_session`, `edit_card`) | ✅ |
 | **Daemon como serviço** (launchd auto-start no macOS) | ✅ |
-| **TUI fullscreen** (`cockpit tui` — board + sessions + live tail) | ✅ |
+| **TUI fullscreen** (`cockpit tui` — board + sessions + actions: implement/archive/abort) | ✅ |
 | **Multi-session orchestration** (project lock + `--isolation worktree` opt-in) | ✅ |
+| **Live Agents Panel** (Web UI cross-workspace + file heatmap de conflitos) | ✅ |
 | **Archive de cards** (Descartar separado de Excluir) | ✅ |
+| **Doctor `--fix`** (auto-corrige locks órfãos, sessions zumbis) | ✅ |
 | **Auth multi-user** | ❌ não está no roadmap (single-user OSS) |
 
 ## Documentação adicional

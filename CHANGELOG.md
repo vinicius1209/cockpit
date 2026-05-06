@@ -2,6 +2,72 @@
 
 Todas as mudanças notáveis do Cockpit. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.3.0] — 2026-05-05
+
+Foco: **observabilidade cross-workspace**, **controle pelo Claude Code via MCP**, **TUI deixa de ser viewer e vira controlador**, **doctor com auto-fix**.
+
+### Fixed — TUI rendering em raw mode
+
+Em raw mode terminal, `\n` faz line feed mas NÃO carriage return — produzia escada/sobreposição. `Engine.draw()` agora usa `moveTo + clearLine` por linha em vez de juntar com `\n`. Também limpa linhas residuais quando o frame encolhe e parqueia o cursor no canto direito ao final pra evitar piscar no meio do conteúdo.
+
+### Added — Live Agents Panel (Web UI)
+
+Nova rota `/live-agents` na sidebar (`LIV`). Visão cross-workspace de TODAS as sessions em tempo real:
+
+- Cada lane: header com link pro card + agent + phase + elapsed (atualiza por segundo); tail das últimas 8 chunks live; banner de erro; chips de arquivos tocados pelo agent
+- File heatmap sticky à direita: top 10 arquivos tocados, marca `CONFLICT` em vermelho quando 2+ sessions tocam o mesmo path simultâneo (= use `--isolation worktree`)
+- SSE EventSource per-session, reconcile a cada 5s pra detectar sessions novas que apareceram entre updates
+- Botão "limpar" remove finished do panel sem afetar histórico no DB
+
+### Added — MCP Tier 3 (15 tools no total)
+
+- **`cockpit_edit_card`**: patch de campos (título/tipo/prioridade/descrição/assignee/due_date) sem precisar abrir Web UI
+- **`cockpit_set_active_workspace`**: muda o workspace ativo compartilhado entre CLI e MCP (escreve `~/.cockpit/cli.json`)
+- **`cockpit_abort_session`**: aborta uma session em curso (mata o processo do agent, marca phase=error, libera lock, limpa worktree). Idempotente.
+
+Daemon: novo endpoint `POST /agents/sessions/<id>/abort`. `executeAgentWithCallbacks` aceita `AbortSignal` opcional. `runImplementation` registra abort via `registerSessionAbort(sessionId, fn)`.
+
+### Added — TUI vira controlador
+
+Card screen ganha actions:
+- **`i`** = implementar (lock mode)
+- **`I`** (Shift+I) = implementar com `--isolation worktree`
+- **`s`** = spec gen (placeholder com hint pro `cockpit spec gen`)
+- **`a`** = archive/unarchive (existia, ganhou flash de feedback)
+- **`x`** = abortar session ativa
+- Flash banner inline: feedback colorido em emerald/amber/rose por 3s
+- Tick periódico atualiza sessions ativas
+
+Sessions screen ganha **`x`** = abortar selecionada.
+
+### Added — `cockpit doctor --fix`
+
+Detecta + corrige issues comuns:
+
+- Locks órfãos (sessions já terminaram mas lock ficou) → `reapOrphanLocks`
+- Sessions zumbis (>30min sem update) → `reapStaleSessions`
+- Projetos com path inexistente (sem auto-fix — usuário decide reescrever ou desvincular)
+- `cockpit` não no PATH (sem auto-fix — mexer em rc não deve ser auto)
+
+Daemon: novo módulo `daemon/src/routes/maintenance.ts` com:
+- `GET /maintenance/locks` — lista locks marcando órfãos (`active: false`)
+- `POST /maintenance/reap-locks`
+- `GET /maintenance/zombie-sessions?staleAfterMin=N` — preview
+- `POST /maintenance/reap-sessions`
+
+Sem `--fix`, doctor lista issues e sugere `cockpit doctor --fix`.
+
+### Changed
+
+- Daemon `/health` reporta `version: 0.3.0`
+- CLI banner mostra `v0.3.0`
+- MCP server identifica como `cockpit/0.3.0`
+- README / CLAUDE.md / cli/README.md / mcp/README.md atualizados
+
+### Migration
+
+Sem mudança breaking de schema. Sessions e locks da v0.2.0 funcionam normalmente.
+
 ## [0.2.0] — 2026-05-05
 
 Foco: **multi-session orchestration**, **descarte de cards** e **TUI fullscreen**. Cockpit deixa de ser apenas Web/CLI/MCP isolados e ganha primitivas pra trabalhar com N agents em paralelo de forma segura.
@@ -163,5 +229,6 @@ Primeiro release público. Cockpit deixa de ser "interno" e ganha as três inter
 - MCP `cockpit_implement_async` é fire-and-forget (Claude Code UI não streama chunks live; use `cockpit watch` no terminal pra acompanhar)
 - Sem TUI fullscreen (`cockpit tui` planejado)
 
+[0.3.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.3.0
 [0.2.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.2.0
 [0.1.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.1.0

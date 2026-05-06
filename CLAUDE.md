@@ -189,7 +189,7 @@ O Cockpit pode ser operado de **3 formas paralelas** que conversam com o mesmo d
 |---|---|---|
 | **Web UI** (port 5173) | Visão geral, kanban visual, dashboard, AI Chat com contexto rico | `src/` (React + Vite) |
 | **CLI `cockpit`** | Operações rápidas no terminal, scripts, watch live de execução, REPL ai | `cli/` (Bun standalone, zero deps) |
-| **MCP server `cockpit-mcp`** | Claude Code controla Cockpit pelo protocolo MCP (12 tools + 2 resources) | `mcp/` (Bun + `@modelcontextprotocol/sdk`) |
+| **MCP server `cockpit-mcp`** | Claude Code controla Cockpit pelo protocolo MCP (15 tools + 2 resources, inclui implement_async + abort_session + edit_card) | `mcp/` (Bun + `@modelcontextprotocol/sdk`) |
 
 Os 3 modos compartilham 100% do estado (mesmo SQLite, mesmas sessions, mesmas APIs). Não há "modo prioritário" — cada um serve um caso de uso.
 
@@ -223,7 +223,10 @@ CLI cockpit (Bun standalone)       ──HTTP──▶
 - **Project lock (F9-A)**: `daemon/src/tasks/project-lock.ts` impede 2 implementacoes simultaneas no mesmo path. Pre-check nas rotas implement retorna 409 com payload `held_by` rico antes de criar session. Locks orfaos sao limpos lazy (peek) + batch (reaper 5min) + boot. Lock NAO afeta spec/discovery/chat/watch — so implementations.
 - **Worktree opt-in (F9-B)**: `daemon/src/git/worktree-manager.ts` cria git worktree separado por session quando `isolation=worktree`. Path: `<projectPath>.cockpit-worktrees/<sessionId>/`. Skipa lock, usa working tree isolado. Cleanup automatico no finally. CLI: `--isolation worktree`. MCP: `isolation: "worktree"` arg.
 - **Card archive (F10)**: `Card.archived_at` field (Zustand-persisted). Web UI tem botao Descartar (amber) separado de Excluir. Board filtra archived por padrao com toggle. Cards archived: opacity-50 + grayscale + border-dashed.
-- **TUI (`cli/src/tui/`)**: engine proprio (alternate screen + raw mode), screens em `cli/src/tui/screens/`. Cada screen implementa interface `Screen` (render + onKey + onEnter/onLeave + tick opcional). Engine gerencia stack (push/pop/replace) e cleanup ANSI no exit.
+- **TUI (`cli/src/tui/`)**: engine proprio (alternate screen + raw mode), screens em `cli/src/tui/screens/`. Cada screen implementa interface `Screen` (render + onKey + onEnter/onLeave + tick opcional). Engine gerencia stack (push/pop/replace) e cleanup ANSI no exit. **Render usa moveTo+clearLine por linha** (NAO `\n`) pra evitar staircase em raw mode. Card screen tem actions: i=implement, I=worktree, s=spec hint, a=archive, x=abort.
+- **Session abort (F-MCP-T3)**: `daemon/src/tasks/session-manager.ts` exporta `registerSessionAbort/unregisterSessionAbort/abortSession`. `executeAgentWithCallbacks` aceita `AbortSignal` opcional. `runImplementation` registra/desregistra automaticamente. Endpoint `POST /agents/sessions/<id>/abort`.
+- **Live Agents Panel** (`src/app/routes/live-agents.tsx`): visao cross-workspace de sessions ativas. SSE per-session. File heatmap detecta conflito (2+ sessions tocando mesmo path → sugestao de worktree).
+- **Maintenance** (`daemon/src/routes/maintenance.ts`): endpoints pro `cockpit doctor --fix` chamar (`reap-locks`, `reap-sessions`, listagem).
 - **Agent execution**: `daemon/src/executor/agent-executor.ts` — abstrai
   CLI agents (claude-code, opencode, gemini-cli) com `KNOWN_AGENTS` registry.
   - **claude-code precisa de `--permission-mode bypassPermissions`** em modo
