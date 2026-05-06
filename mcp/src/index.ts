@@ -5,7 +5,7 @@
 // Communication: stdio (JSON-RPC 2.0). Auto-launched by the client.
 // Backend: HTTP requests to the local daemon (127.0.0.1:4800).
 //
-// Tools exposed (20 total — v0.8.0):
+// Tools exposed (20 total — v0.9.0):
 //   READ:  cockpit_health, cockpit_list_workspaces, cockpit_list_cards,
 //          cockpit_show_card, cockpit_search, cockpit_metrics,
 //          cockpit_get_session, cockpit_list_projects
@@ -35,7 +35,7 @@ import {
   type AgentSession,
 } from './api'
 
-const VERSION = '0.8.0'
+const VERSION = '0.9.0'
 
 const server = new Server(
   { name: 'cockpit', version: VERSION },

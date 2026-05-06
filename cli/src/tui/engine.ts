@@ -181,8 +181,12 @@ export class TuiEngine {
           const result = await top.onKey(key)
           await this.handleResult(result)
         } catch (err) {
-          // Render error inline na linha 1 (sera sobrescrita no proximo draw)
+          // I11 fix — antes nao setava dirty=true, entao se nenhum tick
+          // disparasse depois, error message ficava congelada na tela.
+          // Agora marca dirty + força redraw imediato, aviso some no proximo
+          // draw normal (proximo onKey).
           process.stdout.write(ANSI.moveTo(1, 1) + ANSI.clearLine + `\x1b[91merror in ${top.name}: ${(err as Error).message}\x1b[0m`)
+          this.dirty = true
         }
       }
       if (this.quit) break

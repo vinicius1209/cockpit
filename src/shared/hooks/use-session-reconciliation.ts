@@ -7,20 +7,48 @@ import { DAEMON_URL } from '@/shared/lib/constants'
 // `processingCards` store on app boot, and opens an SSE per session for live
 // updates (N3 + N8).
 //
-// Module-level dedup: keeps track of session IDs we've already opened streams
-// for, so React StrictMode (which runs effects twice in dev) and re-mounts of
-// the App component don't double-subscribe.
+// I1 fix — antes:
+//   activeSources Map module-level NUNCA era limpado. Sessions que sumiam do
+//   daemon (manual delete, restart, prune) deixavam EventSource auto-retrying
+//   pra sempre. Daemon em apps abertos por horas acumulava 50+ ESes orfas.
+//
+// Agora:
+//   - Dedup via Map module-level continua (StrictMode dev safety)
+//   - Reconcile periodico a cada 30s: lista running sessions, fecha ESes
+//     cujo session_id sumiu da lista (revoked: daemon restart, delete manual,
+//     session terminou off-line e não emitiu done)
+//   - Cleanup do useEffect fecha tudo no unmount (componente raiz desmontando
+//     = app quitting; perfeito momento pra liberar)
 const subscribedSessions = new Set<string>()
 const activeSources = new Map<string, EventSource>()
+const RECONCILE_INTERVAL_MS = 30_000
+
+function closeSession(sessionId: string): void {
+  const es = activeSources.get(sessionId)
+  if (es) es.close()
+  activeSources.delete(sessionId)
+  subscribedSessions.delete(sessionId)
+}
 
 export function useSessionReconciliation() {
   useEffect(() => {
     let cancelled = false
     const { setProcessing, addProcessingChunk, completeProcessing, errorProcessing } = useCardStore.getState()
 
-    daemonClient.listRunningSessions()
-      .then(({ sessions }) => {
+    const reconcile = async () => {
+      try {
+        const { sessions } = await daemonClient.listRunningSessions()
         if (cancelled) return
+
+        const liveIds = new Set(sessions.map((s) => s.id))
+
+        // Fecha ESes cujas sessions sumiram do daemon (revogacao automatica)
+        const ourIds = Array.from(activeSources.keys())
+        for (const id of ourIds) {
+          if (!liveIds.has(id)) {
+            closeSession(id)
+          }
+        }
 
         for (const s of sessions) {
           // Hydrate state from snapshot
@@ -35,18 +63,11 @@ export function useSessionReconciliation() {
             model: s.model || undefined,
           })
 
-          // Dedup: if we already have a stream for this session, skip
           if (subscribedSessions.has(s.id)) continue
           subscribedSessions.add(s.id)
 
           const es = new EventSource(`${DAEMON_URL}/agents/sessions/${s.id}/stream`)
           activeSources.set(s.id, es)
-
-          const cleanup = () => {
-            es.close()
-            activeSources.delete(s.id)
-            subscribedSessions.delete(s.id)
-          }
 
           es.onmessage = (msg) => {
             try {
@@ -55,32 +76,37 @@ export function useSessionReconciliation() {
                 addProcessingChunk(s.cardId, event.text as string)
               } else if (event.type === 'done') {
                 completeProcessing(s.cardId)
-                cleanup()
+                closeSession(s.id)
               } else if (event.type === 'error') {
                 errorProcessing(s.cardId, (event.error as string) || 'Erro desconhecido')
-                cleanup()
+                closeSession(s.id)
               }
             } catch {
               // skip malformed
             }
           }
 
-          // EventSource auto-retries on connection failure. Em caso de erro,
-          // fechamos imediatamente para evitar loop de reconexao spam.
-          es.onerror = () => cleanup()
+          // EventSource auto-retries em fail. Fechamos imediato pra evitar
+          // loop de reconnect spam — o reconcile periodico vai re-abrir
+          // se a session ainda estiver viva.
+          es.onerror = () => closeSession(s.id)
         }
+      } catch (err) {
+        if (!cancelled) console.warn('[reconciliation] skip:', (err as Error).message)
+      }
+    }
 
-        if (sessions.length > 0) {
-          console.log(`[reconciliation] ${sessions.length} sessao(oes) ativa(s); ${activeSources.size} stream(s) abertos`)
-        }
-      })
-      .catch((err) => {
-        if (!cancelled) console.warn('[reconciliation] skip:', err.message)
-      })
+    void reconcile()
+    const intervalId = setInterval(reconcile, RECONCILE_INTERVAL_MS)
 
-    return () => { cancelled = true }
-    // NOTE: nao fechamos sources aqui no cleanup do effect porque eles vivem
-    // no module scope — fechar derrubaria streams legitimos quando StrictMode
-    // re-monta o componente. Eles fecham sozinhos em done/error/errorEvent.
+    return () => {
+      cancelled = true
+      clearInterval(intervalId)
+      // I1 fix: fecha TODAS as ESes no unmount. Em prod, o hook so monta uma
+      // vez no app root, entao unmount = app quitting (rare). Em StrictMode
+      // dev unmount/remount imediato, vamos abrir tudo de novo no remount —
+      // safe, traffic temporario aceitavel.
+      for (const id of Array.from(activeSources.keys())) closeSession(id)
+    }
   }, [])
 }

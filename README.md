@@ -3,7 +3,7 @@
 > Cabine de comando pra orquestrar code agents (Claude Code, OpenCode, Gemini CLI, Aider) em workspaces multi-projeto.
 
 ```
-▰▰▰▰▰  COCKPIT v0.8.0
+▰▰▰▰▰  COCKPIT v0.9.0
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ━ ACTIVE WORKSPACE
@@ -235,6 +235,7 @@ cockpit tui
 | **Empty states** + tooltips em jargão técnico (InfoHint) | ✅ |
 | **Tests** — 235 tests no total (24 frontend + 102 daemon + 80 cli + 29 mcp) | ✅ |
 | **6/6 CRITICAL do code review fechados** (Lost Update, path traversal, file races, TUI cleanup, MCP path redaction, lock TOCTOU) | ✅ |
+| **6/11 IMPORTANT fechados** (EventSource leak, PR badge dedup, proc órfão, appendFile TOCTOU, chunks throttle, TUI error freeze) | ✅ |
 | **`cockpit doctor` com severidade + JSON + 5 checks** | ✅ |
 | **Spec gen via chat** (`cockpit_spec_gen_async`) — 20 tools no total | ✅ |
 | **Hooks** (`before_implement`, `after_implement`, `after_pr` shell scripts) | ✅ |

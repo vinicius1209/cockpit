@@ -2,6 +2,63 @@
 
 Todas as mudanças notáveis do Cockpit. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.9.0] — 2026-05-06
+
+Foco: **6 IMPORTANT do code review fechados**. Sem novas features de produto — release de qualidade interna.
+
+### Fixed — I1: EventSource leak em `useSessionReconciliation`
+
+**Antes**: `activeSources` Map module-level NUNCA era limpado. Sessions que sumiam do daemon (manual delete, restart, prune) deixavam EventSource auto-retrying eternamente. App rodando 8h acumulava 50+ ESes órfãs.
+
+**Agora**:
+- Reconcile periódico a cada 30s → lista running sessions, fecha ESes cujo session_id sumiu da lista (revoked: daemon restart, delete manual, session terminou off-line)
+- Cleanup do `useEffect` fecha tudo no unmount (componente raiz desmontando = app quitting; perfeito momento pra liberar)
+- Dedup module-level preservado (proteção StrictMode dev)
+
+### Fixed — I2: PR badge sem dedup cross-instance
+
+**Antes**: cada `<PrStatusBadge>` tinha seu próprio `fetch` + `setInterval`. Workspace com 20 cards apontando pro mesmo PR (re-implementações) = 20 fetches paralelos a cada 60s ao daemon.
+
+**Agora**: subscriber pattern com cache module-level (`Map<url, CacheEntry>`). Múltiplos badges do mesmo URL compartilham UM fetch + UM timer. Quando entra primeiro subscriber → dispara fetch. Demais subscribers recebem snapshot imediato. Quando último subscriber sai → cleanup interval + cache. **20 fetches/min → 1 fetch/min** quando os badges apontam pra mesmo PR.
+
+### Fixed — I3: `executeAgentStreaming` proc órfão
+
+**Antes**: cliente fecha aba do browser → `ReadableStream` é cancelado pelo Bun, mas o agent CLI spawnado **continua rodando** até `AGENT_TIMEOUT_MS` (5min) ou completar. Resource leak silencioso.
+
+**Agora**: `ReadableStream.cancel(reason)` callback dispara quando consumer desconecta. Mata o proc com SIGTERM, fallback SIGKILL após 5s se não morrer.
+
+### Fixed — I8: `appendFile` TOCTOU em session-manager
+
+**Antes**: `SELECT files → JSON.parse → push → UPDATE`. Race entre 2 events do mesmo file no mesmo segundo permitia duplicação.
+
+**Agora**: wrap em `db.transaction()` (BEGIN IMMEDIATE serializa writes do mesmo processo). Dedup por path preservada.
+
+### Fixed — I9: spec-runner chunks persist heurística frágil
+
+**Antes**: `if (allOutput.length % 1000 < chunk.length)` — chunk grande podia pular vários "marcos" de 1000 chars sem persistir → perda de chunks em crash.
+
+**Agora**: throttle temporal (`now - lastPersistAt > 2000ms`). Garante max 1 update/2s e pelo menos 1 update por janela ativa de 2s.
+
+### Fixed — I11: TUI freeze em `onKey` error
+
+**Antes**: erro durante `onKey` renderizava mensagem mas não setava `dirty=true`. Se nenhum tick disparasse depois, mensagem ficava congelada na tela.
+
+**Agora**: `dirty = true` no catch handler → próximo render normal limpa a mensagem.
+
+### Code review status
+
+| Severidade | Total | Fechado | Restante |
+|---|---|---|---|
+| 🔴 CRITICAL | 6 | 6 ✅ | — |
+| 🟧 IMPORTANT | 11 | **6** ✅ | 5 |
+| 🟨 MODERATE | 11 | 0 | 11 |
+
+**6 IMPORTANT fechados em v0.9** (I1, I2, I3, I8, I9, I11). Restantes: I4 (prompt injection guard), I5 (silent errors UX), I6 (zod nos handlers), I7 (spec_content cru), I10 (mcp config auto-fix).
+
+### Tests
+
+Sem testes novos (fixes em arquivos com cobertura existente; tests passam sem regressão). Total mantido em **235 tests**.
+
 ## [0.8.0] — 2026-05-06
 
 Foco: **fechar 100% dos críticos do code review**. C1 já era v0.7. C2-C6 entregues nesta release com 25 tests de regressão. Hardening completo da fundação antes de retomar features.
@@ -526,6 +583,7 @@ Primeiro release público. Cockpit deixa de ser "interno" e ganha as três inter
 - MCP `cockpit_implement_async` é fire-and-forget (Claude Code UI não streama chunks live; use `cockpit watch` no terminal pra acompanhar)
 - Sem TUI fullscreen (`cockpit tui` planejado)
 
+[0.9.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.9.0
 [0.8.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.8.0
 [0.7.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.7.0
 [0.6.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.6.0

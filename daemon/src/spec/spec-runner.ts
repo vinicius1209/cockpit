@@ -188,6 +188,13 @@ async function runSpecGenInBackground(
   const fullPrompt = `${systemPrompt}\n\n---\n\n${userMessage}`
 
   let allOutput = ''
+  // I9 fix — antes usava `allOutput.length % 1000 < chunk.length` que e
+  // heuristica fragil: chunk grande pode pular varios "marcos" sem
+  // persistir. Agora throttle temporal: persiste se passou >2s desde o
+  // ultimo persist E ha conteudo novo. Garante max 1 update/2s e min
+  // 1 update por janela ativa de 2s.
+  let lastPersistAt = 0
+  const PERSIST_THROTTLE_MS = 2000
 
   try {
     const result = await executeAgentWithCallbacks(
@@ -199,8 +206,9 @@ async function runSpecGenInBackground(
       },
       (chunk) => {
         allOutput += chunk
-        // Persiste chunks incrementais a cada N caracteres
-        if (allOutput.length % 1000 < chunk.length) {
+        const now = Date.now()
+        if (now - lastPersistAt > PERSIST_THROTTLE_MS) {
+          lastPersistAt = now
           updateSession(config.workspaceSlug, config.cardId, sessionId, {
             chunks: [allOutput],
           }).catch(() => {})

@@ -1,6 +1,14 @@
 // PR status badge — fetch live status do GitHub via daemon /git/pr-status.
 // Mostra estado (DRAFT/OPEN/MERGED/CLOSED) com cor, link clicavel.
 // Re-fetch a cada 60s enquanto o componente esta montado.
+//
+// I2 fix — antes: cada PrStatusBadge tinha seu proprio fetch + interval.
+// Workspace com 20 cards apontando pra mesmo PR (re-implementacao da mesma
+// task) = 20 fetches paralelos a cada 60s (apesar do cache 30s no daemon
+// mitigar load real, frontend faz overhead inutil).
+//
+// Agora: subscriber pattern via Map<url, {status, subscribers, timer}>.
+// Multiplos badges do mesmo URL compartilham UM fetch + UM timer.
 
 import { useEffect, useState } from 'react'
 import { DAEMON_URL } from '@/shared/lib/constants'
@@ -25,37 +33,101 @@ interface PrStatusBadgeProps {
 
 const REFRESH_MS = 60_000
 
+// ── Shared cache + subscribers (I2 fix) ──
+
+interface CacheEntry {
+  status: PrStatus | null
+  err: string | null
+  loading: boolean
+  fetchedAt: number  // ms timestamp
+  subscribers: Set<(snapshot: { status: PrStatus | null; err: string | null; loading: boolean }) => void>
+  timer: ReturnType<typeof setInterval> | null
+  inFlight: Promise<void> | null
+}
+
+const cache = new Map<string, CacheEntry>()
+
+async function fetchStatusInto(entry: CacheEntry, url: string): Promise<void> {
+  // Coalesce: se ja ha fetch em voo, espera ele.
+  if (entry.inFlight) return entry.inFlight
+
+  entry.inFlight = (async () => {
+    try {
+      const res = await fetch(`${DAEMON_URL}/git/pr-status?url=${encodeURIComponent(url)}`)
+      if (!res.ok) {
+        entry.err = `HTTP ${res.status}`
+        entry.loading = false
+      } else {
+        entry.status = await res.json() as PrStatus
+        entry.err = null
+        entry.loading = false
+      }
+      entry.fetchedAt = Date.now()
+    } catch (e) {
+      entry.err = (e as Error).message
+      entry.loading = false
+    } finally {
+      entry.inFlight = null
+      // Notifica todos os subscribers
+      const snapshot = { status: entry.status, err: entry.err, loading: entry.loading }
+      for (const fn of entry.subscribers) fn(snapshot)
+    }
+  })()
+  return entry.inFlight
+}
+
+function subscribe(url: string, callback: (snapshot: { status: PrStatus | null; err: string | null; loading: boolean }) => void): () => void {
+  let entry = cache.get(url)
+  if (!entry) {
+    entry = {
+      status: null,
+      err: null,
+      loading: true,
+      fetchedAt: 0,
+      subscribers: new Set(),
+      timer: null,
+      inFlight: null,
+    }
+    cache.set(url, entry)
+  }
+  entry.subscribers.add(callback)
+
+  // Se entrou primeiro subscriber → dispara fetch + timer
+  if (entry.subscribers.size === 1) {
+    void fetchStatusInto(entry, url)
+    entry.timer = setInterval(() => {
+      const e = cache.get(url)
+      if (e) void fetchStatusInto(e, url)
+    }, REFRESH_MS)
+  } else if (entry.fetchedAt > 0) {
+    // Ja temos dado em cache — entrega snapshot imediato pro novo subscriber
+    callback({ status: entry.status, err: entry.err, loading: entry.loading })
+  }
+
+  return () => {
+    const e = cache.get(url)
+    if (!e) return
+    e.subscribers.delete(callback)
+    // Ultimo subscriber saiu → cleanup
+    if (e.subscribers.size === 0) {
+      if (e.timer) clearInterval(e.timer)
+      cache.delete(url)
+    }
+  }
+}
+
 export function PrStatusBadge({ url, compact }: PrStatusBadgeProps) {
   const [status, setStatus] = useState<PrStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
-    let cancelled = false
-
-    const fetchStatus = async () => {
-      try {
-        const res = await fetch(`${DAEMON_URL}/git/pr-status?url=${encodeURIComponent(url)}`)
-        if (cancelled) return
-        if (!res.ok) {
-          setErr(`HTTP ${res.status}`)
-          setLoading(false)
-          return
-        }
-        const data = await res.json() as PrStatus
-        setStatus(data)
-        setErr(null)
-        setLoading(false)
-      } catch (e) {
-        if (cancelled) return
-        setErr((e as Error).message)
-        setLoading(false)
-      }
-    }
-
-    void fetchStatus()
-    const id = setInterval(fetchStatus, REFRESH_MS)
-    return () => { cancelled = true; clearInterval(id) }
+    const unsubscribe = subscribe(url, (snapshot) => {
+      setStatus(snapshot.status)
+      setErr(snapshot.err)
+      setLoading(snapshot.loading)
+    })
+    return unsubscribe
   }, [url])
 
   if (loading) {

@@ -611,6 +611,22 @@ export function executeAgentStreaming(request: AgentExecRequest): {
         controller.close()
       }
     },
+    // I3 fix — cliente fechou conexao (browser fechou aba, fetch abortado).
+    // ReadableStream.cancel dispara aqui. Sem isso, o agent CLI continua
+    // rodando ate AGENT_TIMEOUT_MS (5min) ou completar — resource leak.
+    cancel(reason) {
+      try {
+        if (proc && !proc.killed) {
+          proc.kill('SIGTERM')
+          // Backup: SIGKILL apos 5s se SIGTERM nao surtir efeito
+          setTimeout(() => {
+            try { if (proc && !proc.killed) proc.kill('SIGKILL') } catch { /* ignore */ }
+          }, 5000)
+        }
+      } catch (err) {
+        console.warn(`[executeAgentStreaming] cancel cleanup falhou: ${(err as Error).message}`, reason)
+      }
+    },
   })
 
   return {

@@ -216,15 +216,19 @@ export async function appendFile(
   sessionId: string,
   trackedFile: SessionFile,
 ): Promise<void> {
-  // Check if file already tracked (read from DB, not memory)
-  const row = getDB().query('SELECT files FROM sessions WHERE id = ?').get(sessionId) as { files: string } | null
-  if (!row) return
-
-  const files: SessionFile[] = JSON.parse(row.files || '[]')
-  if (files.some((f) => f.path === trackedFile.path)) return
-
-  files.push(trackedFile)
-  getDB().query('UPDATE sessions SET files = ? WHERE id = ?').run(JSON.stringify(files), sessionId)
+  // I8 fix — antes era SELECT → JSON.parse → push → UPDATE, com janela de
+  // race entre 2 events do mesmo file no mesmo segundo (duplicacao).
+  // Agora wrap em transacao SQLite (BEGIN IMMEDIATE serializa writes do
+  // mesmo proceso). Dedup por path preservada.
+  const db = getDB()
+  db.transaction(() => {
+    const row = db.query('SELECT files FROM sessions WHERE id = ?').get(sessionId) as { files: string } | null
+    if (!row) return
+    const files: SessionFile[] = JSON.parse(row.files || '[]')
+    if (files.some((f) => f.path === trackedFile.path)) return  // dedup
+    files.push(trackedFile)
+    db.query('UPDATE sessions SET files = ? WHERE id = ?').run(JSON.stringify(files), sessionId)
+  })()
 }
 
 export async function listSessions(wsSlug: string, cardId: string): Promise<ImplementSession[]> {
