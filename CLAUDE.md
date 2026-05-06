@@ -189,7 +189,7 @@ O Cockpit pode ser operado de **3 formas paralelas** que conversam com o mesmo d
 |---|---|---|
 | **Web UI** (port 5173) | Visão geral, kanban visual, dashboard, AI Chat com contexto rico | `src/` (React + Vite) |
 | **CLI `cockpit`** | Operações rápidas no terminal, scripts, watch live de execução, REPL ai | `cli/` (Bun standalone, zero deps) |
-| **MCP server `cockpit-mcp`** | Claude Code controla Cockpit pelo protocolo MCP (19 tools + 2 resources, bootstrap completo: create_workspace + link_project + set_card_project) | `mcp/` (Bun + `@modelcontextprotocol/sdk`) |
+| **MCP server `cockpit-mcp`** | Claude Code controla Cockpit pelo protocolo MCP (20 tools + 2 resources, fluxo completo card → spec → implement → PR via chat) | `mcp/` (Bun + `@modelcontextprotocol/sdk`) |
 
 Os 3 modos compartilham 100% do estado (mesmo SQLite, mesmas sessions, mesmas APIs). Não há "modo prioritário" — cada um serve um caso de uso.
 
@@ -232,6 +232,8 @@ CLI cockpit (Bun standalone)       ──HTTP──▶
 - **First-run wizard** (`src/widgets/onboarding/`): Dialog 4-step disparado quando `totalCards === 0` E `localStorage['cockpit-first-run-seen']` ausente. Cria workspace+projeto+card guiado.
 - **InfoHint** (`src/components/ui/info-hint.tsx`): tooltip wrapper pra explicar jargao tecnico (spec status, auto_pr, isolation worktree). Use sempre que adicionar termo novo que pode confundir usuario nao 100% tecnico.
 - **Tests**: `bun test src/__tests__/` em cada package (cli, mcp, daemon, frontend usa vitest). Total v0.5.0: 175 tests.
+- **Spec gen async** (`daemon/src/spec/spec-runner.ts`): `startSpecGenAsync({cardId, workspaceSlug, projectPath?})` — cria session 'spec', spawna agent com cwd=projectPath (Read/Glob real do codigo), persiste chunks, ao final salva `card.spec_content` direto no kv_stores. Endpoint: `POST /agents/spec/async`. MCP: `cockpit_spec_gen_async`.
+- **Hooks** (`daemon/src/hooks/hook-runner.ts`): `runHook(name, ctx)` carrega script do workspace.hooks no kv_stores e executa em `/bin/sh -c` com env vars. Integrado em `runImplementation` em 3 pontos: `before_implement` (gate, exit != 0 aborta), `after_implement` (apos agent, antes do PR), `after_pr` (apos PR criado). UI em workspace settings tab Hooks.
 - **Agent execution**: `daemon/src/executor/agent-executor.ts` — abstrai
   CLI agents (claude-code, opencode, gemini-cli) com `KNOWN_AGENTS` registry.
   - **claude-code precisa de `--permission-mode bypassPermissions`** em modo

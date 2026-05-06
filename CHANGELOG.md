@@ -2,6 +2,60 @@
 
 Todas as mudanças notáveis do Cockpit. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.6.0] — 2026-05-06
+
+Foco: **fechar o ciclo MCP** (spec gen via chat) + **extensibilidade via hooks** + **mobile responsive**. Cockpit agora roda end-to-end pelo Claude Code e pode ser usado do celular.
+
+### Added — `cockpit_spec_gen_async` (MCP Tier 5)
+
+Última peça do MCP: agora gerar spec técnica é via chat, sem Web UI. Total: 20 tools.
+
+```
+[Você] "transforme SW79 em spec"
+[Claude] → cockpit_spec_gen_async(card_id="SW79")
+         ✓ session sess_xyz iniciada
+[Você] "como tá?"
+[Claude] → cockpit_get_session  →  phase=done
+[Você] "mostra a spec"
+[Claude] → cockpit_show_card  →  spec_content já populado
+```
+
+Daemon: `daemon/src/spec/spec-runner.ts` com `startSpecGenAsync` fire-and-forget. Carrega card do `kv_stores`, monta prompt (system DEFAULT_SYSTEM_PROMPT + contexto card), spawna agent CLI com cwd=projectPath (Read/Glob real do código). Persiste chunks incrementais. Ao completar: salva `card.spec_content` + `spec_status='draft'` direto no DB.
+
+Endpoint: `POST /agents/spec/async`. Aborto via `cockpit_abort_session` reaproveitado.
+
+### Added — Hooks (`before_implement`, `after_implement`, `after_pr`)
+
+Power users plugam shell scripts em momentos chave do ciclo de implementação. Padrão git-hooks.
+
+- **`before_implement`** (gate): exit != 0 ABORTA. Use pra `bun run lint`, schema check, etc
+- **`after_implement`**: informativo, antes do PR. Use pra rodar testes, métricas, etc
+- **`after_pr`**: depois do PR criado. Use pra Slack notify, deploy preview, etc
+
+Daemon (`daemon/src/hooks/hook-runner.ts`): executa em `/bin/sh -c <script>` com env vars (`COCKPIT_CARD_ID`, `SESSION_ID`, `BRANCH`, `PROJECT_PATH`, `AGENT`, `PR_URL`, `PR_NUMBER`, `SUMMARY`). Timeout 60s. Stdout aparece no live tail.
+
+UI: nova tab "Hooks" em workspace settings com:
+- Banner amber de aviso de segurança ("rodam com permissões do daemon")
+- Cada hook tem card com label + GATE badge (se blocking) + textarea mono + lista expansível de env vars disponíveis
+
+### Added — Mobile responsive Web UI
+
+Triagem do celular vira viável.
+
+- **Board**: `BoardColumn` `w-72` → `w-[85vw] sm:w-72`. `snap-x snap-mandatory` no container, `snap-center` na coluna → swipe natural alinhado. Hint "swipe ← →" visível em mobile com 2+ colunas
+- **Card dialog**: full-screen no mobile (`h-[100dvh] sm:h-[88vh]` + `rounded-none sm:rounded-lg`)
+- **Card detail**: sidebar direita (`w-52 + border-l`) vira bottom-stack com `border-t` em mobile
+- **Live Agents**: heatmap empilha embaixo das lanes em mobile. Lane header com `flex-wrap`
+- **Header**: workspace name truncado em mobile, botão `⌘K` já era `hidden md:flex`
+
+Sidebar e Toaster já tinham comportamento mobile via shadcn (sidebar vira drawer < md).
+
+### Changed
+
+- Daemon `/health` reporta `version: 0.6.0`
+- CLI banner / MCP server identifier sincronizados
+- `session-manager.updateSession` aceita `action` + `chunks` (eram só `ImplementSession`-fields). Sempre atualiza `updated_at` (reaper sabe que há atividade)
+
 ## [0.5.0] — 2026-05-06
 
 Foco: **qualidade interna** (cobertura inicial de tests) + **UX pra usuário não 100% técnico** (first-run wizard, empty states, tooltips em jargão).
@@ -336,6 +390,7 @@ Primeiro release público. Cockpit deixa de ser "interno" e ganha as três inter
 - MCP `cockpit_implement_async` é fire-and-forget (Claude Code UI não streama chunks live; use `cockpit watch` no terminal pra acompanhar)
 - Sem TUI fullscreen (`cockpit tui` planejado)
 
+[0.6.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.6.0
 [0.5.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.5.0
 [0.4.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.4.0
 [0.3.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.3.0

@@ -57,6 +57,7 @@ O instalador:
 | `cockpit_archive_card` | Descarta card (preserva spec/sessions) | card_id* |
 | `cockpit_unarchive_card` | Reativa card descartado | card_id* |
 | `cockpit_set_active_workspace` | Muda workspace ativo (compartilhado CLI+MCP via cli.json) | workspace* |
+| `cockpit_spec_gen_async` | Gera spec tecnica via AI em background (salva em card.spec_content) | card_id*, agent, model, system_prompt |
 | `cockpit_implement_async` | Dispara `implement` em background, retorna sessionId | card_id*, feedback, no_pr, **isolation** (`lock`/`worktree`) |
 | `cockpit_get_session` | Status de uma session (phase + últimas chunks) | session_id*, tail_chunks |
 | `cockpit_abort_session` | Aborta session em curso (mata processo, marca error, libera lock/worktree) | session_id* |
@@ -164,10 +165,13 @@ Implementadas em v0.4.0 (Tier 4):
 - ✅ `cockpit_link_project` — vincular diretorio local
 - ✅ `cockpit_set_card_project` — atribuir projeto a card
 
-Próximas (Tier 5):
-- `cockpit_spec_gen_async` — gerar spec via chat (precisa fluxo AI dedicado no daemon)
+Implementadas em v0.6.0 (Tier 5):
+- ✅ `cockpit_spec_gen_async` — gerar spec via chat (fluxo AI dedicado no daemon)
+
+Próximas (Tier 6+):
 - `cockpit_get_metrics_workspace` — métricas filtradas por ws
 - `cockpit_pr_status` — atalho pra surface PR sem chamar /git/pr-status manualmente
+- `cockpit_run_hook` — disparar hook avulso (testar before_implement/after_pr)
 
 ## Debugging
 

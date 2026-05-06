@@ -3,7 +3,7 @@
 > Cabine de comando pra orquestrar code agents (Claude Code, OpenCode, Gemini CLI, Aider) em workspaces multi-projeto.
 
 ```
-▰▰▰▰▰  COCKPIT v0.5.0
+▰▰▰▰▰  COCKPIT v0.6.0
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ━ ACTIVE WORKSPACE
@@ -63,7 +63,7 @@ bun run mcp:install                # registra em ~/.claude.json
 [Claude] → cockpit_create_card(title='...', type='chore') → ✓ #SW82
 ```
 
-Tools expostas (19): `cockpit_health`, `cockpit_list_workspaces`, `cockpit_list_cards`, `cockpit_show_card`, `cockpit_create_card`, `cockpit_edit_card`, `cockpit_move_card`, `cockpit_archive_card`, `cockpit_unarchive_card`, `cockpit_search`, `cockpit_metrics`, `cockpit_set_active_workspace`, `cockpit_create_workspace`, `cockpit_list_projects`, `cockpit_link_project`, `cockpit_set_card_project`, `cockpit_implement_async`, `cockpit_get_session`, `cockpit_abort_session`. Resources: `cockpit://card/<id>`, `cockpit://board/<workspace>`.
+Tools expostas (20): `cockpit_health`, `cockpit_list_workspaces`, `cockpit_list_cards`, `cockpit_show_card`, `cockpit_create_card`, `cockpit_edit_card`, `cockpit_move_card`, `cockpit_archive_card`, `cockpit_unarchive_card`, `cockpit_search`, `cockpit_metrics`, `cockpit_set_active_workspace`, `cockpit_create_workspace`, `cockpit_list_projects`, `cockpit_link_project`, `cockpit_set_card_project`, `cockpit_spec_gen_async`, `cockpit_implement_async`, `cockpit_get_session`, `cockpit_abort_session`. Resources: `cockpit://card/<id>`, `cockpit://board/<workspace>`.
 
 ## Quickstart
 
@@ -234,6 +234,9 @@ cockpit tui
 | **First-run wizard** (4-step guiado pra primeiro uso) | ✅ |
 | **Empty states** + tooltips em jargão técnico (InfoHint) | ✅ |
 | **Tests** — 175 tests no total (24 frontend + 79 daemon + 70 cli + 22 mcp) | ✅ |
+| **Spec gen via chat** (`cockpit_spec_gen_async`) — 20 tools no total | ✅ |
+| **Hooks** (`before_implement`, `after_implement`, `after_pr` shell scripts) | ✅ |
+| **Mobile responsive** Web UI (board swipe, card full-screen, heatmap stack) | ✅ |
 | **Daemon como serviço** (launchd auto-start no macOS) | ✅ |
 | **TUI fullscreen** (`cockpit tui` — board + sessions + actions: implement/archive/abort) | ✅ |
 | **Multi-session orchestration** (project lock + `--isolation worktree` opt-in) | ✅ |
