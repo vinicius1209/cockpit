@@ -3,7 +3,7 @@
 > Cabine de comando pra orquestrar code agents (Claude Code, OpenCode, Gemini CLI, Aider) em workspaces multi-projeto.
 
 ```
-▰▰▰▰▰  COCKPIT v0.4.0
+▰▰▰▰▰  COCKPIT v0.5.0
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ━ ACTIVE WORKSPACE
@@ -231,6 +231,9 @@ cockpit tui
 | **MCP server** (19 tools + 2 resources, bootstrap completo via chat: `create_workspace` / `link_project` / `set_card_project`) | ✅ |
 | **Web UI Command Palette** (⌘K + atalhos `g d/g a/g b`) | ✅ |
 | **PR status sync** (badge live no card detail e Live Agents) | ✅ |
+| **First-run wizard** (4-step guiado pra primeiro uso) | ✅ |
+| **Empty states** + tooltips em jargão técnico (InfoHint) | ✅ |
+| **Tests** — 175 tests no total (24 frontend + 79 daemon + 70 cli + 22 mcp) | ✅ |
 | **Daemon como serviço** (launchd auto-start no macOS) | ✅ |
 | **TUI fullscreen** (`cockpit tui` — board + sessions + actions: implement/archive/abort) | ✅ |
 | **Multi-session orchestration** (project lock + `--isolation worktree` opt-in) | ✅ |

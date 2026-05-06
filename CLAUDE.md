@@ -229,6 +229,9 @@ CLI cockpit (Bun standalone)       ──HTTP──▶
 - **Maintenance** (`daemon/src/routes/maintenance.ts`): endpoints pro `cockpit doctor --fix` chamar (`reap-locks`, `reap-sessions`, listagem).
 - **Command Palette** (`src/widgets/command-palette/command-palette.tsx`): cmdk-based, ⌘K global. `useCommandPalette` hook tambem instala atalhos sequenciais `g d/g a/g b/g m/g s` (Vim-style, fora de input). `workspace.tsx` + `board-view.tsx` escutam `?cardId/?new=1/?archived=1` pra integrar com palette + Live Agents links.
 - **PR status** (`src/features/board/pr-status-badge.tsx` + `daemon/src/routes/git.ts`): live status via `gh pr view --json` no daemon (cache 30s). Card.pr_url salvo automaticamente quando `runImplementation` cria PR. Badge usado no card detail (full) e Live Agents lane (compact).
+- **First-run wizard** (`src/widgets/onboarding/`): Dialog 4-step disparado quando `totalCards === 0` E `localStorage['cockpit-first-run-seen']` ausente. Cria workspace+projeto+card guiado.
+- **InfoHint** (`src/components/ui/info-hint.tsx`): tooltip wrapper pra explicar jargao tecnico (spec status, auto_pr, isolation worktree). Use sempre que adicionar termo novo que pode confundir usuario nao 100% tecnico.
+- **Tests**: `bun test src/__tests__/` em cada package (cli, mcp, daemon, frontend usa vitest). Total v0.5.0: 175 tests.
 - **Agent execution**: `daemon/src/executor/agent-executor.ts` — abstrai
   CLI agents (claude-code, opencode, gemini-cli) com `KNOWN_AGENTS` registry.
   - **claude-code precisa de `--permission-mode bypassPermissions`** em modo

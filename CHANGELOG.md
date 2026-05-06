@@ -2,6 +2,61 @@
 
 Todas as mudanças notáveis do Cockpit. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [0.5.0] — 2026-05-06
+
+Foco: **qualidade interna** (cobertura inicial de tests) + **UX pra usuário não 100% técnico** (first-run wizard, empty states, tooltips em jargão).
+
+### Added — Cobertura inicial de tests (92 tests, 0 falhas)
+
+CLI/TUI (`cli/src/__tests__/`, 70 tests):
+- **`tui-keys.test.ts`**: parser stdin raw — letras, ctrl+letra, alt+letra, enter/tab/backspace/space/escape, setas (CSI), home/end/pgup/pgdn/del, F1-F12 (xterm legacy + tilde), paste com várias keys, robustez (chunk vazio, escape incompleto, CSI desconhecido, diacríticos)
+- **`tui-layout.test.ts`**: clip preservando ANSI, padRight/padLeft/center, joinCols com gap configurável, box com título
+- **`resolve.test.ts`**: shortId, resolveCard (id/short/com#/lower/prefix/ambíguo/vazio), resolveWorkspace (slug/nome/id/case-insensitive)
+
+MCP (`mcp/src/__tests__/`, 22 tests):
+- **`api.test.ts`**: shortId, resolveCard, resolveWorkspace, newCardId, ProjectLockedError (path+heldBy+hints, instance check, defaults)
+- **`daemon-post.test.ts`**: integration test com `Bun.serve` fake — 409 vira ProjectLockedError preservando held_by, 500/404 viram Error genérico
+
+Refactor pra permitir testar:
+- `mcp/src/api.ts`: `getDaemonUrl()` lazy (era const capturada no load)
+- `mcp/src/index.ts`: `daemonHint()` lazy (mesmo motivo)
+
+Scripts: `bun run test` em CLI e MCP (além dos já existentes em daemon e frontend).
+
+Cobertura intencional: regressão do bug TUI raw mode (`\n` staircase) seria pega pelo parser/layout. Detecta também regressão em parsing 409 → MCP deixar de surface PROJECT_LOCKED corretamente pro Claude Code.
+
+### Added — First-run wizard (Web UI)
+
+Pra usuário não 100% técnico que abre Cockpit pela primeira vez. Dialog 4-step:
+
+1. **Welcome** — tour rápido (workspace/projeto/card explicados como tiles)
+2. **Workspace** — nome + descrição + slug auto-derivado preview
+3. **Projeto** — path absoluto, opcional (pode pular e adicionar depois)
+4. **Card** — título + descrição opcional → "Boarding completo" com hint pra Spec → "Gerar com AI"
+
+UX: pula step "workspace" se já há workspaces, "pular tutorial" sempre visível, slug renderiza em real-time, caixinhas explicando o modelo.
+
+`useFirstRun` hook dispara wizard auto quando `totalCards === 0` E nunca viu o tutorial (localStorage). `showAgain()` pra reabrir manualmente no futuro.
+
+### Added — Empty state Dashboard
+
+Quando `totalCards === 0`, banner com CTA grande (3 botões: "Novo card em X", "⌘K abrir busca", "Configurar daemon / agents") + hint do uso via Claude Code com exemplo de prompt MCP. Some assim que primeiro card é criado.
+
+### Added — InfoHint (`<InfoHint>`)
+
+Componente reutilizável: info icon (i) com tooltip de 1 linha + detail opcional. Aplicado em 3 lugares de alta confusão:
+
+- **Card detail → Spec status**: explica `draft / ready / in_progress / review / done`
+- **Workspace settings → Auto PR**: explica `gh CLI`, draft mode, quando desligar
+- **Live Agents → CONFLICT badge**: explica conflito de arquivo + sugere `--isolation worktree` com tradeoffs
+
+`TelemetryRow` ganha prop opcional `hint` pra reaproveitar no futuro.
+
+### Changed
+
+- Daemon `/health` reporta `version: 0.5.0`
+- CLI banner / MCP server identifier sincronizados
+
 ## [0.4.0] — 2026-05-05
 
 Foco: **bootstrap completo via Claude Code**, **navegação ⌘K na Web**, **PR status ao vivo no card**. Cockpit fecha o loop "ideia → spec → implement → PR" sem precisar trocar de ferramenta.
@@ -281,6 +336,7 @@ Primeiro release público. Cockpit deixa de ser "interno" e ganha as três inter
 - MCP `cockpit_implement_async` é fire-and-forget (Claude Code UI não streama chunks live; use `cockpit watch` no terminal pra acompanhar)
 - Sem TUI fullscreen (`cockpit tui` planejado)
 
+[0.5.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.5.0
 [0.4.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.4.0
 [0.3.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.3.0
 [0.2.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.2.0
