@@ -1,5 +1,7 @@
 import { jsonResponse } from '../http'
 import { detectInstalledAgents, executeAgent, executeAgentStreaming } from '../executor/agent-executor'
+import { startSpecGenAsync, type SpecGenConfig } from '../spec/spec-runner'
+import { validateProjectPath } from '../validation'
 
 export async function handleAgentRoutes(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
@@ -8,6 +10,25 @@ export async function handleAgentRoutes(req: Request, url: URL): Promise<Respons
   if (path === '/agents/available' && req.method === 'GET') {
     const agents = await detectInstalledAgents()
     return jsonResponse(agents)
+  }
+
+  // POST /agents/spec/async — fire-and-forget spec generation
+  if (path === '/agents/spec/async' && req.method === 'POST') {
+    const body = await req.json() as Partial<SpecGenConfig>
+    if (!body.cardId || !body.workspaceSlug) {
+      return jsonResponse({ error: 'cardId + workspaceSlug obrigatorios' }, 400)
+    }
+    if (body.projectPath) {
+      const valid = validateProjectPath(body.projectPath)
+      if (!valid) return jsonResponse({ error: 'Invalid projectPath' }, 400)
+      body.projectPath = valid
+    }
+    try {
+      const result = await startSpecGenAsync(body as SpecGenConfig)
+      return jsonResponse({ sessionId: result.sessionId, status: 'started' })
+    } catch (err) {
+      return jsonResponse({ error: err instanceof Error ? err.message : 'erro' }, 400)
+    }
   }
 
   // POST /agents/execute — run agent (blocking)

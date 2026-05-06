@@ -161,11 +161,19 @@ export async function createSession(wsSlug: string, cardId: string, data: {
   return session
 }
 
+// Extension dos updates aceitos: campos de AgentSession que nao estao em
+// ImplementSession (action, chunks). Mantemos um type local pra nao
+// quebrar callers existentes que esperam ImplementSession.
+type SessionUpdates = Partial<ImplementSession> & {
+  action?: SessionAction
+  chunks?: string[]
+}
+
 export async function updateSession(
   wsSlug: string,
   cardId: string,
   sessionId: string,
-  updates: Partial<ImplementSession>,
+  updates: SessionUpdates,
 ): Promise<void> {
   const sets: string[] = []
   const values: unknown[] = []
@@ -178,6 +186,10 @@ export async function updateSession(
   if (updates.output !== undefined) { sets.push('output = ?'); values.push(JSON.stringify(updates.output)) }
   if (updates.files !== undefined) { sets.push('files = ?'); values.push(JSON.stringify(updates.files)) }
   if (updates.error !== undefined) { sets.push('error = ?'); values.push(updates.error) }
+  if (updates.action !== undefined) { sets.push('action = ?'); values.push(updates.action) }
+  if (updates.chunks !== undefined) { sets.push('chunks = ?'); values.push(JSON.stringify(updates.chunks)) }
+  // updated_at — sempre atualiza pra reaper detectar atividade
+  sets.push("updated_at = datetime('now')")
 
   if (sets.length === 0) return
 

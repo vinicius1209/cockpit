@@ -166,6 +166,25 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
+      name: 'cockpit_spec_gen_async',
+      description:
+        'Gera a spec tecnica de um card usando AI em background (fire-and-forget). ' +
+        'Use quando o usuario fala "escreve uma spec pro SW79" ou "transforma esse card em spec". ' +
+        'Pre-req: card precisa ter titulo + (descricao OU notas de entrevista) pra ter contexto suficiente. ' +
+        'Salva o resultado em card.spec_content + spec_status="draft" quando terminar. ' +
+        'Retorna sessionId — use cockpit_get_session pra acompanhar progresso, ou cockpit_show_card pra ver spec ao final.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          card_id: { type: 'string', description: 'Card short ID (SW78) ou full ID' },
+          agent: { type: 'string', description: 'Agent CLI a usar. Default: claude-code (ou primeiro detectado)' },
+          model: { type: 'string', description: 'Modelo (sonnet/haiku/opus). Default: agent escolhe' },
+          system_prompt: { type: 'string', description: 'Override do system prompt (avancado). Default: template embutido' },
+        },
+        required: ['card_id'],
+      },
+    },
+    {
       name: 'cockpit_implement_async',
       description:
         'Trigger implementation of a card in the background. The card must have a ready spec and a project linked to its workspace. ' +
@@ -334,6 +353,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'cockpit_set_card_project': return ok(await toolSetCardProject(args as { card_id: string; project_id: string }))
       case 'cockpit_set_active_workspace': return ok(await toolSetActiveWorkspace(args as { workspace: string }))
       case 'cockpit_abort_session':  return ok(await toolAbortSession(args as { session_id: string }))
+      case 'cockpit_spec_gen_async':  return ok(await toolSpecGenAsync(args as unknown as SpecGenAsyncArgs))
       case 'cockpit_implement_async': return ok(await toolImplementAsync(args as unknown as ImplementAsyncArgs))
       case 'cockpit_get_session':  return ok(await toolGetSession(args as { session_id: string; tail_chunks?: number }))
       default: throw new Error(`unknown tool: ${name}`)
@@ -927,6 +947,53 @@ interface ImplementAsyncArgs {
   feedback?: string
   no_pr?: boolean
   isolation?: 'lock' | 'worktree'
+}
+
+interface SpecGenAsyncArgs {
+  card_id: string
+  agent?: string
+  model?: string
+  system_prompt?: string
+}
+
+async function toolSpecGenAsync(args: SpecGenAsyncArgs): Promise<unknown> {
+  const [workspaces, cards, projects] = await Promise.all([
+    loadWorkspaces(), loadCards(), loadProjects(),
+  ])
+  const card = resolveCard(args.card_id, cards)
+  if (!card) throw new Error(`card not found: ${args.card_id}`)
+  const ws = workspaces.find((w) => w.id === card.workspace_id)
+  if (!ws) throw new Error('workspace not found for card')
+
+  // projectPath opcional — pega primeiro projeto do workspace pra dar
+  // contexto de codigo pro agent (Read/Glob real do repo).
+  const wsProjects = projects.filter((p) => p.workspace_id === ws.id)
+  const project = card.project_id
+    ? wsProjects.find((p) => p.id === card.project_id)
+    : wsProjects[0]
+
+  const body = {
+    cardId: card.id,
+    workspaceSlug: ws.slug,
+    agent: args.agent,
+    model: args.model,
+    systemPrompt: args.system_prompt,
+    projectPath: project?.path,
+  }
+
+  const res = await daemonPost<{ sessionId: string; status: string }>('/agents/spec/async', body)
+
+  return {
+    session_id: res.sessionId,
+    status: res.status,
+    card: { id: shortId(card.id), title: card.title },
+    workspace: ws.slug,
+    project: project?.name,
+    follow_up: {
+      poll: `cockpit_get_session({ session_id: "${res.sessionId}" })`,
+      result: `cockpit_show_card({ card_id: "${shortId(card.id)}" })  # apos status='done', ve spec_content`,
+    },
+  }
 }
 
 async function toolImplementAsync(args: ImplementAsyncArgs): Promise<unknown> {
