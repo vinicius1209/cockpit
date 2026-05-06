@@ -5,6 +5,12 @@ import { jsonResponse } from '../http'
 import { reapStaleSessions } from '../tasks/session-manager'
 import { reapOrphanLocks, getProjectLock } from '../tasks/project-lock'
 import { getDB } from '../persistence/db'
+import { worktreeRoot } from '../git/worktree-manager'
+import { existsSync } from 'node:fs'
+import { readdir, rm, stat } from 'node:fs/promises'
+import { join } from 'node:path'
+import { homedir } from 'node:os'
+import { validateProjectPath } from '../validation'
 
 export async function handleMaintenanceRoutes(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
@@ -35,6 +41,107 @@ export async function handleMaintenanceRoutes(req: Request, url: URL): Promise<R
     return jsonResponse({ reaped })
   }
 
+  // GET /maintenance/worktrees?projectPath=... — lista worktrees orfaos
+  // (dirs em <projectPath>.cockpit-worktrees/ cuja session ja terminou).
+  if (path === '/maintenance/worktrees' && req.method === 'GET') {
+    const projectPath = url.searchParams.get('projectPath') || ''
+    const valid = validateProjectPath(projectPath)
+    if (!valid) return jsonResponse({ error: 'invalid projectPath' }, 400)
+
+    const root = worktreeRoot(valid)
+    if (!existsSync(root)) {
+      return jsonResponse({ root, worktrees: [] })
+    }
+
+    const db = getDB()
+    const activeSessions = db.query(`
+      SELECT id FROM sessions
+      WHERE phase NOT IN ('done', 'error') AND completed_at IS NULL
+    `).all() as Array<{ id: string }>
+    const activeIds = new Set(activeSessions.map((s) => s.id))
+
+    const entries = await readdir(root).catch(() => [])
+    const worktrees: Array<{ sessionId: string; path: string; orphan: boolean; sizeBytes?: number }> = []
+    for (const sessionId of entries) {
+      const wtPath = join(root, sessionId)
+      const orphan = !activeIds.has(sessionId)
+      let sizeBytes: number | undefined
+      try {
+        const st = await stat(wtPath)
+        if (st.isDirectory()) sizeBytes = await dirSize(wtPath)
+      } catch { /* ignore */ }
+      worktrees.push({ sessionId, path: wtPath, orphan, sizeBytes })
+    }
+    return jsonResponse({ root, worktrees })
+  }
+
+  // POST /maintenance/cleanup-worktrees — remove dirs orfaos
+  if (path === '/maintenance/cleanup-worktrees' && req.method === 'POST') {
+    const body = await req.json().catch(() => ({})) as { projectPath?: string; force?: boolean }
+    const valid = body.projectPath ? validateProjectPath(body.projectPath) : null
+    if (!valid) return jsonResponse({ error: 'invalid or missing projectPath' }, 400)
+
+    const root = worktreeRoot(valid)
+    if (!existsSync(root)) return jsonResponse({ removed: 0, root })
+
+    const db = getDB()
+    const activeSessions = db.query(`
+      SELECT id FROM sessions
+      WHERE phase NOT IN ('done', 'error') AND completed_at IS NULL
+    `).all() as Array<{ id: string }>
+    const activeIds = new Set(activeSessions.map((s) => s.id))
+
+    const entries = await readdir(root).catch(() => [])
+    let removed = 0
+    const errors: string[] = []
+    for (const sessionId of entries) {
+      if (activeIds.has(sessionId)) continue  // pula vivos
+      const wtPath = join(root, sessionId)
+      try {
+        await rm(wtPath, { recursive: true, force: !!body.force })
+        removed++
+      } catch (e) {
+        errors.push(`${sessionId}: ${(e as Error).message}`)
+      }
+    }
+    return jsonResponse({ removed, root, errors })
+  }
+
+  // GET /system/info — version, paths, disk usage de ~/.cockpit/.
+  // Doctor usa pra detectar version drift e disk pressure.
+  if (path === '/system/info' && req.method === 'GET') {
+    const cockpitDir = join(homedir(), '.cockpit')
+    const dataDir = join(cockpitDir, 'data')
+    const tasksDir = join(cockpitDir, 'tasks')
+    const logsDir = join(cockpitDir, 'logs')
+
+    const [dataSize, tasksSize, logsSize] = await Promise.all([
+      existsSync(dataDir) ? dirSize(dataDir).catch(() => 0) : 0,
+      existsSync(tasksDir) ? dirSize(tasksDir).catch(() => 0) : 0,
+      existsSync(logsDir) ? dirSize(logsDir).catch(() => 0) : 0,
+    ])
+
+    return jsonResponse({
+      // version eh atualizada pelo bump (sed em release). Fonte unica
+      // pra doctor comparar com /health.
+      daemon_version: '0.6.0',
+      cockpit_dir: cockpitDir,
+      paths: {
+        data: dataDir,
+        tasks: tasksDir,
+        logs: logsDir,
+      },
+      sizes_bytes: {
+        data: dataSize,
+        tasks: tasksSize,
+        logs: logsSize,
+        total: dataSize + tasksSize + logsSize,
+      },
+      pid: process.pid,
+      uptime_seconds: Math.round(process.uptime()),
+    })
+  }
+
   // GET /maintenance/zombie-sessions — preview de sessions stale
   if (path === '/maintenance/zombie-sessions' && req.method === 'GET') {
     const db = getDB()
@@ -51,4 +158,26 @@ export async function handleMaintenanceRoutes(req: Request, url: URL): Promise<R
   }
 
   return jsonResponse({ error: 'Not found' }, 404)
+}
+
+// du -sb local — recursivo. Cap em 10k entries pra evitar travar com
+// node_modules absurdos.
+async function dirSize(dir: string, depth = 0, count = { n: 0 }): Promise<number> {
+  if (depth > 8 || count.n > 10000) return 0
+  let total = 0
+  let entries: string[]
+  try { entries = await readdir(dir) } catch { return 0 }
+  for (const name of entries) {
+    if (count.n++ > 10000) return total
+    const p = join(dir, name)
+    try {
+      const st = await stat(p)
+      if (st.isDirectory()) {
+        total += await dirSize(p, depth + 1, count)
+      } else {
+        total += st.size
+      }
+    } catch { /* ignore unreadable */ }
+  }
+  return total
 }

@@ -6,7 +6,7 @@ const COMMANDS: Array<{ cmd: string; desc: string; group: string }> = [
   // Status & info
   { cmd: 'cockpit',                       desc: 'status overview global',                                     group: 'status' },
   { cmd: 'cockpit tui',                   desc: 'TUI fullscreen — board kanban interativo + sessions live',   group: 'status' },
-  { cmd: 'cockpit doctor [--fix]',        desc: 'health check + auto-fix (locks orfaos, sessions zumbis)',    group: 'status' },
+  { cmd: 'cockpit doctor [--fix --json]', desc: 'health check + auto-fix (locks/sessions/worktrees/hooks/mcp/disk)', group: 'status' },
   { cmd: 'cockpit metrics',               desc: 'dashboards de uso (cards, runs, velocity)',                  group: 'status' },
   { cmd: 'cockpit help [cmd]',            desc: 'ajuda',                                                      group: 'status' },
 

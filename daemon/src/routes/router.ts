@@ -68,8 +68,8 @@ export async function handleRequest(req: Request): Promise<Response> {
     return handleMetricsRoutes(req, url)
   }
 
-  // Maintenance (doctor --fix)
-  if (path.startsWith('/maintenance')) {
+  // Maintenance (doctor --fix) + system info
+  if (path.startsWith('/maintenance') || path === '/system/info') {
     return handleMaintenanceRoutes(req, url)
   }
 
