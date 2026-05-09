@@ -11,20 +11,20 @@ interface WatchOpts {
 }
 
 interface WatchAllOpts {
-  includeCompleted?: boolean  // se true, mostra completas tambem (snapshot read-only)
+  includeCompleted?: boolean  // se true, mostra completas também (snapshot read-only)
 }
 
 export async function watch(ref: string, opts: WatchOpts = {}): Promise<void> {
   const { workspaces, cards } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
 
   const ws = workspaces.find((w) => w.id === card.workspace_id)
   if (!ws) {
-    console.error(c.rose('✕ workspace nao encontrado'))
+    console.error(c.rose('✕ workspace não encontrado'))
     process.exit(1)
   }
 
@@ -66,7 +66,7 @@ export async function watch(ref: string, opts: WatchOpts = {}): Promise<void> {
     await getSSE(
       `/agents/sessions/${session.id}/stream`,
       (event) => {
-        if (event.type === 'snapshot') return  // ja temos do header
+        if (event.type === 'snapshot') return  // já temos do header
         if (event.type === 'chunk') {
           const text = event.text as string
           const isReplayed = !!event.replayed
@@ -74,7 +74,7 @@ export async function watch(ref: string, opts: WatchOpts = {}): Promise<void> {
           else liveCount++
 
           // Heuristica simples: linha eh log se vier de message do daemon.
-          // Aqui nao temos essa info — assume tudo como output, exceto
+          // Aqui não temos essa info — assume tudo como output, exceto
           // se for tool (▶ ...). Eh um trade-off do replay simplificado.
           const k = classifyLine(text, false)
           renderChunk({ kind: k, text, state: renderer })
@@ -224,7 +224,7 @@ async function streamLane(
   lanes: Map<string, Lane>,
   ctrl: AbortController,
 ): Promise<void> {
-  let replayDone = false  // suprime chunks anteriores ate replay-done
+  let replayDone = false  // suprime chunks anteriores até replay-done
 
   await getSSE(
     `/agents/sessions/${lane.session.id}/stream`,
@@ -232,7 +232,7 @@ async function streamLane(
       if (event.type === 'snapshot') return
       if (event.type === 'replay-done') {
         replayDone = true
-        // Marca inicio do live com um divisor sutil
+        // Marca início do live com um divisor sutil
         printLaneLine(lane, c.dim(`━ live (replay ${(event.replayedCount as number) || 0})`))
         return
       }
@@ -264,7 +264,7 @@ async function streamLane(
 }
 
 function printLaneLine(lane: Lane, text: string): void {
-  // Trunca linhas longas pra nao quebrar o layout
+  // Trunca linhas longas pra não quebrar o layout
   const w = (process.stdout.columns || 100) - strip(lane.label).length - 4
   const truncated = strip(text).length > w ? text.slice(0, w) + c.dim('…') : text
   console.log(`  ${lane.label} ${truncated}`)

@@ -1,4 +1,4 @@
-// Live tail de uma session via SSE. Mostra ultimas N linhas em scroll automatico.
+// Live tail de uma session via SSE. Mostra últimas N linhas em scroll automático.
 
 import type { Screen, KeyResult } from '../engine'
 import type { Key } from '../keys'

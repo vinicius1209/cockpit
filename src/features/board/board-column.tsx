@@ -46,7 +46,7 @@ export function BoardColumn({ column, cards, onCardClick, onAddCard, index, tota
         {enabledAutomations.length > 0 && (
           <span
             className="flex items-center gap-0.5 font-mono text-[10px] text-amber-500/80"
-            title={`${enabledAutomations.length} automacao(oes) ativa(s)`}
+            title={`${enabledAutomations.length} automação(oes) ativa(s)`}
           >
             <Zap className="h-2.5 w-2.5" fill="currentColor" />
             <span className="tabular-nums">{enabledAutomations.length}</span>

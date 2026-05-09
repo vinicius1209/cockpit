@@ -76,13 +76,13 @@ export async function handleSessionRoutes(req: Request, url: URL): Promise<Respo
           },
         })
 
-        // Replay — manda chunks ja persistidos (cliente reconcilia state)
+        // Replay — manda chunks já persistidos (cliente reconcilia state)
         for (const chunk of session.chunks) {
           safeEnqueue({ type: 'chunk', text: chunk, replayed: true })
         }
         safeEnqueue({ type: 'replay-done', replayedCount })
 
-        // Se sessao ja terminou, manda terminal event e fecha
+        // Se sessão já terminou, manda terminal event e fecha
         if (session.phase === 'done' || session.phase === 'error') {
           safeEnqueue({
             type: session.phase === 'error' ? 'error' : 'done',
@@ -136,7 +136,7 @@ export async function handleSessionRoutes(req: Request, url: URL): Promise<Respo
     const session = await getAgentSession(id)
     if (!session) return jsonResponse({ error: 'Session not found' }, 404)
     if (session.completedAt || session.phase === 'done' || session.phase === 'error') {
-      return jsonResponse({ aborted: false, reason: 'session ja terminou', phase: session.phase }, 200)
+      return jsonResponse({ aborted: false, reason: 'session já terminou', phase: session.phase }, 200)
     }
     const result = abortSession(id)
     return jsonResponse({ ...result, sessionId: id }, result.aborted ? 200 : 409)

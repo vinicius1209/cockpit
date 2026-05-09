@@ -38,7 +38,7 @@ O que deve ser alcancado com essa tarefa.
 - [ ] RF1:
 - [ ] RF2:
 
-## Requisitos Nao Funcionais
+## Requisitos Não Funcionais
 - [ ] RNF1:
 
 ## Criterios de Aceite
@@ -48,7 +48,7 @@ O que deve ser alcancado com essa tarefa.
 ## Impacto / Riscos
 
 
-## Plano de Implementacao
+## Plano de Implementação
 1.
 2.
 
@@ -141,7 +141,7 @@ export function SpecPanel({ card, workspaceId }: SpecPanelProps) {
 
     if (activeWorkspace) {
       contextParts.push(`Workspace: ${activeWorkspace.name}`)
-      if (activeWorkspace.description) contextParts.push(`Descricao: ${activeWorkspace.description}`)
+      if (activeWorkspace.description) contextParts.push(`Descrição: ${activeWorkspace.description}`)
     }
 
     if (projects.length > 0) {
@@ -150,8 +150,8 @@ export function SpecPanel({ card, workspaceId }: SpecPanelProps) {
 
     const projectPath = getProjectPath()
     if (projectPath) {
-      contextParts.push(`Diretorio do projeto: ${projectPath}`)
-      contextParts.push('Voce tem acesso ao codigo-fonte do projeto. Leia os arquivos relevantes para gerar uma spec mais precisa.')
+      contextParts.push(`Diretório do projeto: ${projectPath}`)
+      contextParts.push('Você tem acesso ao codigo-fonte do projeto. Leia os arquivos relevantes para gerar uma spec mais precisa.')
     }
 
     if (contextParts.length === 0) return base
@@ -178,16 +178,16 @@ export function SpecPanel({ card, workspaceId }: SpecPanelProps) {
 
     setViewMode('preview')
 
-    const userMessage = `Gere uma spec tecnica completa para o seguinte card:
+    const userMessage = `Gere uma spec técnica completa para o seguinte card:
 
 Titulo: ${card.title}
 Tipo: ${card.type}
 Prioridade: ${card.priority}
-Descricao: ${card.description || 'Sem descricao detalhada'}
+Descrição: ${card.description || 'Sem descrição detalhada'}
 ${card.interview_notes ? `\nNotas da entrevista:\n${card.interview_notes}` : ''}
 ${card.project_id ? `\nProjeto: ${projects.find((p) => p.id === card.project_id)?.name || 'N/A'}` : ''}
 
-Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o contexto real antes de gerar a spec.`
+Se você tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o contexto real antes de gerar a spec.`
 
     const enrichedConfig = {
       ...specWriter,
@@ -302,7 +302,7 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
                   <p className="mb-1 font-medium">Spec Writer · {specWriter.provider}/{specWriter.model}</p>
                   <p className="text-muted-foreground mb-2">
                     Sem API key configurada, o agent roda via CLI local (claude-code/opencode/gemini-cli)
-                    com fallback automatico.
+                    com fallback automático.
                   </p>
                   <button
                     className="text-primary hover:underline flex items-center gap-1"
@@ -380,7 +380,7 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
             className="h-7 text-xs bg-blue-500 hover:bg-blue-600 text-white"
             onClick={() => {
               handleStatusChange('ready')
-              toast.success('Spec marcada como Pronta', { description: 'Disponivel para implementacao' })
+              toast.success('Spec marcada como Pronta', { description: 'Disponível para implementação' })
             }}
           >
             <span className="h-1.5 w-1.5 rounded-full bg-white mr-1.5" />
@@ -390,7 +390,7 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
         </div>
       )}
 
-      {/* ── READY BADGE — quando ja foi aprovada ── */}
+      {/* ── READY BADGE — quando já foi aprovada ── */}
       {showReadyBadge && (
         <div className="border-b border-blue-500/30 bg-blue-500/5 px-3 py-1.5 flex items-center gap-2">
           <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-blue-500 flex items-center gap-1.5">
@@ -398,7 +398,7 @@ Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o
             ━ SPEC PRONTA
           </span>
           <span className="text-[11px] text-muted-foreground">
-            Disponivel para implementar. Va para a aba
+            Disponível para implementar. Va para a aba
             {' '}<span className="font-mono uppercase tracking-[0.14em] text-foreground">[4] IMPLEMENTAR</span>.
           </span>
         </div>
@@ -478,7 +478,7 @@ function SpecEmptyState({ onGenerate, onTemplate, agentReady, modelLabel }: Spec
 
       <div className="space-y-1 max-w-sm">
         <p className="text-sm text-foreground">
-          Ainda nao ha especificacao para este card.
+          Ainda não ha especificacao para este card.
         </p>
         <p className="text-xs text-muted-foreground">
           Sem spec, a etapa
@@ -523,7 +523,7 @@ function AutoSaveIndicator({ state }: { state: 'idle' | 'pending' | 'saving' | '
   return (
     <span
       className={`flex items-center gap-1 font-mono text-[10px] uppercase tracking-[0.14em] transition-opacity ${config.color}`}
-      title="Spec eh salva automaticamente apos 1.5s sem digitar"
+      title="Spec eh salva automaticamente após 1.5s sem digitar"
     >
       <span className={`h-1.5 w-1.5 rounded-full ${config.dot}`} />
       {config.label}

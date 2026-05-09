@@ -22,7 +22,7 @@ function findRepoRoot(): string {
   }
   if (existsSync(join(process.cwd(), 'daemon', 'src', 'index.ts'))) return process.cwd()
   throw new Error(
-    'nao consegui localizar o repo Cockpit\n' +
+    'não consegui localizar o repo Cockpit\n' +
     '  ↳ rode este comando dentro da pasta do repo, ou defina COCKPIT_REPO=<path>'
   )
 }
@@ -102,7 +102,7 @@ async function checkHealth(): Promise<{ ok: boolean; version?: string; error?: s
 
 function ensureMacOS(): void {
   if (process.platform !== 'darwin') {
-    console.error(c.rose('✕ launchd disponivel apenas em macOS'))
+    console.error(c.rose('✕ launchd disponível apenas em macOS'))
     console.error(c.dim('  para Linux, considere systemd: ~/.config/systemd/user/cockpit.service'))
     console.error(c.dim('  para Windows, use Task Scheduler ou WSL'))
     process.exit(1)
@@ -140,7 +140,7 @@ export async function daemonStatus(opts: { asJson?: boolean } = {}): Promise<voi
 
   console.log(section('Process'))
   if (process.platform !== 'darwin') {
-    console.log(`  ${sym.warn} ${c.amber('platform nao macOS')} ${c.dim('— launchd indisponivel')}`)
+    console.log(`  ${sym.warn} ${c.amber('platform não macOS')} ${c.dim('— launchd indisponível')}`)
   } else if (loaded) {
     console.log(`  ${sym.ok} launchd ${c.dim('label')} ${c.bold(LABEL)} ${c.emerald('loaded')}`)
   } else if (existsSync(PLIST_PATH)) {
@@ -200,11 +200,11 @@ export async function daemonInstall(): Promise<void> {
     const h = await checkHealth()
     console.log(`${sym.check} daemon ${c.emerald('online')} ${c.gray(`v${h.version}`)}`)
   } else {
-    console.log(`${sym.warn} daemon ainda nao respondeu ${c.dim('— veja: cockpit daemon logs')}`)
+    console.log(`${sym.warn} daemon ainda não respondeu ${c.dim('— veja: cockpit daemon logs')}`)
   }
 
   console.log()
-  console.log(c.dim('  ↳ daemon vai iniciar automaticamente no proximo login'))
+  console.log(c.dim('  ↳ daemon vai iniciar automaticamente no próximo login'))
   console.log(c.dim('  ↳ status:  cockpit daemon status'))
   console.log(c.dim('  ↳ logs:    cockpit daemon logs'))
   console.log(c.dim('  ↳ remover: cockpit daemon uninstall'))
@@ -213,25 +213,25 @@ export async function daemonInstall(): Promise<void> {
 export async function daemonUninstall(): Promise<void> {
   ensureMacOS()
   if (!existsSync(PLIST_PATH)) {
-    console.log(`${sym.warn} ${c.amber('launchagent nao instalado')}`)
+    console.log(`${sym.warn} ${c.amber('launchagent não instalado')}`)
     return
   }
   await run(['launchctl', 'unload', '-w', PLIST_PATH])
   unlinkSync(PLIST_PATH)
   console.log(`${sym.check} launchagent removido`)
-  console.log(c.dim('  daemon nao vai mais iniciar no login'))
+  console.log(c.dim('  daemon não vai mais iniciar no login'))
   console.log(c.dim('  para subir manualmente: bun run dev:daemon'))
 }
 
 export async function daemonStart(): Promise<void> {
   ensureMacOS()
   if (!existsSync(PLIST_PATH)) {
-    console.error(c.rose('✕ launchagent nao instalado'))
+    console.error(c.rose('✕ launchagent não instalado'))
     console.error(c.dim('  rode primeiro: cockpit daemon install'))
     process.exit(1)
   }
   if (await isLoaded()) {
-    console.log(`${sym.warn} ${c.amber('ja esta rodando')}`)
+    console.log(`${sym.warn} ${c.amber('já esta rodando')}`)
     const h = await checkHealth()
     if (h.ok) console.log(`  ${c.dim('health:')} ${c.emerald('ok')} ${c.gray(`v${h.version}`)}`)
     return
@@ -246,18 +246,18 @@ export async function daemonStart(): Promise<void> {
     const h = await checkHealth()
     console.log(`${sym.check} daemon ${c.emerald('online')} ${c.gray(`v${h.version}`)}`)
   } else {
-    console.log(`${sym.warn} daemon iniciado mas nao respondeu — veja cockpit daemon logs`)
+    console.log(`${sym.warn} daemon iniciado mas não respondeu — veja cockpit daemon logs`)
   }
 }
 
 export async function daemonStop(): Promise<void> {
   ensureMacOS()
   if (!existsSync(PLIST_PATH)) {
-    console.error(c.rose('✕ launchagent nao instalado'))
+    console.error(c.rose('✕ launchagent não instalado'))
     process.exit(1)
   }
   if (!(await isLoaded())) {
-    console.log(`${sym.warn} ${c.amber('ja esta parado')}`)
+    console.log(`${sym.warn} ${c.amber('já esta parado')}`)
     return
   }
   const r = await run(['launchctl', 'unload', PLIST_PATH])
@@ -266,7 +266,7 @@ export async function daemonStop(): Promise<void> {
     process.exit(1)
   }
   console.log(`${sym.check} daemon ${c.dim('parado')}`)
-  console.log(c.dim('  ↳ inicia novamente no proximo login (KeepAlive)'))
+  console.log(c.dim('  ↳ inicia novamente no próximo login (KeepAlive)'))
   console.log(c.dim('  ↳ subir agora: cockpit daemon start'))
 }
 
@@ -280,8 +280,8 @@ export async function daemonRestart(): Promise<void> {
 export async function daemonLogs(opts: { follow?: boolean; lines?: number; err?: boolean } = {}): Promise<void> {
   const file = opts.err ? ERR_FILE : LOG_FILE
   if (!existsSync(file)) {
-    console.error(c.rose(`✕ log nao encontrado: ${file}`))
-    console.error(c.dim('  o daemon ainda nao foi iniciado via launchd'))
+    console.error(c.rose(`✕ log não encontrado: ${file}`))
+    console.error(c.dim('  o daemon ainda não foi iniciado via launchd'))
     console.error(c.dim('  rode: cockpit daemon install'))
     process.exit(1)
   }

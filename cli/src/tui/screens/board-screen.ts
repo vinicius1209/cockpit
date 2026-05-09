@@ -1,4 +1,4 @@
-// Board screen — kanban interativo. Setas movem selecao, enter abre detalhe,
+// Board screen — kanban interativo. Setas movem seleção, enter abre detalhe,
 // q quit, tab vai pra sessions, / busca, w troca workspace, r refresh.
 
 import type { Screen, KeyResult } from '../engine'

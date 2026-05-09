@@ -34,7 +34,7 @@ export async function implement(ref: string, opts: ImplementOpts = {}): Promise<
   const { workspaces, cards, projects } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
   if (!card.spec_content) {
@@ -45,7 +45,7 @@ export async function implement(ref: string, opts: ImplementOpts = {}): Promise<
 
   const ws = workspaces.find((w) => w.id === card.workspace_id)
   if (!ws) {
-    console.error(c.rose('✕ workspace do card nao encontrado'))
+    console.error(c.rose('✕ workspace do card não encontrado'))
     process.exit(1)
   }
 
@@ -55,7 +55,7 @@ export async function implement(ref: string, opts: ImplementOpts = {}): Promise<
     ? wsProjects.find((p) => p.id === card.project_id)
     : wsProjects[0]
   if (!project) {
-    console.error(c.rose('✕ workspace nao tem projeto vinculado'))
+    console.error(c.rose('✕ workspace não tem projeto vinculado'))
     console.log(c.dim('  vincule pelo web UI > workspace settings > Projetos'))
     process.exit(1)
   }
@@ -88,7 +88,7 @@ export async function implement(ref: string, opts: ImplementOpts = {}): Promise<
     ctrl.abort()
     flushOutputBuffer(renderer)
     console.log()
-    console.log(c.amber('━ ABORT enviado. agent CLI continua se ja spawnou. cleanup pelo daemon.'))
+    console.log(c.amber('━ ABORT enviado. agent CLI continua se já spawnou. cleanup pelo daemon.'))
     process.exit(130)
   })
 
@@ -192,7 +192,7 @@ export async function implement(ref: string, opts: ImplementOpts = {}): Promise<
     }
   } else {
     console.log(`  ${sym.err} falhou em ${formatDuration(elapsed)}`)
-    console.log(c.dim(`  use ${c.bold('cockpit log ' + shortId(card.id))} para historico`))
+    console.log(c.dim(`  use ${c.bold('cockpit log ' + shortId(card.id))} para histórico`))
   }
 }
 
@@ -213,7 +213,7 @@ function renderLockError(err: ProjectLockedError): void {
   console.log()
   console.log(c.rose('━━━━━━━━━━ PROJECT LOCKED ━━━━━━━━━━'))
   console.log()
-  console.log(`  ${c.rose(sym.cross)} outra implementacao ja roda neste projeto`)
+  console.log(`  ${c.rose(sym.cross)} outra implementação já roda neste projeto`)
   console.log()
   console.log(`  ${c.dim('project   :')} ${err.projectPath}`)
   if (heldBy.card_id) console.log(`  ${c.dim('card      :')} ${c.bold('#' + shortId(heldBy.card_id))}`)
@@ -222,7 +222,7 @@ function renderLockError(err: ProjectLockedError): void {
   console.log(`  ${c.dim('session   :')} ${heldBy.session_id}`)
   console.log(`  ${c.dim('rodando ha:')} ${c.amber(ageStr)}`)
   console.log()
-  console.log(c.dim('  ━ opcoes:'))
+  console.log(c.dim('  ━ opções:'))
   if (heldBy.card_id) {
     console.log(`    ${c.bold('cockpit watch ' + shortId(heldBy.card_id))}      ${c.dim('# acompanhar a session em curso')}`)
   }

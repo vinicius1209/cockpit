@@ -1,7 +1,7 @@
 import type { Card, Workspace } from './client'
 
 // Converte ID longo (cuid-like) em #XXXX (últimos 4 alfa-num em uppercase).
-// Espelha a logica do flight strip do web UI.
+// Espelha a lógica do flight strip do web UI.
 export function shortId(id: string): string {
   return id.replace(/[^a-z0-9]/gi, '').slice(-4).toUpperCase()
 }

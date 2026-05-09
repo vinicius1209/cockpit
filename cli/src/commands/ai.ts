@@ -33,12 +33,12 @@ export async function ai(ref: string): Promise<void> {
   const { workspaces, cards, projects } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
   const ws = workspaces.find((w) => w.id === card.workspace_id)
   if (!ws) {
-    console.error(c.rose('✕ workspace nao encontrado'))
+    console.error(c.rose('✕ workspace não encontrado'))
     process.exit(1)
   }
 
@@ -52,7 +52,7 @@ export async function ai(ref: string): Promise<void> {
     || enabled.find((a: AgentConfig) => a.role !== 'interviewer')
     || enabled[0]
   if (!agent) {
-    console.error(c.rose('✕ workspace nao tem agentes configurados'))
+    console.error(c.rose('✕ workspace não tem agentes configurados'))
     process.exit(1)
   }
 
@@ -172,16 +172,16 @@ function buildSystemPrompt(base: string, card: { title: string; type: string; pr
   if (base) parts.push(base.trim())
 
   parts.push(`## Escopo da conversa
-Voce esta conversando sobre UM card especifico. Responda APENAS dentro do escopo do card e do projeto vinculado.
-- NAO faca perguntas sobre informacoes que ja estao no contexto.
-- Use ativamente o contexto: titulo, descricao, entrevista, spec, projeto.`)
+Você esta conversando sobre UM card especifico. Responda APENAS dentro do escopo do card e do projeto vinculado.
+- NAO faca perguntas sobre informações que já estão no contexto.
+- Use ativamente o contexto: titulo, descrição, entrevista, spec, projeto.`)
 
   const cardLines: string[] = ['## Contexto do card']
   cardLines.push(`- Titulo: ${card.title}`)
   cardLines.push(`- Tipo: ${card.type} · Prioridade: ${card.priority}`)
   if (card.description?.trim()) {
     cardLines.push('')
-    cardLines.push('### Descricao')
+    cardLines.push('### Descrição')
     cardLines.push(card.description.trim())
   }
   if (card.interview_notes?.trim()) {
@@ -202,7 +202,7 @@ Voce esta conversando sobre UM card especifico. Responda APENAS dentro do escopo
 - Nome: ${project.name}
 - Path: ${project.path}
 
-Voce tem acesso ao codigo-fonte deste projeto via filesystem.`)
+Você tem acesso ao codigo-fonte deste projeto via filesystem.`)
   }
 
   return parts.join('\n\n')

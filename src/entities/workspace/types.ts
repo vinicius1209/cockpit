@@ -1,9 +1,9 @@
 /** Hooks shell scripts executados pelo daemon em momentos do ciclo de
- *  implementacao. Cada string e um script bash inteiro (multi-linha ok).
+ *  implementação. Cada string e um script bash inteiro (multi-linha ok).
  *  Daemon executa com timeout de 60s e injeta env vars (CARD_ID, SESSION_ID,
  *  BRANCH, PR_URL, etc). Strings vazias = hook desabilitado. */
 export interface WorkspaceHooks {
-  /** Antes do agent CLI spawnar (apos lock + branch criada). Exit != 0 aborta. */
+  /** Antes do agent CLI spawnar (após lock + branch criada). Exit != 0 aborta. */
   before_implement?: string
   /** Depois do agent terminar com sucesso, ANTES do PR ser criado. */
   after_implement?: string

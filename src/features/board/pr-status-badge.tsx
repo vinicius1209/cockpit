@@ -2,8 +2,8 @@
 // Mostra estado (DRAFT/OPEN/MERGED/CLOSED) com cor, link clicavel.
 // Re-fetch a cada 60s enquanto o componente esta montado.
 //
-// I2 fix — antes: cada PrStatusBadge tinha seu proprio fetch + interval.
-// Workspace com 20 cards apontando pra mesmo PR (re-implementacao da mesma
+// I2 fix — antes: cada PrStatusBadge tinha seu próprio fetch + interval.
+// Workspace com 20 cards apontando pra mesmo PR (re-implementação da mesma
 // task) = 20 fetches paralelos a cada 60s (apesar do cache 30s no daemon
 // mitigar load real, frontend faz overhead inutil).
 //
@@ -40,7 +40,7 @@ interface CacheEntry {
   err: string | null
   loading: boolean
   fetchedAt: number  // ms timestamp
-  /** I5 fix — contagem de erros consecutivos. Apos N falhas, mostra
+  /** I5 fix — contagem de erros consecutivos. Após N falhas, mostra
    *  badge "⚠ check failed" pra avisar que o status pode estar stale. */
   consecutiveErrors: number
   subscribers: Set<(snapshot: { status: PrStatus | null; err: string | null; loading: boolean; consecutiveErrors: number }) => void>
@@ -53,7 +53,7 @@ const RECURRING_ERROR_THRESHOLD = 3
 const cache = new Map<string, CacheEntry>()
 
 async function fetchStatusInto(entry: CacheEntry, url: string): Promise<void> {
-  // Coalesce: se ja ha fetch em voo, espera ele.
+  // Coalesce: se já ha fetch em voo, espera ele.
   if (entry.inFlight) return entry.inFlight
 
   entry.inFlight = (async () => {
@@ -122,7 +122,7 @@ function subscribe(url: string, callback: (snapshot: { status: PrStatus | null; 
     const e = cache.get(url)
     if (!e) return
     e.subscribers.delete(callback)
-    // Ultimo subscriber saiu → cleanup
+    // Último subscriber saiu → cleanup
     if (e.subscribers.size === 0) {
       if (e.timer) clearInterval(e.timer)
       cache.delete(url)
@@ -178,7 +178,7 @@ export function PrStatusBadge({ url, compact }: PrStatusBadgeProps) {
   }
 
   if (err || !status) {
-    // Sem detalhes (gh nao instalado / nao auth / repo privado) — mostra link bruto
+    // Sem detalhes (gh não instalado / não auth / repo privado) — mostra link bruto
     return compact
       ? <a href={url} target="_blank" rel="noreferrer" className="text-[10px] text-muted-foreground hover:text-foreground font-mono">PR ↗</a>
       : (
@@ -191,7 +191,7 @@ export function PrStatusBadge({ url, compact }: PrStatusBadgeProps) {
             </a>
           </div>
           <div className="text-muted-foreground/70 truncate">{url}</div>
-          {err && <div className="text-rose-500/70 text-[10px]">{err === 'HTTP 500' ? '(gh CLI offline ou nao autenticado)' : err}</div>}
+          {err && <div className="text-rose-500/70 text-[10px]">{err === 'HTTP 500' ? '(gh CLI offline ou não autenticado)' : err}</div>}
         </div>
       )
   }
@@ -268,9 +268,9 @@ function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime()
   const min = Math.floor(diff / 60000)
   if (min < 1) return 'agora'
-  if (min < 60) return `${min}m atras`
+  if (min < 60) return `${min}m atrás`
   const h = Math.floor(min / 60)
-  if (h < 24) return `${h}h atras`
+  if (h < 24) return `${h}h atrás`
   const d = Math.floor(h / 24)
-  return `${d}d atras`
+  return `${d}d atrás`
 }

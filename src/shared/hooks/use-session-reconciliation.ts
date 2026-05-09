@@ -10,11 +10,11 @@ import { DAEMON_URL } from '@/shared/lib/constants'
 // I1 fix — antes:
 //   activeSources Map module-level NUNCA era limpado. Sessions que sumiam do
 //   daemon (manual delete, restart, prune) deixavam EventSource auto-retrying
-//   pra sempre. Daemon em apps abertos por horas acumulava 50+ ESes orfas.
+//   pra sempre. Daemon em apps abertos por horas acumulava 50+ ESes órfãs.
 //
 // Agora:
 //   - Dedup via Map module-level continua (StrictMode dev safety)
-//   - Reconcile periodico a cada 30s: lista running sessions, fecha ESes
+//   - Reconcile periódico a cada 30s: lista running sessions, fecha ESes
 //     cujo session_id sumiu da lista (revoked: daemon restart, delete manual,
 //     session terminou off-line e não emitiu done)
 //   - Cleanup do useEffect fecha tudo no unmount (componente raiz desmontando
@@ -42,7 +42,7 @@ export function useSessionReconciliation() {
 
         const liveIds = new Set(sessions.map((s) => s.id))
 
-        // Fecha ESes cujas sessions sumiram do daemon (revogacao automatica)
+        // Fecha ESes cujas sessions sumiram do daemon (revogacao automática)
         const ourIds = Array.from(activeSources.keys())
         for (const id of ourIds) {
           if (!liveIds.has(id)) {
@@ -87,7 +87,7 @@ export function useSessionReconciliation() {
           }
 
           // EventSource auto-retries em fail. Fechamos imediato pra evitar
-          // loop de reconnect spam — o reconcile periodico vai re-abrir
+          // loop de reconnect spam — o reconcile periódico vai re-abrir
           // se a session ainda estiver viva.
           es.onerror = () => closeSession(s.id)
         }
@@ -103,7 +103,7 @@ export function useSessionReconciliation() {
       cancelled = true
       clearInterval(intervalId)
       // I1 fix: fecha TODAS as ESes no unmount. Em prod, o hook so monta uma
-      // vez no app root, entao unmount = app quitting (rare). Em StrictMode
+      // vez no app root, então unmount = app quitting (rare). Em StrictMode
       // dev unmount/remount imediato, vamos abrir tudo de novo no remount —
       // safe, traffic temporario aceitavel.
       for (const id of Array.from(activeSources.keys())) closeSession(id)

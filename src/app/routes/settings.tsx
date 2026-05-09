@@ -27,7 +27,7 @@ export function SettingsPage() {
   return (
     <div className="p-4 lg:p-6 max-w-3xl mx-auto">
       <CockpitPageHeader
-        systemLabel="SYSTEM · CONFIGURACOES"
+        systemLabel="SYSTEM · CONFIGURAÇÕES"
         title="Configuracoes"
         subtitle="Configuracoes globais do Cockpit · API keys, segredos e telemetria"
         stats={[

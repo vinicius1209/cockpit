@@ -52,12 +52,12 @@ export async function agentTest(name: string, opts: TestOpts = {}): Promise<void
   const agents = await api.getAvailableAgents()
   const agent = agents.find((a: InstalledAgent) => a.name === name)
   if (!agent) {
-    console.error(c.rose('✕ agent nao encontrado: ') + name)
-    console.log(c.dim('  disponiveis: ' + agents.map((a) => a.name).join(', ')))
+    console.error(c.rose('✕ agent não encontrado: ') + name)
+    console.log(c.dim('  disponíveis: ' + agents.map((a) => a.name).join(', ')))
     process.exit(1)
   }
 
-  const prompt = opts.prompt || 'Responda apenas a palavra "OK" se voce conseguir me ouvir.'
+  const prompt = opts.prompt || 'Responda apenas a palavra "OK" se você conseguir me ouvir.'
   console.log(divider(`AGENT TEST · ${agent.name}`, 'cyan'))
   console.log(`  ${c.dim('command:')} ${agent.command}`)
   console.log(`  ${c.dim('prompt:')} ${prompt}`)

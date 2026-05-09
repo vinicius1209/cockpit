@@ -129,7 +129,7 @@ export const useCardStore = create<CardState>()(
       },
 
       getColumnCards: (workspaceId, columnId) => {
-        // F10 — esconde archived por padrao (board nao polui). UI tem toggle pra mostrar.
+        // F10 — esconde archived por padrão (board não polui). UI tem toggle pra mostrar.
         return get()
           .cards.filter((c) =>
             c.workspace_id === workspaceId

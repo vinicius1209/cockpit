@@ -39,7 +39,7 @@ export function DashboardPage() {
             <h2 className="text-lg font-semibold">Nada decolando ainda</h2>
             <p className="text-sm text-muted-foreground max-w-md mx-auto">
               Crie seu primeiro card num workspace pra comecar.
-              Voce pode digitar diretamente, ou pedir pro Claude Code via MCP:{' '}
+              Você pode digitar diretamente, ou pedir pro Claude Code via MCP:{' '}
               <code className="font-mono text-foreground/80 text-[11px] bg-background px-1.5 py-0.5 rounded">
                 "cria um card pra X no workspace Y"
               </code>

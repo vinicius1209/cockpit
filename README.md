@@ -150,7 +150,7 @@ cockpit/
 ├── CLAUDE.md                # design system + arquitetura
 ├── AGENTS.md                # ponto de entrada pra LLMs
 ├── TODO_CLI.md              # roadmap do CLI
-└── TODO_HUMAN_LLM.md        # backlog tecnico geral
+└── TODO_HUMAN_LLM.md        # backlog técnico geral
 ```
 
 ## Comandos principais do CLI
@@ -261,7 +261,7 @@ cockpit tui
 - [`AGENTS.md`](./AGENTS.md) — ponto de entrada pra LLMs trabalhando no repo
 - [`cli/README.md`](./cli/README.md) — cheatsheet do CLI
 - [`mcp/README.md`](./mcp/README.md) — tools/resources do MCP server
-- [`DOGFOOD.md`](./DOGFOOD.md) — checklist de validação real (10 cenários)
+- [`DOGFOOD.md`](./DOGFOOD.md) — checklist de válidação real (10 cenários)
 - [`CHANGELOG.md`](./CHANGELOG.md) — mudanças por versão
 - [`TODO_CLI.md`](./TODO_CLI.md) — roadmap do CLI
 - [`TODO_HUMAN_LLM.md`](./TODO_HUMAN_LLM.md) — backlog técnico (inclui F9 multi-session research direction)

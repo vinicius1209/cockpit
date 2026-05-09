@@ -32,11 +32,11 @@ export function NewWorkspacePage() {
       <CockpitPageHeader
         systemLabel="LAUNCHPAD · NOVO WORKSPACE"
         title="Novo Workspace"
-        subtitle="Cabine independente com seu proprio board, agentes e projetos"
+        subtitle="Cabine independente com seu próprio board, agentes e projetos"
       />
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* ── IDENTIFICACAO ── */}
+        {/* ── IDENTIFICAÇÃO ── */}
         <div className="rounded-md border bg-card overflow-hidden">
           <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/20 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             <span>━ Identificacao</span>
@@ -57,7 +57,7 @@ export function NewWorkspacePage() {
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="desc" className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Descricao</Label>
+              <Label htmlFor="desc" className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Descrição</Label>
               <Textarea
                 id="desc"
                 value={description}

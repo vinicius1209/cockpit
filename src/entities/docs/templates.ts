@@ -15,17 +15,17 @@ export const DOC_TEMPLATES: DocTemplate[] = [
   {
     id: 'adr',
     name: 'ADR (Architecture Decision Record)',
-    description: 'Registrar uma decisao arquitetural',
-    content: `# ADR: [Titulo da decisao]
+    description: 'Registrar uma decisão arquitetural',
+    content: `# ADR: [Titulo da decisão]
 
 ## Status
 Proposta | Aceita | Deprecada | Substituida
 
 ## Contexto
-Descreva o contexto e o problema que motivou essa decisao.
+Descreva o contexto e o problema que motivou essa decisão.
 
 ## Decisao
-Descreva a decisao tomada e as razoes.
+Descreva a decisão tomada e as razões.
 
 ## Consequencias
 
@@ -44,35 +44,35 @@ Descreva a decisao tomada e as razoes.
   {
     id: 'rfc',
     name: 'RFC (Request for Comments)',
-    description: 'Proposta tecnica para discussao',
+    description: 'Proposta técnica para discussao',
     content: `# RFC: [Titulo da proposta]
 
 ## Resumo
-Uma descricao breve da proposta (2-3 frases).
+Uma descrição breve da proposta (2-3 frases).
 
 ## Motivacao
-Por que essa mudanca e necessaria? Qual problema resolve?
+Por que essa mudanca e necessária? Qual problema resolve?
 
 ## Proposta Detalhada
 Descreva a solucao proposta em detalhes.
 
 ### Arquitetura
-### Implementacao
+### Implementação
 ### Migracao
 
 ## Alternativas Consideradas
 
 ### Alternativa 1
-- **Descricao**:
+- **Descrição**:
 - **Pros**:
 - **Contras**:
 
 ### Alternativa 2
-- **Descricao**:
+- **Descrição**:
 - **Pros**:
 - **Contras**:
 
-## Plano de Implementacao
+## Plano de Implementação
 1.
 2.
 3.
@@ -127,10 +127,10 @@ Passos para reverter em caso de problema.
 
 ## User Story
 **Como** [persona/papel],
-**quero** [acao/funcionalidade],
+**quero** [ação/funcionalidade],
 **para** [beneficio/valor].
 
-## Descricao
+## Descrição
 Contexto adicional sobre a necessidade.
 
 ## Criterios de Aceite
@@ -182,10 +182,10 @@ Como o incidente foi detectado? Alertas? Usuarios?
 ## Resolucao
 O que foi feito para resolver.
 
-## Acoes Preventivas
-- [ ] Acao 1:
-- [ ] Acao 2:
-- [ ] Acao 3:
+## Ações Preventivas
+- [ ] Ação 1:
+- [ ] Ação 2:
+- [ ] Ação 3:
 
 ## Licoes Aprendidas
 - O que funcionou bem:

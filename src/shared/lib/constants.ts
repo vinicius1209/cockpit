@@ -2,7 +2,7 @@ import type { CardType, CardPriority, ColumnAutomation } from '@/entities/card/t
 
 // Use 127.0.0.1 explicito em vez de "localhost" para evitar ambiguidade
 // IPv4/IPv6: alguns navegadores resolvem "localhost" para ::1 (IPv6) e o
-// daemon Bun por padrao binda em IPv4. Ja vimos requests /health falhando
+// daemon Bun por padrão binda em IPv4. Ja vimos requests /health falhando
 // aleatoriamente por causa disso.
 export const DAEMON_URL = import.meta.env.VITE_DAEMON_URL || 'http://127.0.0.1:4800'
 

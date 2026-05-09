@@ -35,7 +35,7 @@ Se `~/.local/bin` não está no `$PATH`, o script avisa e mostra como adicionar.
 ## Quickstart (3 comandos)
 
 ```bash
-cockpit doctor                  # 1. valida setup
+cockpit doctor                  # 1. válida setup
 cockpit ws use portfolio        # 2. seleciona workspace ativo
 cockpit                         # 3. dashboard global no terminal
 ```
@@ -152,11 +152,11 @@ cockpit log SW79 --json | jq       # processar com jq
 | `cockpit daemon install` | escreve `~/Library/LaunchAgents/dev.cockpit.daemon.plist` e carrega |
 | `cockpit daemon uninstall` | unload + remove plist |
 | `cockpit daemon start` | sobe agora (idempotente) |
-| `cockpit daemon stop` | para (volta no proximo login — KeepAlive) |
+| `cockpit daemon stop` | para (volta no próximo login — KeepAlive) |
 | `cockpit daemon restart` | stop + start |
 | `cockpit daemon logs [-f] [--lines N] [--err]` | tail dos logs |
 
-> Apos `install`, o daemon roda como background service e sobe automaticamente em todo login. Logs em `~/.cockpit/logs/`.
+> Após `install`, o daemon roda como background service e sobe automaticamente em todo login. Logs em `~/.cockpit/logs/`.
 
 ### Workspaces
 

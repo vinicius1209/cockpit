@@ -16,7 +16,7 @@ export async function handleAgentRoutes(req: Request, url: URL): Promise<Respons
   if (path === '/agents/spec/async' && req.method === 'POST') {
     const body = await req.json() as Partial<SpecGenConfig>
     if (!body.cardId || !body.workspaceSlug) {
-      return jsonResponse({ error: 'cardId + workspaceSlug obrigatorios' }, 400)
+      return jsonResponse({ error: 'cardId + workspaceSlug obrigatórios' }, 400)
     }
     if (body.projectPath) {
       const valid = validateProjectPath(body.projectPath)

@@ -26,12 +26,12 @@ export async function log(ref: string, opts: LogOpts = {}): Promise<void> {
   const { workspaces, cards } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
   const ws = workspaces.find((w) => w.id === card.workspace_id)
   if (!ws) {
-    console.error(c.rose('✕ workspace nao encontrado'))
+    console.error(c.rose('✕ workspace não encontrado'))
     process.exit(1)
   }
 
@@ -87,7 +87,7 @@ export async function log(ref: string, opts: LogOpts = {}): Promise<void> {
   }
 
   console.log()
-  console.log(c.dim(`  use ${c.bold('cockpit watch #' + shortId(card.id))} para tail da ultima`))
+  console.log(c.dim(`  use ${c.bold('cockpit watch #' + shortId(card.id))} para tail da última`))
 }
 
 async function fetchSessions(wsSlug: string, cardId: string): Promise<SessionRow[]> {
@@ -112,11 +112,11 @@ function formatRelative(d: Date): string {
   const diff = Date.now() - d.getTime()
   const min = Math.floor(diff / 60000)
   if (min < 1) return 'agora'
-  if (min < 60) return `${min}m atras`
+  if (min < 60) return `${min}m atrás`
   const h = Math.floor(min / 60)
-  if (h < 24) return `${h}h atras`
+  if (h < 24) return `${h}h atrás`
   const days = Math.floor(h / 24)
-  if (days < 7) return `${days}d atras`
+  if (days < 7) return `${days}d atrás`
   return d.toLocaleDateString('pt-BR')
 }
 

@@ -11,7 +11,7 @@ interface CardStatusBarProps {
 }
 
 // Persistent telemetry strip — sempre visivel no rodape do card dialog.
-// Quando ha processamento ativo, mostra timer e ultima chunk.
+// Quando ha processamento ativo, mostra timer e última chunk.
 // Quando idle, mostra contexto do workspace/projeto.
 export function CardStatusBar({ processing, workspaceName, projectName, agentName, modelName }: CardStatusBarProps) {
   const [elapsed, setElapsed] = useState(0)

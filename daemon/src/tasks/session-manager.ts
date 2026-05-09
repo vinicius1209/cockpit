@@ -161,8 +161,8 @@ export async function createSession(wsSlug: string, cardId: string, data: {
   return session
 }
 
-// Extension dos updates aceitos: campos de AgentSession que nao estao em
-// ImplementSession (action, chunks). Mantemos um type local pra nao
+// Extension dos updates aceitos: campos de AgentSession que não estão em
+// ImplementSession (action, chunks). Mantemos um type local pra não
 // quebrar callers existentes que esperam ImplementSession.
 type SessionUpdates = Partial<ImplementSession> & {
   action?: SessionAction
@@ -217,7 +217,7 @@ export async function appendFile(
   trackedFile: SessionFile,
 ): Promise<void> {
   // I8 fix — antes era SELECT → JSON.parse → push → UPDATE, com janela de
-  // race entre 2 events do mesmo file no mesmo segundo (duplicacao).
+  // race entre 2 events do mesmo file no mesmo segundo (duplicação).
   // Agora wrap em transacao SQLite (BEGIN IMMEDIATE serializa writes do
   // mesmo proceso). Dedup por path preservada.
   const db = getDB()
@@ -338,8 +338,8 @@ export async function finishAgentSession(
 
 // ── Session abort registry (F-MCP-T3) ──
 //
-// runImplementation registra uma funcao de abort por sessionId. O endpoint
-// POST /agents/sessions/<id>/abort lookup + chama. Se nao registrado (ja
+// runImplementation registra uma função de abort por sessionId. O endpoint
+// POST /agents/sessions/<id>/abort lookup + chama. Se não registrado (já
 // terminou ou daemon reiniciou), abort e no-op idempotente.
 const abortRegistry = new Map<string, () => void>()
 
@@ -354,7 +354,7 @@ export function unregisterSessionAbort(sessionId: string): void {
 export function abortSession(sessionId: string): { aborted: boolean; reason: string } {
   const fn = abortRegistry.get(sessionId)
   if (!fn) {
-    return { aborted: false, reason: 'session nao esta sendo executada por este daemon (ja terminou ou daemon reiniciou)' }
+    return { aborted: false, reason: 'session não esta sendo executada por este daemon (já terminou ou daemon reiniciou)' }
   }
   try {
     fn()
@@ -370,11 +370,11 @@ export function abortSession(sessionId: string): { aborted: boolean; reason: str
 // Retorna o numero de sessions limpas.
 export async function reapStaleSessions(staleAfterMin = 30): Promise<number> {
   const cutoffMin = Math.max(1, staleAfterMin)
-  // Usa COALESCE para sessoes sem updated_at (legado) — cai pra started_at
+  // Usa COALESCE para sessões sem updated_at (legado) — cai pra started_at
   const result = getDB().query(`
     UPDATE sessions
     SET phase = 'error',
-        error = 'Sessao stale (sem atividade ha mais de ${cutoffMin}min — agent travou ou processo morreu)',
+        error = 'Sessão stale (sem atividade ha mais de ${cutoffMin}min — agent travou ou processo morreu)',
         completed_at = datetime('now'),
         updated_at = datetime('now')
     WHERE phase NOT IN ('done', 'error')

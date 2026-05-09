@@ -1,8 +1,8 @@
 // Engine TUI minimalista, zero deps. Alternate screen buffer + raw mode +
-// event loop. Renderiza Screens que sao funcoes puras (state → string).
+// event loop. Renderiza Screens que são funções puras (state → string).
 //
 // Filosofia: nada de framework — apenas escape sequences ANSI e stdin raw.
-// Bun nao tem 'readline' nativo (Node.tty); usamos process.stdin diretamente.
+// Bun não tem 'readline' nativo (Node.tty); usamos process.stdin diretamente.
 
 import { parseKey, type Key } from './keys'
 
@@ -94,7 +94,7 @@ export class TuiEngine {
   private signalListener: (() => void) | null = null
   // C4 fix — handlers globais pra restaurar terminal mesmo em paths
   // anomalos (uncaughtException, unhandledRejection, exit normal).
-  // cleanupDone garante idempotencia (nao restaura 2x).
+  // cleanupDone garante idempotencia (não restaura 2x).
   private cleanupDone = false
   private uncaughtHandler: ((err: Error) => void) | null = null
   private rejectionHandler: ((reason: unknown) => void) | null = null
@@ -125,15 +125,15 @@ export class TuiEngine {
     process.on('SIGTERM', this.signalListener)
 
     // C4 fix — fallbacks pra cenarios anomalos onde o for-await loop
-    // nao volta normalmente: exception nao tratada, rejection nao tratada,
-    // ou processo sendo killed (SIGKILL nao captura, mas SIGTERM/exit sim).
+    // não volta normalmente: exception não tratada, rejection não tratada,
+    // ou processo sendo killed (SIGKILL não captura, mas SIGTERM/exit sim).
     //
     // Comportamento: imprime stack-trace e sai com restore do terminal.
-    // Se nao restaurar: usuario fica com terminal em raw mode (sem echo,
+    // Se não restaurar: usuario fica com terminal em raw mode (sem echo,
     // alt screen ativo) — irrecuperavel sem `reset`.
     this.uncaughtHandler = (err: Error) => {
       this.cleanupSync()
-      // Imprime apos restaurar terminal pra mensagem ser visivel
+      // Imprime após restaurar terminal pra mensagem ser visivel
       console.error('\n[tui] uncaught exception:', err.message)
       console.error(err.stack)
       process.exit(1)
@@ -181,10 +181,10 @@ export class TuiEngine {
           const result = await top.onKey(key)
           await this.handleResult(result)
         } catch (err) {
-          // I11 fix — antes nao setava dirty=true, entao se nenhum tick
+          // I11 fix — antes não setava dirty=true, então se nenhum tick
           // disparasse depois, error message ficava congelada na tela.
-          // Agora marca dirty + força redraw imediato, aviso some no proximo
-          // draw normal (proximo onKey).
+          // Agora marca dirty + força redraw imediato, aviso some no próximo
+          // draw normal (próximo onKey).
           process.stdout.write(ANSI.moveTo(1, 1) + ANSI.clearLine + `\x1b[91merror in ${top.name}: ${(err as Error).message}\x1b[0m`)
           this.dirty = true
         }
@@ -257,14 +257,14 @@ export class TuiEngine {
     for (let i = maxLines; i < rows; i++) {
       out += ANSI.moveTo(i + 1, 1) + ANSI.clearLine
     }
-    // Parqueia o cursor no canto direito da ultima linha pra evitar piscar
-    // no meio do conteudo enquanto o proximo frame e construido.
+    // Parqueia o cursor no canto direito da última linha pra evitar piscar
+    // no meio do conteudo enquanto o próximo frame e construido.
     out += ANSI.moveTo(rows, cols)
     process.stdout.write(out)
     this.dirty = false
   }
 
-  /** Sinaliza que a tela mudou — proximo tick redesenha. Util pra screens
+  /** Sinaliza que a tela mudou — próximo tick redesenha. Util pra screens
    *  que recebem callbacks async (SSE etc). */
   markDirty(): void {
     this.dirty = true
@@ -297,7 +297,7 @@ export class TuiEngine {
 
   /**
    * C4 fix — restoreTerminal sync, sem awaits. Usado por handlers de
-   * uncaughtException, unhandledRejection e 'exit' onde nao podemos
+   * uncaughtException, unhandledRejection e 'exit' onde não podemos
    * fazer async ops. Idempotente via cleanupDone.
    */
   private cleanupSync(): void {
@@ -316,7 +316,7 @@ export class TuiEngine {
     } catch { /* stdout pode estar fechado */ }
     try {
       if (process.stdin.isTTY) process.stdin.setRawMode(false)
-    } catch { /* nao TTY ou ja restored */ }
+    } catch { /* não TTY ou já restored */ }
     try { process.stdin.pause() } catch { /* ignore */ }
   }
 }

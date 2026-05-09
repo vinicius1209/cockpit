@@ -6,7 +6,7 @@ import { reapOrphanLocks } from './tasks/project-lock'
 
 const PORT = Number(process.env.COCKPIT_DAEMON_PORT || 4800)
 // Bind explicito em 127.0.0.1 (IPv4 loopback). Sem isso, Bun.serve em algumas
-// versoes binda APENAS em IPv6 (`::*`), e o navegador resolvendo "localhost"
+// versões binda APENAS em IPv6 (`::*`), e o navegador resolvendo "localhost"
 // pode tentar IPv4 primeiro (Happy Eyeballs) e receber "connection refused"
 // silenciosamente. Causou requests /health falhando aleatoriamente.
 const HOST = process.env.COCKPIT_DAEMON_HOST || '127.0.0.1'
@@ -41,8 +41,8 @@ const server = Bun.serve({
 
 console.log(`[cockpit-daemon] Running on http://${HOST}:${server.port}`)
 
-// Reaper de sessoes stale — roda a cada 5min e marca como error sessions
-// que estao "running" ha mais de 30min sem update. Captura agents travados
+// Reaper de sessões stale — roda a cada 5min e marca como error sessions
+// que estão "running" ha mais de 30min sem update. Captura agents travados
 // ou crashes silenciosos sem precisar reiniciar o daemon.
 const REAPER_INTERVAL_MS = 5 * 60 * 1000
 const REAPER_STALE_MIN = 30
@@ -50,9 +50,9 @@ const reaperTimer = setInterval(async () => {
   try {
     const reaped = await reapStaleSessions(REAPER_STALE_MIN)
     if (reaped > 0) {
-      console.log(`[reaper] ${reaped} sessao(oes) stale marcada(s) como error`)
+      console.log(`[reaper] ${reaped} sessão(oes) stale marcada(s) como error`)
     }
-    // Locks orfaos (cuja session ja terminou) — depende do reaper de sessions
+    // Locks órfãos (cuja session já terminou) — depende do reaper de sessions
     // ter rodado primeiro pra marcar as zumbis como error.
     await reapOrphanLocks()
   } catch (err) {
@@ -60,7 +60,7 @@ const reaperTimer = setInterval(async () => {
   }
 }, REAPER_INTERVAL_MS)
 
-// Boot cleanup: locks orfaos de runs anteriores que crasharam sem release.
+// Boot cleanup: locks órfãos de runs anteriores que crasharam sem release.
 // Executa antes de aceitar requests novas pra evitar 409 falso-positivo.
 try {
   const orphans = await reapOrphanLocks()

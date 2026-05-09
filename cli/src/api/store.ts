@@ -11,7 +11,7 @@ interface PersistEnvelope<S> {
 }
 
 // Lê um campo do state desempacotado. Retorna `undefined` se store ou campo
-// nao existem. Tipo de retorno deixado em `unknown` — caller faz cast guardado.
+// não existem. Tipo de retorno deixado em `unknown` — caller faz cast guardado.
 async function readField<T>(name: string, key: string): Promise<unknown> {
   const env = await api.getStore<PersistEnvelope<T>>(name)
   if (!env || !env.state) return undefined
@@ -95,7 +95,7 @@ async function readAndPatch<S>(name: string, mutate: (state: S) => S): Promise<v
   for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
     const env = await api.getStore<PersistEnvelope2<S>>(name)
     if (!env || !env.state) {
-      throw new Error(`Store "${name}" nao encontrado ou vazio. Crie pelo web UI primeiro.`)
+      throw new Error(`Store "${name}" não encontrado ou vazio. Crie pelo web UI primeiro.`)
     }
     const patched: PersistEnvelope2<S> = {
       ...env,
@@ -118,7 +118,7 @@ async function readAndPatch<S>(name: string, mutate: (state: S) => S): Promise<v
       throw err
     }
   }
-  throw new Error(`readAndPatch(${name}): ${MAX_RETRY_ATTEMPTS} tentativas falharam. Ultimo erro: ${lastErr?.message}`)
+  throw new Error(`readAndPatch(${name}): ${MAX_RETRY_ATTEMPTS} tentativas falharam. Último erro: ${lastErr?.message}`)
 }
 
 export function newCardId(): string {
@@ -146,7 +146,7 @@ export async function updateCard(cardId: string, patch: Partial<Card>): Promise<
       return updated
     }),
   }))
-  if (!updated) throw new Error(`card ${cardId} nao encontrado`)
+  if (!updated) throw new Error(`card ${cardId} não encontrado`)
   return updated
 }
 
@@ -154,9 +154,9 @@ export async function moveCardToColumn(cardId: string, targetColumnId: string): 
   await readAndPatch<CardStoreState>('cards', (s) => {
     const cards = s.cards || []
     const card = cards.find((c) => c.id === cardId)
-    if (!card) throw new Error(`card ${cardId} nao encontrado`)
+    if (!card) throw new Error(`card ${cardId} não encontrado`)
 
-    // Posicao = ultima da coluna alvo
+    // Posicao = última da coluna alvo
     const targetCount = cards.filter((c) => c.column_id === targetColumnId).length
 
     return {

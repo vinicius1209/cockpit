@@ -1,6 +1,6 @@
-// InfoHint — info-icon (i) com tooltip explicando jargao tecnico em 1
+// InfoHint — info-icon (i) com tooltip explicando jargao técnico em 1
 // linha. Usado em campos onde o termo ('spec status', 'auto_pr',
-// 'isolation worktree') pode confundir usuario nao 100% tecnico.
+// 'isolation worktree') pode confundir usuario não 100% técnico.
 
 import { Info } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip'
@@ -21,7 +21,7 @@ export function InfoHint({ text, detail, side = 'top', className }: InfoHintProp
           <button
             type="button"
             className={`inline-flex h-3.5 w-3.5 items-center justify-center text-muted-foreground/70 hover:text-foreground transition-colors ${className || ''}`}
-            aria-label="Mais informacao"
+            aria-label="Mais informação"
             onClick={(e) => e.preventDefault()}
           >
             <Info className="h-3 w-3" />

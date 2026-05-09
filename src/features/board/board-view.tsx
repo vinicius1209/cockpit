@@ -78,7 +78,7 @@ export function BoardView() {
   )
 
   /** Cards de uma coluna respeitando includeArchived. getColumnCards exclui archived
-   *  por padrao; aqui adicionamos de volta quando o toggle esta on. */
+   *  por padrão; aqui adicionamos de volta quando o toggle esta on. */
   const columnCardsFor = useCallback(
     (columnId: string): Card[] => {
       const active = getColumnCards(activeWorkspaceId, columnId)

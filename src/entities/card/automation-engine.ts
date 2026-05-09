@@ -48,7 +48,7 @@ export async function executeColumnAutomations(
         }
 
         case 'generate_spec':
-          toast.info('Geracao de spec automatica disponivel na aba Spec do card')
+          toast.info('Geracao de spec automática disponível na aba Spec do card')
           break
 
         case 'run_implementation': {
@@ -58,10 +58,10 @@ export async function executeColumnAutomations(
           }
           // Auto-implement only if assignee is AI Agent
           if (card.assignee === 'ai-agent') {
-            toast.info('Implementacao automatica iniciada...', { description: card.title })
+            toast.info('Implementação automática iniciada...', { description: card.title })
             await runAutoImplementation(card, workspaceId)
           } else {
-            toast.info(`Card pronto para implementacao`, { description: 'Abra o card e use a aba Implementar' })
+            toast.info(`Card pronto para implementação`, { description: 'Abra o card e use a aba Implementar' })
           }
           break
         }
@@ -137,7 +137,7 @@ async function runAutoImplementation(card: Card, workspaceId: string) {
     })
 
     if (!response.ok) {
-      toast.error('Implementacao falhou')
+      toast.error('Implementação falhou')
       completeProcessing(card.id)
       return
     }
@@ -172,10 +172,10 @@ async function runAutoImplementation(card: Card, workspaceId: string) {
               useCardStore.getState().moveCard(card.id, reviewCol.id, 0)
               useCardStore.getState().updateCard(card.id, { spec_status: 'review' })
             }
-            toast.success('Implementacao concluida', { description: branch ? `Branch: ${branch}` : undefined })
+            toast.success('Implementação concluida', { description: branch ? `Branch: ${branch}` : undefined })
           }
           if (event.phase === 'error') {
-            toast.error('Implementacao falhou', { description: event.message })
+            toast.error('Implementação falhou', { description: event.message })
           }
         } catch { /* skip */ }
       }
@@ -184,7 +184,7 @@ async function runAutoImplementation(card: Card, workspaceId: string) {
     completeProcessing(card.id)
   } catch (err) {
     completeProcessing(card.id)
-    toast.error('Implementacao falhou', { description: err instanceof Error ? err.message : 'Erro' })
+    toast.error('Implementação falhou', { description: err instanceof Error ? err.message : 'Erro' })
   }
 }
 
@@ -204,19 +204,19 @@ async function runCardDiscovery(card: Card, workspaceId: string) {
   // Start processing state (live card)
   useCardStore.getState().startProcessing(card.id, 'discovery')
 
-  const systemPrompt = `Voce e um analista de software. Investigue o problema descrito no card no contexto do projeto. Seja conciso e pratico. Use portugues brasileiro.`
+  const systemPrompt = `Você e um analista de software. Investigue o problema descrito no card no contexto do projeto. Seja conciso e pratico. Use portugues brasileiro.`
 
   const userMessage = `Analise este card no contexto do projeto:
 
 Titulo: ${card.title}
 Tipo: ${card.type}
 Prioridade: ${card.priority}
-Descricao: ${card.description || 'Sem descricao'}
+Descrição: ${card.description || 'Sem descrição'}
 
 Investigue:
-1. Quais arquivos sao afetados por este problema?
-2. Qual o impacto? Quantos componentes/funcoes dependem?
-3. Existe codigo relacionado que tambem precisa mudar?
+1. Quais arquivos são afetados por este problema?
+2. Qual o impacto? Quantos componentes/funções dependem?
+3. Existe codigo relacionado que também precisa mudar?
 4. Qual a complexidade estimada (baixa/media/alta)?
 5. Sugestoes de abordagem para resolver
 
@@ -273,7 +273,7 @@ Retorne em formato markdown estruturado.`
       updateCard(card.id, {
         description: `${existingDesc}\n\n---\n\n## Card Discovery\n\n${fullText.trim()}`,
       })
-      toast.success('Card Discovery concluido', { description: 'Descricao enriquecida com contexto do codigo' })
+      toast.success('Card Discovery concluido', { description: 'Descrição enriquecida com contexto do codigo' })
     }
     useCardStore.getState().completeProcessing(card.id)
   } catch (err) {

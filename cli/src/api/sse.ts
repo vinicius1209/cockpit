@@ -66,7 +66,7 @@ export async function postSSE(
     signal: opts.signal,
   })
   if (!res.ok || !res.body) {
-    // F9-A — 409 vem como JSON normal (nao SSE) com payload estruturado.
+    // F9-A — 409 vem como JSON normal (não SSE) com payload estruturado.
     if (res.status === 409) {
       const data = await res.json().catch(() => null) as {
         error?: string

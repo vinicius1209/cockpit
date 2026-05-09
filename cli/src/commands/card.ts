@@ -28,7 +28,7 @@ export async function cardList(filters: ListFilters = {}): Promise<void> {
   if (filters.type) filtered = filtered.filter((c) => c.type === filters.type)
   if (filters.priority) filtered = filtered.filter((c) => c.priority === filters.priority)
   if (filters.status) filtered = filtered.filter((c) => c.spec_status === filters.status)
-  // F10 — archived: por padrao escondidos. --include-archived mostra junto.
+  // F10 — archived: por padrão escondidos. --include-archived mostra junto.
   // --only-archived mostra apenas descartados.
   if (filters.onlyArchived) {
     filtered = filtered.filter((c) => !!c.archived_at)
@@ -96,8 +96,8 @@ export async function cardShow(ref: string): Promise<void> {
   const { workspaces, cards, columns, projects } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
-    console.log(c.dim('  cockpit card list para ver disponiveis'))
+    console.error(c.rose('✕ card não encontrado: ') + ref)
+    console.log(c.dim('  cockpit card list para ver disponíveis'))
     process.exit(1)
   }
 
@@ -151,7 +151,7 @@ export async function cardShow(ref: string): Promise<void> {
 
   // Description
   if (card.description?.trim()) {
-    console.log(section('Descricao'))
+    console.log(section('Descrição'))
     const cleaned = card.description.trim().split('\n').slice(0, 8).join('\n')
     console.log(cleaned.split('\n').map((l) => '  ' + c.dim(l)).join('\n'))
     if (card.description.split('\n').length > 8) {
@@ -173,7 +173,7 @@ export async function cardShow(ref: string): Promise<void> {
 
   // Last session summary
   if (session) {
-    console.log(section('Ultima execucao'))
+    console.log(section('Última execução'))
     console.log(`  ${c.dim('action')}    ${c.bold(session.action)}`)
     console.log(`  ${c.dim('agent')}     ${session.agent}${session.model ? c.dim('/' + session.model) : ''}`)
     console.log(`  ${c.dim('phase')}     ${phaseColor(session.phase)(session.phase)}`)
@@ -185,9 +185,9 @@ export async function cardShow(ref: string): Promise<void> {
 
   // Hints
   const id = shortId(card.id)
-  console.log(c.dim('  ━ acoes:'))
+  console.log(c.dim('  ━ ações:'))
   console.log(c.dim(`    cockpit watch ${id}       acompanha live`))
-  console.log(c.dim(`    cockpit log ${id}         ultimo log`))
+  console.log(c.dim(`    cockpit log ${id}         último log`))
   console.log(c.dim(`    cockpit implement ${id}   re-implementar`))
 }
 
@@ -239,7 +239,7 @@ const VALID_PRIORITIES = ['critical', 'high', 'medium', 'low']
 
 export async function cardNew(title: string, opts: NewOpts = {}): Promise<void> {
   if (!title || title.trim().length === 0) {
-    console.error(c.rose('✕ titulo obrigatorio'))
+    console.error(c.rose('✕ titulo obrigatório'))
     console.log(c.dim('  uso: cockpit card new "Titulo do card"'))
     process.exit(1)
   }
@@ -251,7 +251,7 @@ export async function cardNew(title: string, opts: NewOpts = {}): Promise<void> 
     ? resolveWorkspace(opts.ws, workspaces)
     : workspaces.find((w) => w.slug === cli.activeWorkspaceSlug)
   if (!ws) {
-    console.error(c.rose('✕ workspace ativo nao definido'))
+    console.error(c.rose('✕ workspace ativo não definido'))
     console.log(c.dim('  use: cockpit ws use <name> ou --ws <name>'))
     process.exit(1)
   }
@@ -259,13 +259,13 @@ export async function cardNew(title: string, opts: NewOpts = {}): Promise<void> 
   // Type/priority validation
   const type = (opts.type || 'feature').toLowerCase()
   if (!VALID_TYPES.includes(type)) {
-    console.error(c.rose('✕ tipo invalido: ' + type))
-    console.log(c.dim('  validos: ' + VALID_TYPES.join(', ')))
+    console.error(c.rose('✕ tipo inválido: ' + type))
+    console.log(c.dim('  válidos: ' + VALID_TYPES.join(', ')))
     process.exit(1)
   }
   const priority = (opts.priority || 'medium').toLowerCase()
   if (!VALID_PRIORITIES.includes(priority)) {
-    console.error(c.rose('✕ prioridade invalida: ' + priority))
+    console.error(c.rose('✕ prioridade inválida: ' + priority))
     console.log(c.dim('  validas: ' + VALID_PRIORITIES.join(', ')))
     process.exit(1)
   }
@@ -273,15 +273,15 @@ export async function cardNew(title: string, opts: NewOpts = {}): Promise<void> 
   // Column resolution: --col <slug>, ou primeira coluna
   const wsCols = (columns[ws.id] || []).sort((a, b) => a.position - b.position)
   if (wsCols.length === 0) {
-    console.error(c.rose('✕ workspace nao tem colunas'))
+    console.error(c.rose('✕ workspace não tem colunas'))
     process.exit(1)
   }
   let column = wsCols[0]
   if (opts.col) {
     const found = wsCols.find((co) => co.slug === opts.col || co.name.toLowerCase() === opts.col!.toLowerCase())
     if (!found) {
-      console.error(c.rose('✕ coluna nao encontrada: ' + opts.col))
-      console.log(c.dim('  disponiveis: ' + wsCols.map((co) => co.slug).join(', ')))
+      console.error(c.rose('✕ coluna não encontrada: ' + opts.col))
+      console.log(c.dim('  disponíveis: ' + wsCols.map((co) => co.slug).join(', ')))
       process.exit(1)
     }
     column = found
@@ -319,15 +319,15 @@ export async function cardMove(ref: string, columnSlug: string): Promise<void> {
   const { workspaces, cards, columns } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
 
   const wsCols = (columns[card.workspace_id] || []).sort((a, b) => a.position - b.position)
   const target = wsCols.find((co) => co.slug === columnSlug || co.name.toLowerCase() === columnSlug.toLowerCase())
   if (!target) {
-    console.error(c.rose('✕ coluna nao encontrada: ') + columnSlug)
-    console.log(c.dim('  disponiveis: ' + wsCols.map((co) => co.slug).join(', ')))
+    console.error(c.rose('✕ coluna não encontrada: ') + columnSlug)
+    console.log(c.dim('  disponíveis: ' + wsCols.map((co) => co.slug).join(', ')))
     process.exit(1)
   }
 
@@ -340,13 +340,13 @@ export async function cardDelete(ref: string, force = false): Promise<void> {
   const { cards } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
 
   if (!force) {
     console.log(c.amber('⚠ vai excluir #' + shortId(card.id) + ': ') + c.bold(card.title))
-    console.log(c.dim('  use --force para confirmar (nao tem undo)'))
+    console.log(c.dim('  use --force para confirmar (não tem undo)'))
     process.exit(0)
   }
 
@@ -368,16 +368,16 @@ export async function cardArchive(ref: string): Promise<void> {
   const { cards } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
   if (card.archived_at) {
-    console.log(c.amber('⚠ #' + shortId(card.id) + ' ja esta descartado'))
+    console.log(c.amber('⚠ #' + shortId(card.id) + ' já esta descartado'))
     console.log(c.dim('  cockpit card unarchive ' + shortId(card.id) + '  ← pra reativar'))
     return
   }
   await updateCard(card.id, { archived_at: new Date().toISOString() } as never)
-  console.log(`${c.amber('●')} #${shortId(card.id)} descartado ${c.dim('· some do board, fica no historico')}`)
+  console.log(`${c.amber('●')} #${shortId(card.id)} descartado ${c.dim('· some do board, fica no histórico')}`)
   console.log(c.dim(`  reativar: cockpit card unarchive ${shortId(card.id)}`))
 }
 
@@ -386,11 +386,11 @@ export async function cardUnarchive(ref: string): Promise<void> {
   // Aceita tanto cards ativos quanto archived nessa busca
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
   if (!card.archived_at) {
-    console.log(c.dim('  #' + shortId(card.id) + ' ja esta ativo (nao foi descartado)'))
+    console.log(c.dim('  #' + shortId(card.id) + ' já esta ativo (não foi descartado)'))
     return
   }
   await updateCard(card.id, { archived_at: null } as never)
@@ -401,7 +401,7 @@ export async function cardEdit(ref: string, opts: EditOpts): Promise<void> {
   const { cards } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
 
@@ -409,14 +409,14 @@ export async function cardEdit(ref: string, opts: EditOpts): Promise<void> {
   if (opts.title) patch.title = opts.title
   if (opts.type) {
     if (!VALID_TYPES.includes(opts.type)) {
-      console.error(c.rose('✕ tipo invalido: ' + opts.type))
+      console.error(c.rose('✕ tipo inválido: ' + opts.type))
       process.exit(1)
     }
     patch.type = opts.type
   }
   if (opts.priority) {
     if (!VALID_PRIORITIES.includes(opts.priority)) {
-      console.error(c.rose('✕ prioridade invalida: ' + opts.priority))
+      console.error(c.rose('✕ prioridade inválida: ' + opts.priority))
       process.exit(1)
     }
     patch.priority = opts.priority

@@ -39,7 +39,7 @@ function buildPrompt(systemPrompt: string, messages: ChatMessage[]): string {
   }
 
   if (messages.length > 1) {
-    parts.push('Historico da conversa:')
+    parts.push('Histórico da conversa:')
     for (const msg of messages.slice(0, -1)) {
       const role = msg.role === 'user' ? 'User' : 'Assistant'
       parts.push(`${role}: ${msg.content}`)
@@ -51,7 +51,7 @@ function buildPrompt(systemPrompt: string, messages: ChatMessage[]): string {
   if (lastMsg) {
     parts.push(`User: ${lastMsg.content}`)
     parts.push('')
-    parts.push('Responda a ultima mensagem do usuario.')
+    parts.push('Responda a última mensagem do usuario.')
   }
 
   return parts.join('\n')
@@ -80,7 +80,7 @@ export async function handleChatRoutes(req: Request, url: URL): Promise<Response
     const prompt = buildPrompt(body.systemPrompt || '', body.messages)
 
     // Persistencia opcional — se cliente mandou cardId+action, criamos session
-    // para que o frontend possa reconciliar apos reload (N2/N3).
+    // para que o frontend possa reconciliar após reload (N2/N3).
     const persist = body.cardId && body.workspaceSlug && body.action
     const session = persist
       ? await createAgentSession({
@@ -172,7 +172,7 @@ export async function handleChatRoutes(req: Request, url: URL): Promise<Response
 
     const apiKey = getSecret(body.provider)
     if (!apiKey) {
-      return jsonResponse({ error: `API key para "${body.provider}" nao configurada no daemon. Use Settings > API Keys.` }, 400)
+      return jsonResponse({ error: `API key para "${body.provider}" não configurada no daemon. Use Settings > API Keys.` }, 400)
     }
 
     const stream = new ReadableStream({
@@ -245,7 +245,7 @@ export async function handleChatRoutes(req: Request, url: URL): Promise<Response
               },
             )
           } else {
-            send({ type: 'error', message: `Provider "${body.provider}" nao suportado` })
+            send({ type: 'error', message: `Provider "${body.provider}" não suportado` })
             controller.close()
             return
           }

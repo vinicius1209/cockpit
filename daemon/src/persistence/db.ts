@@ -28,22 +28,22 @@ export async function initDB(): Promise<void> {
   console.log(`[db] SQLite ready at ${DB_PATH}`)
 }
 
-// Sessions com phase != done/error e completed_at IS NULL ficaram orfas do
+// Sessions com phase != done/error e completed_at IS NULL ficaram órfãs do
 // daemon anterior (crash, restart). Sem isto, o frontend reidrata uma session
-// "running" que nao tem agent processo vivo, abre EventSource, conexao morre,
+// "running" que não tem agent processo vivo, abre EventSource, conexao morre,
 // browser auto-reconecta → loop infinito de GET /stream.
 function cleanupOrphanedSessions(): void {
   try {
     const result = db.query(`
       UPDATE sessions
       SET phase = 'error',
-          error = 'Sessao orfa (daemon foi reiniciado durante execucao)',
+          error = 'Sessão órfã (daemon foi reiniciado durante execução)',
           completed_at = datetime('now')
       WHERE phase NOT IN ('done', 'error')
         AND completed_at IS NULL
     `).run() as { changes: number }
     if (result.changes > 0) {
-      console.log(`[db] Marcadas ${result.changes} sessao(oes) orfa(s) como error`)
+      console.log(`[db] Marcadas ${result.changes} sessão(oes) órfã(s) como error`)
     }
   } catch (err) {
     console.warn('[db] cleanupOrphanedSessions failed:', err)
@@ -148,7 +148,7 @@ function runMigrations(): void {
 
   if (v < 2) {
     // v2: generaliza tabela sessions para qualquer action (spec/implementation/discovery/chat)
-    // - action: tipo de execucao
+    // - action: tipo de execução
     // - model: model usado pelo agent
     // - chunks: stream incremental do agent (texto livre, separado de 'output' que era especifico)
     db.exec(`
@@ -165,7 +165,7 @@ function runMigrations(): void {
 
   if (v < 3) {
     // v3: updated_at — usado pelo reaper para detectar sessions "stale"
-    // (running ha mais de N minutos sem novos chunks → orfas em runtime).
+    // (running ha mais de N minutos sem novos chunks → órfãs em runtime).
     db.exec(`
       ALTER TABLE sessions ADD COLUMN updated_at TEXT;
       UPDATE sessions SET updated_at = COALESCE(completed_at, started_at);
@@ -178,9 +178,9 @@ function runMigrations(): void {
 
   if (v < 4) {
     // v4: project_locks — F9-A multi-session orchestration.
-    // Garante que apenas 1 implementacao roda por projeto (por path) por vez,
-    // evitando working tree stomping. Cleanup de orfaos (cuja session ja
-    // terminou) acontece no boot e periodicamente (mesmo padrao do reaper).
+    // Garante que apenas 1 implementação roda por projeto (por path) por vez,
+    // evitando working tree stomping. Cleanup de órfãos (cuja session já
+    // terminou) acontece no boot e periodicamente (mesmo padrão do reaper).
     //  - kind: 'implement' por enquanto; futuro pode ter 'discovery', 'spec' etc
     //  - acquired_at: ISO timestamp; usado em mensagens de erro
     db.exec(`
@@ -199,7 +199,7 @@ function runMigrations(): void {
 
   if (v < 5) {
     // v5: kv_stores ganha coluna 'version' (optimistic concurrency control).
-    // Cada write incrementa a versao. POST /api/data/:store agora aceita
+    // Cada write incrementa a versão. POST /api/data/:store agora aceita
     // expectedVersion no envelope; mismatch retorna 409 → caller refetch+retry.
     // Resolve o Lost Update bug em CLI/MCP/daemon-internal write paths.
     db.exec(`

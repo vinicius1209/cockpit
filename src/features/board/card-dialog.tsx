@@ -130,21 +130,21 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
   const handleDelete = async () => {
     if (!card) return
     // F10 — se card tem conteudo (spec/entrevista), exige digitar o titulo
-    // pra confirmar (defesa contra delete acidental de trabalho ja feito).
+    // pra confirmar (defesa contra delete acidental de trabalho já feito).
     const hasContent = !!(card.spec_content || card.interview_notes || card.description)
     const ok = await confirm({
       title: `Excluir card "${card.title}"?`,
       description: (
         <>
           O card sera removido permanentemente, incluindo entrevista, spec e
-          historico de implementacao. Os arquivos em
+          histórico de implementação. Os arquivos em
           {' '}<span className="font-mono text-foreground">~/.cockpit/tasks/&lt;ws&gt;/{card.id}/</span>
           {' '}permanecem no disco.
           {hasContent && (
             <>
               <br /><br />
-              <span className="text-amber-500">Este card tem conteudo (spec/entrevista/descricao). Considere{' '}
-              <strong className="text-foreground">Descartar</strong> em vez de Excluir — preserva tudo no historico.</span>
+              <span className="text-amber-500">Este card tem conteudo (spec/entrevista/descrição). Considere{' '}
+              <strong className="text-foreground">Descartar</strong> em vez de Excluir — preserva tudo no histórico.</span>
             </>
           )}
         </>
@@ -163,7 +163,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
       title: card.archived_at ? `Reativar card "${card.title}"?` : `Descartar card "${card.title}"?`,
       description: card.archived_at
         ? 'O card volta a aparecer no board.'
-        : 'O card some do board mas permanece no historico (busca, metricas, sessions). Voce pode reativar a qualquer momento. Use Excluir apenas se foi criado por engano.',
+        : 'O card some do board mas permanece no histórico (busca, metricas, sessions). Você pode reativar a qualquer momento. Use Excluir apenas se foi criado por engano.',
       confirmLabel: card.archived_at ? 'Reativar' : 'Descartar',
     })
     if (!ok) return
@@ -225,7 +225,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
               </ErrorBoundary>
             )}
             {isEditing && card && activeTab === 'implement' && (
-              <ErrorBoundary fallbackLabel="Implementacao">
+              <ErrorBoundary fallbackLabel="Implementação">
                 <ImplementPanel card={card} workspaceId={workspaceId} />
               </ErrorBoundary>
             )}
@@ -256,7 +256,7 @@ export function CardDialog({ card, open, onClose, defaultColumnId, workspaceId }
                   size="sm"
                   className="text-amber-500 hover:text-amber-400"
                   onClick={handleArchive}
-                  title={card?.archived_at ? 'Reativar (volta pro board)' : 'Descartar (some do board, fica no historico)'}
+                  title={card?.archived_at ? 'Reativar (volta pro board)' : 'Descartar (some do board, fica no histórico)'}
                 >
                   <ArchiveIcon className="h-3.5 w-3.5 mr-1" />
                   {card?.archived_at ? 'Reativar' : 'Descartar'}

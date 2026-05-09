@@ -29,14 +29,14 @@ export interface TerminalProps {
 const FRESH_GLOW_MS = 600
 
 // Regex para paths comuns: src/foo.ts, daemon/src/x.tsx, ~/projetos/..., etc.
-// Match: path com ao menos uma `/` e extensao reconhecida.
+// Match: path com ao menos uma `/` e extensão reconhecida.
 const PATH_REGEX = /([\w./~-]*\/[\w./~-]+\.(?:tsx?|jsx?|md|json|css|scss|html|yml|yaml|toml|sh|py|go|rs|env)\b)/g
 
 // Cockpit-style live terminal:
 // - Buffer de texto com newlines preservados
 // - ANSI colors (codes do CLI viram cores reais)
 // - Filename click-to-copy
-// - Search local (Ctrl+F) com highlight + navegacao
+// - Search local (Ctrl+F) com highlight + navegação
 // - Glow fade nos chunks novos (animacao de chegada)
 // - Auto-scroll com toggle inteligente
 // - Status bar com tokens estimados, copy all, verbose toggle
@@ -144,7 +144,7 @@ export function AgentTerminal({
       setTimeout(() => setCopied(false), 1500)
       toast.success('Output copiado')
     } catch {
-      toast.error('Nao foi possivel copiar')
+      toast.error('Não foi possivel copiar')
     }
   }
 
@@ -192,10 +192,10 @@ export function AgentTerminal({
           <p className="text-muted-foreground/40 italic">
             {isLive ? (
               <>
-                aguardando saida do agent
+                aguardando saída do agent
                 <span className="inline-block w-1.5 h-3 bg-emerald-400/80 align-middle animate-[blink_1s_step-end_infinite] ml-1" />
               </>
-            ) : 'sem saida'}
+            ) : 'sem saída'}
           </p>
         ) : (
           visibleLines.map((line, i) => (
@@ -402,7 +402,7 @@ function RichText({
   }
 
   // Para output: passa primeiro pelo Anser (ANSI), depois enriquecemos.
-  // Anser retorna string pura quando nao ha codes — perfeito.
+  // Anser retorna string pura quando não ha codes — perfeito.
   if (kind === 'output') {
     // Detecta se ha ANSI codes; se sim, deixa o Anser cuidar (sem filename click)
     if (/\x1b\[/.test(text)) {

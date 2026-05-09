@@ -6,7 +6,7 @@
 // 2. Cada appendChunk → publish('chunk', sessionId, text)
 // 3. finishAgentSession → publish('done'|'error', sessionId, ...)
 // 4. Subscribers (SSE clients) recebem eventos pendentes
-// 5. Quando ultimo subscriber sai, broker libera o slot da memoria
+// 5. Quando último subscriber sai, broker libera o slot da memoria
 
 export type SessionEvent =
   | { type: 'chunk'; text: string }
@@ -17,7 +17,7 @@ type Subscriber = (event: SessionEvent) => void
 
 interface SessionChannel {
   subscribers: Set<Subscriber>
-  // Buffer de events que ja aconteceram (drainado no replay).
+  // Buffer de events que já aconteceram (drainado no replay).
   // Quando session termina, mantemos por 30s para subscribers que conectarem
   // tarde ainda receberem o terminal event.
   finished: SessionEvent | null

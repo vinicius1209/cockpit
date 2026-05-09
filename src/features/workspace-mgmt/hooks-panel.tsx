@@ -28,7 +28,7 @@ const HOOK_DEFS: HookDef[] = [
   {
     key: 'before_implement',
     label: 'before_implement',
-    description: 'Roda apos a branch ser criada e ANTES do agent CLI spawnar. Exit != 0 ABORTA o implement.',
+    description: 'Roda após a branch ser criada e ANTES do agent CLI spawnar. Exit != 0 ABORTA o implement.',
     envVars: [
       { name: 'COCKPIT_CARD_ID', desc: 'id completo do card' },
       { name: 'COCKPIT_SESSION_ID', desc: 'id da session' },
@@ -43,17 +43,17 @@ const HOOK_DEFS: HookDef[] = [
   {
     key: 'after_implement',
     label: 'after_implement',
-    description: 'Roda apos o agent terminar com sucesso, ANTES do PR. Informativo (nao para fluxo).',
+    description: 'Roda após o agent terminar com sucesso, ANTES do PR. Informativo (não para fluxo).',
     envVars: [
       { name: 'COCKPIT_SUMMARY', desc: 'JSON com filesModified/Created/Deleted' },
       { name: 'COCKPIT_BRANCH', desc: 'branch com edits' },
     ],
-    example: '# roda testes apos implementacao\ncd "$COCKPIT_PROJECT_PATH" && bun test || true',
+    example: '# roda testes após implementação\ncd "$COCKPIT_PROJECT_PATH" && bun test || true',
   },
   {
     key: 'after_pr',
     label: 'after_pr',
-    description: 'Roda apos PR ser criado com sucesso. Otimo pra notify Slack, deploy preview, etc.',
+    description: 'Roda após PR ser criado com sucesso. Otimo pra notify Slack, deploy preview, etc.',
     envVars: [
       { name: 'COCKPIT_PR_URL', desc: 'URL completa do PR' },
       { name: 'COCKPIT_PR_NUMBER', desc: 'numero do PR' },
@@ -94,8 +94,8 @@ export function HooksPanel({ workspace, onSave }: HooksPanelProps) {
         <div className="space-y-1">
           <p className="font-medium text-amber-500">Hooks rodam com permissoes do daemon</p>
           <p className="text-muted-foreground">
-            Scripts sao executados em <code className="font-mono">/bin/sh -c</code> com cwd no projeto.
-            Timeout: 60s. Soh use scripts que voce confia. Stdout aparece no live tail; stderr eh capturado pra log.
+            Scripts são executados em <code className="font-mono">/bin/sh -c</code> com cwd no projeto.
+            Timeout: 60s. Soh use scripts que você confia. Stdout aparece no live tail; stderr eh capturado pra log.
           </p>
         </div>
       </div>
@@ -116,8 +116,8 @@ export function HooksPanel({ workspace, onSave }: HooksPanelProps) {
                   text={def.description}
                   detail={
                     def.blocking
-                      ? 'Exit code != 0 cancela toda a implementacao. Use pra validacoes pre-flight (lint, schema check, etc).'
-                      : 'Erros nao param o fluxo — usado pra integracoes (notificar, deploy, metricas).'
+                      ? 'Exit code != 0 cancela toda a implementação. Use pra validacoes pre-flight (lint, schema check, etc).'
+                      : 'Erros não param o fluxo — usado pra integracoes (notificar, deploy, metricas).'
                   }
                 />
               </div>
@@ -138,7 +138,7 @@ export function HooksPanel({ workspace, onSave }: HooksPanelProps) {
 
             <details className="text-[11px] text-muted-foreground">
               <summary className="cursor-pointer hover:text-foreground transition-colors">
-                env vars disponiveis ({def.envVars.length})
+                env vars disponíveis ({def.envVars.length})
               </summary>
               <ul className="mt-2 space-y-0.5 pl-3">
                 {def.envVars.map((v) => (
@@ -156,7 +156,7 @@ export function HooksPanel({ workspace, onSave }: HooksPanelProps) {
       ))}
 
       <div className="flex items-center justify-end gap-2 sticky bottom-0 bg-background py-2">
-        {dirty && <span className="text-[11px] text-amber-500 font-mono">alteracoes nao salvas</span>}
+        {dirty && <span className="text-[11px] text-amber-500 font-mono">alteracoes não salvas</span>}
         <Button size="sm" onClick={handleSave} disabled={!dirty}>
           <Save className="h-3.5 w-3.5 mr-1" />
           Salvar hooks

@@ -62,7 +62,7 @@ export function buildDiscoveryAgentPrompt(scanResult: {
     ? `\nSub-projetos: ${scanResult.subProjects.map((sp) => `${sp.name} (${sp.indicator})`).join(', ')}`
     : ''
 
-  return `Analise este projeto e retorne SOMENTE um JSON array com problemas, debitos tecnicos e melhorias encontrados.
+  return `Analise este projeto e retorne SOMENTE um JSON array com problemas, debitos técnicos e melhorias encontrados.
 
 Projeto: ${scanResult.name}
 Stack: ${scanResult.stack.join(', ')}
@@ -71,5 +71,5 @@ Dependencias: ${Object.keys(scanResult.dependencies).join(', ')}
 Estrutura: ${scanResult.structure.slice(0, 20).join(', ')}${subProjectList}
 
 Formato de resposta (JSON puro, sem markdown):
-[{"title":"descricao curta","description":"descricao detalhada","type":"bugfix|improvement|chore|discovery","priority":"critical|high|medium|low","subProject":"nome-ou-null"}]`
+[{"title":"descrição curta","description":"descrição detalhada","type":"bugfix|improvement|chore|discovery","priority":"critical|high|medium|low","subProject":"nome-ou-null"}]`
 }

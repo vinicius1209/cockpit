@@ -209,7 +209,7 @@ export function DiscoveryPage() {
               setIsRunning(false)
             } else {
               // Job still running — poll every 5s until done
-              setCurrentPhase('Reconectando... agent ainda em execucao')
+              setCurrentPhase('Reconectando... agent ainda em execução')
               const poll = setInterval(() => {
                 daemonClient.getDiscoveryJob(jobId)
                   .then((j2) => {
@@ -321,7 +321,7 @@ export function DiscoveryPage() {
           <h2 className="text-xl font-semibold">Nenhum projeto registrado</h2>
           <p className="text-sm text-muted-foreground leading-relaxed">
             Para usar o Auto-Discovery, primeiro registre um projeto no workspace.
-            O scanner vai analisar o codigo, encontrar TODOs, FIXMEs, debitos tecnicos e gerar cards automaticamente.
+            O scanner vai analisar o codigo, encontrar TODOs, FIXMEs, debitos técnicos e gerar cards automaticamente.
           </p>
           <Button onClick={() => navigate(`/workspace/${activeWorkspaceId}/settings`)}>
             <Settings className="h-4 w-4 mr-2" />
@@ -440,7 +440,7 @@ export function DiscoveryPage() {
                     {useAgent === 'none' ? (
                       <span className="flex items-center gap-2">
                         <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                        Scanner rapido
+                        Scanner rápido
                       </span>
                     ) : (
                       <span className="flex items-center gap-2 truncate">
@@ -466,12 +466,12 @@ export function DiscoveryPage() {
                       <CommandEmpty>Nenhum encontrado.</CommandEmpty>
                       <CommandGroup heading="Scanner">
                         <CommandItem
-                          value="scanner-rapido"
+                          value="scanner-rápido"
                           onSelect={() => { setUseAgent('none'); setSelectedModel(null); setModeOpen(false) }}
                         >
                           <Search className="h-3.5 w-3.5 text-muted-foreground" />
                           <div className="flex flex-col ml-1">
-                            <span>Scanner rapido</span>
+                            <span>Scanner rápido</span>
                             <span className="text-[11px] text-muted-foreground">TODOs, git status, dependencias</span>
                           </div>
                           <Check className={cn('ml-auto h-4 w-4', useAgent === 'none' ? 'opacity-100' : 'opacity-0')} />
@@ -536,7 +536,7 @@ export function DiscoveryPage() {
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <History className="h-4 w-4 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Historico</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Histórico</span>
           </div>
           <div className="flex gap-2 overflow-x-auto pb-1">
             {jobHistory.map((job) => {
@@ -767,7 +767,7 @@ export function DiscoveryPage() {
             <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 px-4 py-3">
               <p className="text-sm font-medium text-blue-500 mb-1">
                 <CheckCircle2 className="h-3.5 w-3.5 inline mr-1.5" />
-                {result.diff.resolvedCount} problema{result.diff.resolvedCount > 1 ? 's' : ''} resolvido{result.diff.resolvedCount > 1 ? 's' : ''} desde o ultimo scan
+                {result.diff.resolvedCount} problema{result.diff.resolvedCount > 1 ? 's' : ''} resolvido{result.diff.resolvedCount > 1 ? 's' : ''} desde o último scan
               </p>
               <div className="space-y-0.5">
                 {result.diff.resolved.slice(0, 5).map((r) => (

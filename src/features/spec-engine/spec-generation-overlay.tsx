@@ -128,11 +128,11 @@ export function SpecGenerationOverlay({ content, agentName, modelName, onAbort }
   )
 }
 
-// Phases visuais enquanto o primeiro chunk nao chega — da feedback ao usuario
+// Phases visuais enquanto o primeiro chunk não chega — da feedback ao usuario
 // que algo esta acontecendo (em vez de spinner mudo).
 function AwaitingPhases({ elapsed }: { elapsed: number }) {
   // Phases conceituais (estimadas) baseadas em tempo decorrido.
-  // Sao otimistas — se demora muito, exibe ultimo phase + dica.
+  // Sao otimistas — se demora muito, exibe último phase + dica.
   const phases = [
     { from: 0,  label: 'Inicializando agent CLI',          icon: '⚙' },
     { from: 3,  label: 'Carregando contexto do workspace', icon: '📡' },
@@ -204,7 +204,7 @@ function AwaitingPhases({ elapsed }: { elapsed: number }) {
               className="text-rose-500 hover:underline font-mono uppercase tracking-wider text-[10px]"
               onClick={(e) => { e.preventDefault() }}
             >ABORT</button>
-            {' '}e tentar com modelo mais rapido (haiku).
+            {' '}e tentar com modelo mais rápido (haiku).
           </p>
         </div>
       )}

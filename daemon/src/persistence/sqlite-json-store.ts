@@ -6,7 +6,7 @@ import { atomicMutate, readStore, setStore } from './atomic-store'
  * IMMEDIATE transaction) — Lost Update fix.
  *
  * IMPORTANTE: get() lê direto do DB cada chamada (sem cache em memoria).
- * Se voce precisa de hot path com cache, use atomicMutate manualmente.
+ * Se você precisa de hot path com cache, use atomicMutate manualmente.
  */
 export class SqliteJsonStore<T> {
   private storeName: string

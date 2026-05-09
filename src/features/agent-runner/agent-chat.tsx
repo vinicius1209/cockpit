@@ -53,13 +53,13 @@ function buildEnrichedSystemPrompt(
   // 2. SCOPE — restrict the agent to this card/project context
   sections.push(`## Escopo da conversa
 
-Voce esta conversando sobre UM card especifico de um projeto. Sua atuacao deve
+Você esta conversando sobre UM card especifico de um projeto. Sua atuacao deve
 ficar restrita ao escopo deste card e do projeto vinculado.
 
 - Responda APENAS perguntas relacionadas a este card ou ao projeto.
 - Se o usuario perguntar algo fora desse escopo, redirecione gentilmente.
-- NAO faca perguntas sobre informacoes que ja estao no contexto abaixo.
-- Use ativamente o contexto: titulo, descricao, entrevista, spec, projeto.`)
+- NAO faca perguntas sobre informações que já estão no contexto abaixo.
+- Use ativamente o contexto: titulo, descrição, entrevista, spec, projeto.`)
 
   // 3. CARD snapshot
   const cardLines: string[] = ['## Contexto do card']
@@ -70,7 +70,7 @@ ficar restrita ao escopo deste card e do projeto vinculado.
   if (card.due_date) cardLines.push(`- Data limite: ${card.due_date}`)
   if (card.description?.trim()) {
     cardLines.push('')
-    cardLines.push('### Descricao')
+    cardLines.push('### Descrição')
     cardLines.push(card.description.trim())
   }
   if (card.interview_notes?.trim()) {
@@ -93,7 +93,7 @@ ficar restrita ao escopo deste card e do projeto vinculado.
 - Nome: ${project.name}
 - Path: ${project.path}
 
-Voce tem acesso ao codigo-fonte deste projeto via filesystem (cwd ja apontando
+Você tem acesso ao codigo-fonte deste projeto via filesystem (cwd já apontando
 para o path acima). Pode ler arquivos para responder com mais precisao.`)
   }
 
@@ -157,9 +157,9 @@ export function AgentChat({ card, workspaceId }: AgentChatProps) {
     const currentRun = getRun(runId)
     const allMessages = currentRun?.messages || []
 
-    // Contexto do card + projeto vai no SYSTEM PROMPT do agente (e nao nas
-    // messages, que sao filtradas em agent-service). Assim:
-    // 1. Nao gasta tokens duplicando em cada turno
+    // Contexto do card + projeto vai no SYSTEM PROMPT do agente (e não nas
+    // messages, que são filtradas em agent-service). Assim:
+    // 1. Não gasta tokens duplicando em cada turno
     // 2. Sobrevive a multiplas mensagens
     // 3. Inclui escopo restritivo: agent so responde sobre card+projeto
     const project = card.project_id
@@ -193,7 +193,7 @@ export function AgentChat({ card, workspaceId }: AgentChatProps) {
       },
       abort.signal,
       projectPath,
-      // N5: persistencia da sessao no daemon — chunks sobrevivem reload.
+      // N5: persistencia da sessão no daemon — chunks sobrevivem reload.
       { cardId: card.id, workspaceSlug: activeWorkspace?.slug || 'default', action: 'chat' },
     )
   }, [input, selectedAgent, isStreaming, activeRunId, activeRun, card, workspaceId, getApiKey, createRun, addMessage, getRun, updateRunStatus, projectPath, projects, activeWorkspace])

@@ -52,11 +52,11 @@ export function readStore<T = unknown>(name: string): KvStoreSnapshot<T> | null 
 /**
  * Mutate atômico. Single-process serialization via SQLite transação
  * BEGIN IMMEDIATE. Use SEMPRE em código daemon-internal (updateCardPrUrl,
- * updateCardSpecContent, etc) — substitui o padrao SELECT → JSON.parse →
+ * updateCardSpecContent, etc) — substitui o padrão SELECT → JSON.parse →
  * mutate → INSERT OR REPLACE que tinha Lost Update.
  *
  * Mutator recebe `current` (parsed) e retorna `next`. Se mutator retornar
- * o mesmo objeto sem mudança, ainda incrementa version (preserva semantica
+ * o mesmo objeto sem mudança, ainda incrementa version (preserva semântica
  * de "houve write").
  *
  * Throws se store não existe (precisa ter sido inicializado antes).
@@ -66,7 +66,7 @@ export function atomicMutate<T = unknown>(
   mutator: (current: T) => T,
 ): KvStoreSnapshot<T> {
   const db = getDB()
-  // BEGIN IMMEDIATE bloqueia outros writers ate COMMIT — serializa.
+  // BEGIN IMMEDIATE bloqueia outros writers até COMMIT — serializa.
   // SELECT + UPDATE no mesmo block garante atomicidade.
   let result: KvStoreSnapshot<T> | null = null
   db.transaction(() => {
@@ -87,11 +87,11 @@ export function atomicMutate<T = unknown>(
 
 /**
  * Write condicional baseado em version. Usado pelo HTTP POST /api/data/:store.
- * Cliente envia o version que ele leu; se ja mudou (version atual > expected),
+ * Cliente envia o version que ele leu; se já mudou (version atual > expected),
  * retorna { ok: false, current } e cliente refetch+retry.
  *
  * `expectedVersion = -1` faz force-write (skip check) — usado por flows
- * legados que ainda nao migraram pra optimistic locking.
+ * legados que ainda não migraram pra optimistic locking.
  */
 export function writeStoreIfVersion<T = unknown>(
   name: string,

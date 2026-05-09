@@ -13,7 +13,7 @@ export async function handleDataRoutes(req: Request, url: URL): Promise<Response
 
   // GET /api/data/:store — load store data + version atual.
   // Retorna { state: ..., version: N, _ts: ... }. Cliente preserva o version
-  // recebido pra usar no proximo POST (optimistic locking).
+  // recebido pra usar no próximo POST (optimistic locking).
   const getMatch = path.match(/^\/api\/data\/([^/]+)$/)
   if (getMatch && req.method === 'GET') {
     if (!validateStoreName(getMatch[1])) return jsonResponse({ error: `Invalid store name` }, 400)
@@ -22,8 +22,8 @@ export async function handleDataRoutes(req: Request, url: URL): Promise<Response
     const snap = readStore(getMatch[1])
     const data = snap?.data ?? store.get()
     const version = snap?.version ?? 0
-    // Backward compat: data ja tem `version` interno em alguns stores.
-    // Sobrescreve com a versao do DB pra ter source of truth unica.
+    // Backward compat: data já tem `version` interno em alguns stores.
+    // Sobrescreve com a versão do DB pra ter source of truth única.
     return jsonResponse({ ...(data as Record<string, unknown>), version })
   }
 
@@ -44,7 +44,7 @@ export async function handleDataRoutes(req: Request, url: URL): Promise<Response
       const body = await req.json() as Record<string, unknown>
       const expectedVersion = typeof body.version === 'number' ? body.version : -1
 
-      // Strip version do payload — ela e metadata da response, nao parte do state
+      // Strip version do payload — ela e metadata da response, não parte do state
       const { version: _omit, ...stateOnly } = body
       void _omit
 

@@ -78,7 +78,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
         setFiles(s.files || [])
         if (s.attempt) setAttempt(s.attempt)
       } else if (s.phase === 'error') {
-        setError(s.error || 'Erro na ultima execucao')
+        setError(s.error || 'Erro na última execução')
         setPhase('error')
         setOutputLines(output)
         setTerminalLines(reconstructTerminalLines(output))
@@ -219,7 +219,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
             }
             if (event.branch) setBranch(event.branch)
 
-            // Heartbeat: nao polui o terminal — atualiza so o status bar
+            // Heartbeat: não polui o terminal — atualiza so o status bar
             if (event.phase === 'heartbeat') {
               setSilenceSeconds(event.silenceSeconds || 0)
               continue
@@ -232,13 +232,13 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
               setOutputLines((prev) => [...prev, incoming])
               addProcessingChunk(card.id, incoming)
 
-              // Classifica para cores semanticas no terminal
+              // Classifica para cores semânticas no terminal
               const isTool = incoming.startsWith('▶ ')
               const isLog = !!event.message  // mensagens vem do daemon (analyzing/branching)
               const kind: TerminalLine['kind'] = isTool ? 'tool' : isLog ? 'log' : 'output'
 
               setTerminalLines((prev) => {
-                // Buffer trick: se o ultimo line eh do mesmo kind 'output' e o
+                // Buffer trick: se o último line eh do mesmo kind 'output' e o
                 // novo chunk NAO comeca com newline, concatena (resolve o
                 // problema de "V" seguido de "ou comecar..." em linhas
                 // separadas — agora vira "Vou comecar..." uma linha so).
@@ -304,7 +304,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
 
   // ── Reset helpers — garantem consistencia entre state local + card + processing ──
 
-  /** Limpa o state local da UI (phase, terminal, errors). Nao mexe no card. */
+  /** Limpa o state local da UI (phase, terminal, errors). Não mexe no card. */
   const clearLocalState = () => {
     setPhase('idle')
     setError(null)
@@ -318,7 +318,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
   }
 
   /** Reset completo: aborta exec, limpa state, devolve card pra Ready,
-   *  remove processingCards. Use em ABORT / Limpar / Reset apos erro. */
+   *  remove processingCards. Use em ABORT / Limpar / Reset após erro. */
   const resetToReady = (opts?: { silent?: boolean }) => {
     abortRef.current?.abort()
     completeProcessing(card.id)
@@ -334,7 +334,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
     }
     if (!opts?.silent) {
       toast.info('Card devolvido para Ready', {
-        description: 'Implementacao pode ser iniciada novamente quando quiser',
+        description: 'Implementação pode ser iniciada novamente quando quiser',
       })
     }
   }
@@ -370,20 +370,20 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
           )}
           {!projectPath && (
             <p className="text-[11px] text-destructive mb-4">
-              Nenhum projeto vinculado. Adicione nas configuracoes do workspace.
+              Nenhum projeto vinculado. Adicione nas configurações do workspace.
             </p>
           )}
           <div className="flex items-center gap-2 flex-wrap">
             {!history ? (
               <Button onClick={() => handleStart()} disabled={!card.spec_content || !projectPath}>
                 <Rocket className="h-4 w-4 mr-2" />
-                Iniciar Implementacao
+                Iniciar Implementação
               </Button>
             ) : (
               <>
                 <Button variant="outline" size="sm" onClick={() => setShowFeedback(!showFeedback)}>
                   <MessageSquareWarning className="h-4 w-4 mr-1" />
-                  Nao resolveu
+                  Não resolveu
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => handleStart()}>
                   <RotateCcw className="h-4 w-4 mr-1" />
@@ -399,7 +399,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
                   }
                 }}>
                   <History className="h-4 w-4 mr-1" />
-                  Historico
+                  Histórico
                 </Button>
               </>
             )}
@@ -411,7 +411,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
           <div className="border-t px-4 py-3 bg-amber-500/5 space-y-2.5">
             <div className="flex items-center gap-2">
               <MessageSquareWarning className="h-4 w-4 text-amber-500 shrink-0" />
-              <span className="text-xs font-medium">O que nao funcionou?</span>
+              <span className="text-xs font-medium">O que não funcionou?</span>
             </div>
             <Textarea
               value={feedbackText}
@@ -448,7 +448,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
           <div className="border-t flex-1 min-h-0 overflow-y-auto px-4 py-3 bg-muted/5">
             <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1.5">
               <History className="h-3 w-3" />
-              Historico de execucoes ({sessions.length})
+              Histórico de execuções ({sessions.length})
             </p>
             {sessions.length === 0 && (
               <p className="text-[11px] text-muted-foreground">Carregando...</p>
@@ -527,7 +527,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
               <>
                 <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setShowFeedback(!showFeedback)}>
                   <MessageSquareWarning className="h-3 w-3 mr-1" />
-                  Nao resolveu
+                  Não resolveu
                 </Button>
                 <Button
                   variant="ghost"
@@ -549,7 +549,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
                   className="h-7 text-xs"
                   onClick={() => handleStart()}
                   disabled={!card.spec_content || !projectPath}
-                  title="Iniciar nova tentativa de implementacao"
+                  title="Iniciar nova tentativa de implementação"
                 >
                   <RotateCcw className="h-3 w-3 mr-1" />
                   Re-implementar
@@ -631,7 +631,7 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
         <div className="border-t px-4 py-2.5 bg-green-500/5">
           <div className="flex items-center gap-3 text-xs flex-wrap">
             <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-            <span className="font-medium">Implementacao concluida</span>
+            <span className="font-medium">Implementação concluida</span>
             {summary.branch && (
               <Badge variant="outline" className="text-[10px]">
                 <GitBranch className="h-2.5 w-2.5 mr-0.5" />
@@ -667,12 +667,12 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
         </div>
       )}
 
-      {/* Feedback — "Nao resolveu" */}
+      {/* Feedback — "Não resolveu" */}
       {showFeedback && phase === 'done' && (
         <div className="border-t px-4 py-3 bg-amber-500/5 space-y-2.5">
           <div className="flex items-center gap-2">
             <MessageSquareWarning className="h-4 w-4 text-amber-500 shrink-0" />
-            <span className="text-xs font-medium">O que nao funcionou? (tentativa {attempt})</span>
+            <span className="text-xs font-medium">O que não funcionou? (tentativa {attempt})</span>
           </div>
           <Textarea
             value={feedbackText}
@@ -709,12 +709,12 @@ export function ImplementPanel({ card, workspaceId }: ImplementPanelProps) {
   )
 }
 
-// ── Reconstroi terminal lines a partir do output persistido na sessao ──
+// ── Reconstroi terminal lines a partir do output persistido na sessão ──
 //
 // O daemon grava cada chunk como string em sessions.output[]. Ao reabrir o
 // card, classificamos cada linha por heuristica para preservar as cores
-// semanticas do terminal (log/tool/output). Adiciona um divider HISTORICO
-// no inicio para deixar claro que e conteudo restaurado.
+// semânticas do terminal (log/tool/output). Adiciona um divider HISTORICO
+// no início para deixar claro que e conteudo restaurado.
 function reconstructTerminalLines(output: string[]): TerminalLine[] {
   if (output.length === 0) return []
 
@@ -722,7 +722,7 @@ function reconstructTerminalLines(output: string[]): TerminalLine[] {
   const LOG_PATTERNS = [
     /^Analisando /,
     /^Criando branch /,
-    /^Branch .+ (criada|ja existe|fazendo checkout)/,
+    /^Branch .+ (criada|já existe|fazendo checkout)/,
     /^Continuando trabalho /,
     /^Task files copiados /,
     /^Executando claude-code/,
@@ -745,7 +745,7 @@ function reconstructTerminalLines(output: string[]): TerminalLine[] {
   let lastPhaseDivider = ''
   const phaseHints: Array<[RegExp, string]> = [
     [/^Analisando /, 'ANALISANDO'],
-    [/^(Criando branch|Branch .+ (criada|ja existe|fazendo checkout)|Continuando trabalho)/, 'CRIANDO BRANCH'],
+    [/^(Criando branch|Branch .+ (criada|já existe|fazendo checkout)|Continuando trabalho)/, 'CRIANDO BRANCH'],
     [/^(Task files copiados|Executando claude-code)/, 'AGENT EXECUTANDO'],
   ]
 
@@ -778,7 +778,7 @@ function reconstructTerminalLines(output: string[]): TerminalLine[] {
       id: `restored-${i}-${text.slice(0, 8)}`,
       kind,
       text: displayText,
-      // Sem ts: nao deve ter glow animation (e historico, nao novo)
+      // Sem ts: não deve ter glow animation (e histórico, não novo)
     })
   })
 

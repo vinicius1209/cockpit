@@ -26,7 +26,7 @@ export class CardScreen implements Screen {
   private tab: Tab = 'details'
   private err: string | null = null
   private scroll = 0
-  /** Mensagem flash apos uma acao (i/s/x) — exibida 3s no rodape */
+  /** Mensagem flash após uma ação (i/s/x) — exibida 3s no rodape */
   private flash: { text: string; kind: 'ok' | 'err' | 'info'; until: number } | null = null
 
   constructor(private cardId: string, private onChange: () => void | Promise<void>) {}
@@ -40,7 +40,7 @@ export class CardScreen implements Screen {
       const all = await loadAll()
       const card = all.cards.find((c) => c.id === this.cardId)
       if (!card) {
-        this.err = 'card nao encontrado (foi excluido?)'
+        this.err = 'card não encontrado (foi excluido?)'
         return
       }
       this.card = card
@@ -66,7 +66,7 @@ export class CardScreen implements Screen {
   }
 
   async tick(): Promise<void> {
-    // Limpa flash expirado e refresh sessions periodico
+    // Limpa flash expirado e refresh sessions periódico
     if (this.flash && Date.now() > this.flash.until) {
       this.flash = null
     }
@@ -148,7 +148,7 @@ export class CardScreen implements Screen {
 
   private async runImplement(isolation: 'lock' | 'worktree'): Promise<void> {
     if (!this.card || !this.ws) {
-      this.setFlash('card ou workspace nao disponivel', 'err')
+      this.setFlash('card ou workspace não disponível', 'err')
       return
     }
     if (!this.card.spec_content) {
@@ -180,7 +180,7 @@ export class CardScreen implements Screen {
       if (res.status === 409) {
         const data = await res.json().catch(() => null) as { held_by?: { card_id?: string } } | null
         const cardId = data?.held_by?.card_id
-        this.setFlash(`projeto ja em uso${cardId ? ' por #' + cardId.slice(-4).toUpperCase() : ''} — tente --isolation worktree (Shift+I)`, 'err')
+        this.setFlash(`projeto já em uso${cardId ? ' por #' + cardId.slice(-4).toUpperCase() : ''} — tente --isolation worktree (Shift+I)`, 'err')
         return
       }
       if (!res.ok) {
@@ -198,7 +198,7 @@ export class CardScreen implements Screen {
 
   private async runSpecGen(): Promise<void> {
     if (!this.card || !this.ws) {
-      this.setFlash('card/ws nao disponivel', 'err')
+      this.setFlash('card/ws não disponível', 'err')
       return
     }
     // Endpoint: o daemon tem agents/spec ou similar. Vou usar rawFetch
@@ -284,14 +284,14 @@ export class CardScreen implements Screen {
 
     if (this.tab === 'details') {
       const out: string[] = []
-      out.push(c.dim('━ DESCRICAO'))
+      out.push(c.dim('━ DESCRIÇÃO'))
       out.push('')
       if (card.description?.trim()) {
         for (const line of card.description.split('\n')) {
           out.push(...wrap(line, w))
         }
       } else {
-        out.push(c.dim('(sem descricao)'))
+        out.push(c.dim('(sem descrição)'))
       }
       out.push('')
       out.push(c.dim('━ METADATA'))
@@ -336,7 +336,7 @@ export class CardScreen implements Screen {
       if (this.sessions.length === 0) {
         out.push(c.dim('(nenhuma session ativa)'))
         out.push('')
-        out.push(c.dim('use: cockpit log ' + card.id.slice(-4).toUpperCase() + ' (historico)'))
+        out.push(c.dim('use: cockpit log ' + card.id.slice(-4).toUpperCase() + ' (histórico)'))
         return out
       }
       for (const s of this.sessions) {

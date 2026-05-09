@@ -8,7 +8,7 @@
 // declara campos required + optional + tipo esperado. Erro retorna
 // mensagem clara que o LLM consegue entender e corrigir.
 //
-// Por que nao zod: deps zero, cobertura suficiente pra nossos casos
+// Por que não zod: deps zero, cobertura suficiente pra nossos casos
 // (string, number, boolean, enum). Se ficar complexo demais, migra-se
 // pro zod sem grande custo.
 
@@ -19,13 +19,13 @@ export interface FieldSpec {
   required?: boolean
   /** Pra enum: valores aceitos. */
   values?: readonly string[]
-  /** Pra string: comprimento minimo (default 1 se required). */
+  /** Pra string: comprimento mínimo (default 1 se required). */
   minLength?: number
-  /** Pra string: comprimento maximo. */
+  /** Pra string: comprimento máximo. */
   maxLength?: number
-  /** Pra number: minimo. */
+  /** Pra number: mínimo. */
   min?: number
-  /** Pra number: maximo. */
+  /** Pra number: máximo. */
   max?: number
 }
 
@@ -33,7 +33,7 @@ export type InputSpec = Record<string, FieldSpec>
 
 export class McpInputError extends Error {
   constructor(public field: string, public reason: string) {
-    super(`input invalido: campo "${field}" — ${reason}`)
+    super(`input inválido: campo "${field}" — ${reason}`)
     this.name = 'McpInputError'
   }
 }
@@ -43,7 +43,7 @@ export class McpInputError extends Error {
  * clara em caso de problema. Se passar, retorna `args` tipado de volta —
  * caller pode usar com confianca.
  *
- * Side effect: campos NAO declarados no spec sao mantidos passthrough
+ * Side effect: campos NAO declarados no spec são mantidos passthrough
  * (intencional — pra extensibilidade futura sem breaking).
  */
 export function validateInput<T>(
@@ -61,7 +61,7 @@ export function validateInput<T>(
 
     if (isAbsent) {
       if (fieldSpec.required) {
-        throw new McpInputError(field, 'obrigatorio (recebeu ' + (value === null ? 'null' : 'undefined') + ')')
+        throw new McpInputError(field, 'obrigatório (recebeu ' + (value === null ? 'null' : 'undefined') + ')')
       }
       continue  // optional + ausente = ok
     }
@@ -73,20 +73,20 @@ export function validateInput<T>(
       }
       const minLen = fieldSpec.minLength ?? (fieldSpec.required ? 1 : 0)
       if (value.length < minLen) {
-        throw new McpInputError(field, `comprimento minimo ${minLen} (recebeu ${value.length})`)
+        throw new McpInputError(field, `comprimento mínimo ${minLen} (recebeu ${value.length})`)
       }
       if (fieldSpec.maxLength != null && value.length > fieldSpec.maxLength) {
-        throw new McpInputError(field, `comprimento maximo ${fieldSpec.maxLength} (recebeu ${value.length})`)
+        throw new McpInputError(field, `comprimento máximo ${fieldSpec.maxLength} (recebeu ${value.length})`)
       }
     } else if (fieldSpec.type === 'number') {
       if (typeof value !== 'number' || !Number.isFinite(value)) {
         throw new McpInputError(field, `esperava number, recebeu ${typeof value}`)
       }
       if (fieldSpec.min != null && value < fieldSpec.min) {
-        throw new McpInputError(field, `minimo ${fieldSpec.min} (recebeu ${value})`)
+        throw new McpInputError(field, `mínimo ${fieldSpec.min} (recebeu ${value})`)
       }
       if (fieldSpec.max != null && value > fieldSpec.max) {
-        throw new McpInputError(field, `maximo ${fieldSpec.max} (recebeu ${value})`)
+        throw new McpInputError(field, `máximo ${fieldSpec.max} (recebeu ${value})`)
       }
     } else if (fieldSpec.type === 'boolean') {
       if (typeof value !== 'boolean') {

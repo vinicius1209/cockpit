@@ -8,7 +8,7 @@ const IS_TEST = typeof process !== 'undefined' && process.env?.NODE_ENV === 'tes
 const lastWriteTs: Record<string, number> = {}
 // Track last persisted content (sem _ts) per store. Usado para deduplicar
 // writes — Zustand persist chama setItem a cada update do state mesmo que
-// o partialized output seja estruturalmente identico, causando spam de POST.
+// o partialized output seja estruturalmente idêntico, causando spam de POST.
 const lastPersistedContent: Record<string, string> = {}
 
 // Strip _ts from a serialized payload for content comparison
@@ -67,8 +67,8 @@ export function createDaemonStorageAdapter(storeName: string): StorageAdapter {
         return
       }
 
-      // Dedup: se o conteudo (sem _ts) eh identico ao ultimo persistido,
-      // skip o POST. Isto previne dezenas de POSTs durante implementacao
+      // Dedup: se o conteudo (sem _ts) eh idêntico ao último persistido,
+      // skip o POST. Isto previne dezenas de POSTs durante implementação
       // (cada chunk muda processingCards, partialize cria novo object literal,
       // Zustand persist chama setItem mesmo com conteudo igual).
       const contentHash = stripTs(value)
@@ -108,7 +108,7 @@ export function createDaemonStorageAdapter(storeName: string): StorageAdapter {
       // enquanto user edita o card no Web — pr_url é overwritten.
       //
       // Fix completo (v0.8?): rastrear `version` retornada pelo GET
-      // (linha 47 ja recebe), incluir em POST → daemon trata 409 e
+      // (linha 47 já recebe), incluir em POST → daemon trata 409 e
       // frontend re-fetch. Implica refatorar Zustand persist signature
       // ou usar zustand/middleware/persist com merge custom.
       fetch(`${DAEMON_URL}/api/data/${storeName}`, {

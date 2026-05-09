@@ -9,7 +9,7 @@ export function useDaemonStatus(intervalMs = 10000) {
 
     const check = async () => {
       try {
-        // 8s timeout — durante implementacoes pesadas o daemon pode demorar
+        // 8s timeout — durante implementações pesadas o daemon pode demorar
         // alguns segundos pra responder /health. 3s era muito agressivo e
         // marcava daemon offline mesmo quando estava rodando.
         const res = await fetch(`${DAEMON_URL}/health`, { signal: AbortSignal.timeout(8000) })

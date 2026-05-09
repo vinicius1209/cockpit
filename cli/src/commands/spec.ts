@@ -20,13 +20,13 @@ O que deve ser alcancado com essa tarefa.
 - [ ] RF1:
 - [ ] RF2:
 
-## Requisitos Nao Funcionais
+## Requisitos Não Funcionais
 - [ ] RNF1:
 
 ## Criterios de Aceite
 - [ ] CA1:
 
-## Plano de Implementacao
+## Plano de Implementação
 1.
 2.
 
@@ -38,7 +38,7 @@ export async function specShow(ref: string): Promise<void> {
   const { cards } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
   if (!card.spec_content?.trim()) {
@@ -69,7 +69,7 @@ export async function specShow(ref: string): Promise<void> {
     }
   }
   console.log()
-  console.log(c.dim('  ━ acoes:'))
+  console.log(c.dim('  ━ ações:'))
   if (card.spec_status === 'draft') {
     console.log(c.dim(`    cockpit spec ready ${shortId(card!.id)}     marca como pronta`))
   }
@@ -93,12 +93,12 @@ export async function specGen(ref: string, opts: GenOpts = {}): Promise<void> {
   const { workspaces, cards, projects } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
   const ws = workspaces.find((w) => w.id === card!.workspace_id)
   if (!ws) {
-    console.error(c.rose('✕ workspace nao encontrado'))
+    console.error(c.rose('✕ workspace não encontrado'))
     process.exit(1)
   }
 
@@ -108,7 +108,7 @@ export async function specGen(ref: string, opts: GenOpts = {}): Promise<void> {
   const wsAgents = env.state?.configs?.[ws.id] || []
   const writer = wsAgents.find((a) => a.role === 'spec-writer' && a.enabled)
   if (!writer) {
-    console.error(c.rose('✕ workspace nao tem spec-writer agent configurado'))
+    console.error(c.rose('✕ workspace não tem spec-writer agent configurado'))
     console.log(c.dim('  configure pelo web UI > workspace settings > Agentes'))
     process.exit(1)
   }
@@ -130,16 +130,16 @@ export async function specGen(ref: string, opts: GenOpts = {}): Promise<void> {
   console.log()
 
   // Build prompt
-  const userMessage = `Gere uma spec tecnica completa para o seguinte card:
+  const userMessage = `Gere uma spec técnica completa para o seguinte card:
 
 Titulo: ${card.title}
 Tipo: ${card.type}
 Prioridade: ${card.priority}
-Descricao: ${card.description || 'Sem descricao detalhada'}
+Descrição: ${card.description || 'Sem descrição detalhada'}
 ${card.interview_notes ? `\nNotas da entrevista:\n${card.interview_notes}` : ''}
 ${project ? `\nProjeto: ${project.name}` : ''}
 
-Se voce tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o contexto real antes de gerar a spec.`
+Se você tem acesso ao codigo-fonte, leia os arquivos mencionados para entender o contexto real antes de gerar a spec.`
 
   const enrichedSystemPrompt = buildSystemPrompt(writer.system_prompt, card, ws, project)
   const renderer = createStreamRenderer()
@@ -213,7 +213,7 @@ export async function specReady(ref: string): Promise<void> {
   const { cards } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
   if (!card.spec_content?.trim()) {
@@ -222,7 +222,7 @@ export async function specReady(ref: string): Promise<void> {
     process.exit(1)
   }
   if (card.spec_status === 'ready') {
-    console.log(c.dim('spec ja esta marcada como ready'))
+    console.log(c.dim('spec já esta marcada como ready'))
     return
   }
   await updateCard(card.id, { spec_status: 'ready' })
@@ -235,11 +235,11 @@ export async function specReset(ref: string, force = false): Promise<void> {
   const { cards } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
   if (!card.spec_content) {
-    console.log(c.dim('spec ja esta vazia'))
+    console.log(c.dim('spec já esta vazia'))
     return
   }
   if (!force) {
@@ -257,7 +257,7 @@ export async function specEdit(ref: string): Promise<void> {
   const { cards } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
 
@@ -282,11 +282,11 @@ export async function specEdit(ref: string): Promise<void> {
 
   const newContent = await Bun.file(tmpFile).text()
   if (newContent === initialContent && !card.spec_content) {
-    console.log(c.dim('  template nao foi modificado — nada a salvar'))
+    console.log(c.dim('  template não foi modificado — nada a salvar'))
     return
   }
   if (newContent === card.spec_content) {
-    console.log(c.dim('  conteudo identico — nada a salvar'))
+    console.log(c.dim('  conteudo idêntico — nada a salvar'))
     return
   }
 
@@ -302,7 +302,7 @@ export async function specSaveVault(ref: string): Promise<void> {
   const { workspaces, cards } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
   if (!card.spec_content?.trim()) {
@@ -311,7 +311,7 @@ export async function specSaveVault(ref: string): Promise<void> {
   }
   const ws = workspaces.find((w) => w.id === card.workspace_id)
   if (!ws) {
-    console.error(c.rose('✕ workspace nao encontrado'))
+    console.error(c.rose('✕ workspace não encontrado'))
     process.exit(1)
   }
 
@@ -376,21 +376,21 @@ function buildSystemPrompt(
 
   parts.push(`## Contexto do Workspace
 Workspace: ${ws.name}
-${ws.description ? `Descricao: ${ws.description}` : ''}`)
+${ws.description ? `Descrição: ${ws.description}` : ''}`)
 
   if (project) {
     parts.push(`## Projeto vinculado
 - Nome: ${project.name}
 - Path: ${project.path}
 
-Voce tem acesso ao codigo-fonte deste projeto via filesystem (cwd ja apontando
+Você tem acesso ao codigo-fonte deste projeto via filesystem (cwd já apontando
 para o path acima). Pode ler arquivos para gerar uma spec mais precisa.`)
   }
 
   parts.push(`## Card
 - Titulo: ${card.title}
 - Tipo: ${card.type} · Prioridade: ${card.priority}
-${card.description ? '\n### Descricao\n' + card.description : ''}
+${card.description ? '\n### Descrição\n' + card.description : ''}
 ${card.interview_notes ? '\n### Notas da entrevista\n' + card.interview_notes : ''}`)
 
   return parts.join('\n\n')

@@ -59,17 +59,17 @@ const KNOWN_AGENTS: KnownAgent[] = [
     versionFlag: '--version',
     modelFlag: '--model',
     models: [
-      { id: 'haiku', label: 'Haiku (rapido, barato)', cost: 'low' },
+      { id: 'haiku', label: 'Haiku (rápido, barato)', cost: 'low' },
       { id: 'sonnet', label: 'Sonnet (equilibrado)', cost: 'medium' },
       { id: 'opus', label: 'Opus (profundo, caro)', cost: 'high' },
     ],
     defaultModel: 'sonnet',
     streamFormat: 'claude-stream-json',
     buildArgs: (flag, prompt, model) => {
-      // bypassPermissions: necessario em modo -p sem TTY, senao Read/Edit
-      // sao bloqueados silenciosamente e o agent responde "nao tenho permissao".
+      // bypassPermissions: necessário em modo -p sem TTY, senao Read/Edit
+      // são bloqueados silenciosamente e o agent responde "não tenho permissao".
       // stream-json + include-partial-messages: streaming real (text deltas em
-      // tempo real). Sem isso o claude-code bufferiza ate o fim e o frontend
+      // tempo real). Sem isso o claude-code bufferiza até o fim e o frontend
       // fica 30s+ vendo "0 chunks".
       const args = [
         flag, prompt,
@@ -89,7 +89,7 @@ const KNOWN_AGENTS: KnownAgent[] = [
     versionFlag: '--version',
     modelFlag: '--model',
     models: [
-      { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash (rapido)', cost: 'low' },
+      { id: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash (rápido)', cost: 'low' },
       { id: 'openai/gpt-5-nano', label: 'GPT-5 Nano (leve)', cost: 'low' },
       { id: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro (equilibrado)', cost: 'medium' },
       { id: 'openai/gpt-5.5', label: 'GPT-5.5 (profundo)', cost: 'high' },
@@ -110,7 +110,7 @@ const KNOWN_AGENTS: KnownAgent[] = [
     versionFlag: '--version',
     modelFlag: '--model',
     models: [
-      { id: 'gemini-2.5-flash', label: 'Flash 2.5 (rapido)', cost: 'low' },
+      { id: 'gemini-2.5-flash', label: 'Flash 2.5 (rápido)', cost: 'low' },
       { id: 'gemini-2.5-pro', label: 'Pro 2.5 (equilibrado)', cost: 'medium' },
       { id: 'gemini-3.1-pro-preview', label: 'Pro 3.1 (mais recente)', cost: 'high' },
     ],
@@ -232,12 +232,12 @@ async function writePromptToStdin(stdin: unknown, prompt: string): Promise<void>
 //   { type: 'result',    result: '...', is_error: false }       → final
 //
 // Funcao de incremento devolve o texto novo (delta). Se for envelope sem texto,
-// devolve null. Se quiser sinais semanticos (tool_use), retorna prefixados.
+// devolve null. Se quiser sinais semânticos (tool_use), retorna prefixados.
 const DEBUG_STREAM = process.env.COCKPIT_DEBUG_STREAM === '1'
 
-// Stateful parser — precisa lembrar se ja vimos stream_event nesta sessao
+// Stateful parser — precisa lembrar se já vimos stream_event nesta sessão
 // para suprimir o `assistant` final (que duplica o texto agregado dos deltas).
-// Tambem acumula input_json_deltas dos tool_use blocks para mostrar args reais.
+// Também acumula input_json_deltas dos tool_use blocks para mostrar args reais.
 export interface ClaudeStreamParserState {
   sawStreamEvent: boolean
   // Map: index do content_block → tool_use info acumulado
@@ -281,7 +281,7 @@ function parseClaudeStreamLine(
         if (typeof blockIdx === 'number') {
           state.pendingTools.set(blockIdx, { name: block.name as string, inputBuffer: '' })
         }
-        // Nao emitimos meta aqui — esperamos o stop com input completo
+        // Não emitimos meta aqui — esperamos o stop com input completo
         return null
       }
     }
@@ -315,8 +315,8 @@ function parseClaudeStreamLine(
     return null
   }
 
-  // Assistant turn — APENAS como fallback quando partial messages nao funcionou.
-  // Se ja vimos stream_event, ignoramos para evitar duplicacao do texto agregado.
+  // Assistant turn — APENAS como fallback quando partial messages não funcionou.
+  // Se já vimos stream_event, ignoramos para evitar duplicação do texto agregado.
   if (type === 'assistant') {
     if (state.sawStreamEvent) return null
 
@@ -366,7 +366,7 @@ function summarizeToolInput(toolName: string, partialJson: string): string {
   if (typeof input.url === 'string') return truncate(input.url, 70)
   if (toolName === 'TodoWrite' && Array.isArray(input.todos)) return `${input.todos.length} todo(s)`
 
-  // Fallback: primeiro field string nao-vazio
+  // Fallback: primeiro field string não-vazio
   for (const [k, v] of Object.entries(input)) {
     if (typeof v === 'string' && v) return truncate(`${k}=${v}`, 70)
   }
@@ -493,15 +493,15 @@ export async function executeAgentWithCallbacks(
     const decoder = new TextDecoder()
     const streamFormat: StreamFormat = agentDef.streamFormat || 'plain-lines'
     const parserState = createClaudeStreamParserState()
-    let fullText = ''      // texto extraido (apenas content, nao envelopes JSON)
-    let lineBuffer = ''    // acumula bytes ate \n para parser por linha
+    let fullText = ''      // texto extraido (apenas content, não envelopes JSON)
+    let lineBuffer = ''    // acumula bytes até \n para parser por linha
 
     while (true) {
       const { done, value } = await reader.read()
       if (done) break
       lineBuffer += decoder.decode(value, { stream: true })
 
-      // Split por \n, mantem o ultimo (incompleto) no buffer
+      // Split por \n, mantem o último (incompleto) no buffer
       const lines = lineBuffer.split('\n')
       lineBuffer = lines.pop() || ''
 
@@ -613,12 +613,12 @@ export function executeAgentStreaming(request: AgentExecRequest): {
     },
     // I3 fix — cliente fechou conexao (browser fechou aba, fetch abortado).
     // ReadableStream.cancel dispara aqui. Sem isso, o agent CLI continua
-    // rodando ate AGENT_TIMEOUT_MS (5min) ou completar — resource leak.
+    // rodando até AGENT_TIMEOUT_MS (5min) ou completar — resource leak.
     cancel(reason) {
       try {
         if (proc && !proc.killed) {
           proc.kill('SIGTERM')
-          // Backup: SIGKILL apos 5s se SIGTERM nao surtir efeito
+          // Backup: SIGKILL após 5s se SIGTERM não surtir efeito
           setTimeout(() => {
             try { if (proc && !proc.killed) proc.kill('SIGKILL') } catch { /* ignore */ }
           }, 5000)

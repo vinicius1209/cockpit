@@ -90,7 +90,7 @@ function printPhaseHeader(label: string): void {
 }
 
 // Helper: classifica linha "vinda do daemon" (event.message ou event.text)
-// no kind correto. Heuristica reusa logica de implement-panel.
+// no kind correto. Heuristica reusa lógica de implement-panel.
 export function classifyLine(text: string, isLog: boolean): 'log' | 'output' | 'tool' {
   if (text.startsWith('▶ ')) return 'tool'
   if (isLog) return 'log'

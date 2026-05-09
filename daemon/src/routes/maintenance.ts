@@ -1,4 +1,4 @@
-// Endpoints de manutencao — chamados pelo `cockpit doctor --fix`.
+// Endpoints de manutenção — chamados pelo `cockpit doctor --fix`.
 // Soh executam side effects quando POST (GET retorna preview/contagem).
 
 import { jsonResponse } from '../http'
@@ -15,7 +15,7 @@ import { validateProjectPath, validateSessionId } from '../validation'
 export async function handleMaintenanceRoutes(req: Request, url: URL): Promise<Response> {
   const path = url.pathname
 
-  // POST /maintenance/reap-locks — limpa locks orfaos (cuja session ja terminou)
+  // POST /maintenance/reap-locks — limpa locks órfãos (cuja session já terminou)
   if (path === '/maintenance/reap-locks' && req.method === 'POST') {
     const cleaned = await reapOrphanLocks()
     return jsonResponse({ cleaned })
@@ -41,8 +41,8 @@ export async function handleMaintenanceRoutes(req: Request, url: URL): Promise<R
     return jsonResponse({ reaped })
   }
 
-  // GET /maintenance/worktrees?projectPath=... — lista worktrees orfaos
-  // (dirs em <projectPath>.cockpit-worktrees/ cuja session ja terminou).
+  // GET /maintenance/worktrees?projectPath=... — lista worktrees órfãos
+  // (dirs em <projectPath>.cockpit-worktrees/ cuja session já terminou).
   if (path === '/maintenance/worktrees' && req.method === 'GET') {
     const projectPath = url.searchParams.get('projectPath') || ''
     const valid = validateProjectPath(projectPath)
@@ -75,7 +75,7 @@ export async function handleMaintenanceRoutes(req: Request, url: URL): Promise<R
     return jsonResponse({ root, worktrees })
   }
 
-  // POST /maintenance/cleanup-worktrees — remove dirs orfaos
+  // POST /maintenance/cleanup-worktrees — remove dirs órfãos
   if (path === '/maintenance/cleanup-worktrees' && req.method === 'POST') {
     const body = await req.json().catch(() => ({})) as { projectPath?: string; force?: boolean }
     const valid = body.projectPath ? validateProjectPath(body.projectPath) : null
@@ -99,7 +99,7 @@ export async function handleMaintenanceRoutes(req: Request, url: URL): Promise<R
       // de construir o path. Linha de defesa contra DB corrompido ou symlinks
       // injetados em <projectPath>.cockpit-worktrees/.
       if (!validateSessionId(sessionId)) {
-        errors.push(`${sessionId}: rejeitado por validateSessionId (caracter invalido / path traversal)`)
+        errors.push(`${sessionId}: rejeitado por validateSessionId (caracter inválido / path traversal)`)
         continue
       }
       if (activeIds.has(sessionId)) continue  // pula vivos
@@ -129,7 +129,7 @@ export async function handleMaintenanceRoutes(req: Request, url: URL): Promise<R
     ])
 
     return jsonResponse({
-      // version eh atualizada pelo bump (sed em release). Fonte unica
+      // version eh atualizada pelo bump (sed em release). Fonte única
       // pra doctor comparar com /health.
       daemon_version: '1.0.0',
       cockpit_dir: cockpitDir,

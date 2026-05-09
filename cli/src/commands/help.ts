@@ -15,7 +15,7 @@ const COMMANDS: Array<{ cmd: string; desc: string; group: string }> = [
   { cmd: 'cockpit daemon install',        desc: 'instala launchagent (auto-start no login)',                  group: 'daemon' },
   { cmd: 'cockpit daemon uninstall',      desc: 'remove launchagent',                                         group: 'daemon' },
   { cmd: 'cockpit daemon start',          desc: 'sobe daemon agora',                                          group: 'daemon' },
-  { cmd: 'cockpit daemon stop',           desc: 'para daemon (volta no proximo login)',                       group: 'daemon' },
+  { cmd: 'cockpit daemon stop',           desc: 'para daemon (volta no próximo login)',                       group: 'daemon' },
   { cmd: 'cockpit daemon restart',        desc: 'stop + start',                                               group: 'daemon' },
   { cmd: 'cockpit daemon logs',           desc: 'tail dos logs (--follow --lines N --err)',                   group: 'daemon' },
 
@@ -34,7 +34,7 @@ const COMMANDS: Array<{ cmd: string; desc: string; group: string }> = [
   { cmd: 'cockpit card move <id> <col>', desc: 'move card de coluna',                                        group: 'card' },
   { cmd: 'cockpit card edit <id>',       desc: 'edita campos (--title --type --prio --assignee --due)',      group: 'card' },
   { cmd: 'cockpit card delete <id>',     desc: 'exclui card permanente (--force)',                           group: 'card' },
-  { cmd: 'cockpit card archive <id>',    desc: 'descarta card (mantem historico, alias: discard)',           group: 'card' },
+  { cmd: 'cockpit card archive <id>',    desc: 'descarta card (mantem histórico, alias: discard)',           group: 'card' },
   { cmd: 'cockpit card unarchive <id>',  desc: 'reativa card descartado (alias: restore)',                   group: 'card' },
 
   // Spec lifecycle
@@ -46,12 +46,12 @@ const COMMANDS: Array<{ cmd: string; desc: string; group: string }> = [
   { cmd: 'cockpit spec save-vault <id>', desc: 'copia spec para Docs Vault',                                  group: 'spec' },
 
   // Long-running
-  { cmd: 'cockpit implement <id>',       desc: 'dispara implementacao (--watch --feedback --no-pr --isolation worktree)', group: 'run' },
+  { cmd: 'cockpit implement <id>',       desc: 'dispara implementação (--watch --feedback --no-pr --isolation worktree)', group: 'run' },
   { cmd: 'cockpit watch <id>',           desc: 'tail live de session (--action spec|implementation|chat)',  group: 'run' },
   { cmd: 'cockpit watch --all',          desc: 'multiplex SSE — todas sessions running em uma timeline',     group: 'run' },
   { cmd: 'cockpit alarm <id>',           desc: 'notify do OS quando session terminar (--silent --sound)',    group: 'run' },
   { cmd: 'cockpit alarm --all',          desc: 'notify ao fim de cada session running',                      group: 'run' },
-  { cmd: 'cockpit log <id>',             desc: 'historico de sessions (--last N --json)',                    group: 'run' },
+  { cmd: 'cockpit log <id>',             desc: 'histórico de sessions (--last N --json)',                    group: 'run' },
   { cmd: 'cockpit ai <id>',              desc: 'AI chat interativo no terminal (REPL)',                      group: 'run' },
 
   // Misc
@@ -81,7 +81,7 @@ export function help(commandName?: string): void {
       console.log(`  ${c.bold(match.cmd)}`)
       console.log(`  ${c.dim(match.desc)}`)
     } else {
-      console.log(c.dim(`  comando "${commandName}" nao encontrado`))
+      console.log(c.dim(`  comando "${commandName}" não encontrado`))
     }
     console.log()
     return

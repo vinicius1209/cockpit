@@ -87,12 +87,12 @@ function buildImplementationPrompt(config: ImplementConfig, taskPath?: string): 
   const isRetry = (config.attempt || 1) > 1
 
   if (isRetry) {
-    parts.push(`## ATENCAO: Esta e a tentativa ${config.attempt} de implementacao.`)
+    parts.push(`## ATENCAO: Esta e a tentativa ${config.attempt} de implementação.`)
     parts.push(`A tentativa anterior NAO resolveu o problema. O usuario testou e reportou feedback.`)
     parts.push('')
   }
 
-  parts.push(`Voce recebeu uma tarefa para ${isRetry ? 'CORRIGIR' : 'implementar'} no codigo deste projeto.`)
+  parts.push(`Você recebeu uma tarefa para ${isRetry ? 'CORRIGIR' : 'implementar'} no codigo deste projeto.`)
   parts.push('')
   parts.push(`## Card`)
   parts.push(`Titulo: ${config.cardTitle}`)
@@ -101,10 +101,10 @@ function buildImplementationPrompt(config: ImplementConfig, taskPath?: string): 
   if (taskPath) {
     parts.push('')
     parts.push(`## Task Workspace`)
-    parts.push(`Os arquivos de contexto desta tarefa estao em: .cockpit/task/ (relativo ao projeto)`)
+    parts.push(`Os arquivos de contexto desta tarefa estão em: .cockpit/task/ (relativo ao projeto)`)
     parts.push('')
-    parts.push(`Arquivos disponiveis:`)
-    parts.push(`- **.cockpit/task/spec.md**: Especificacao tecnica completa — LEIA ESTE ARQUIVO`)
+    parts.push(`Arquivos disponíveis:`)
+    parts.push(`- **.cockpit/task/spec.md**: Especificacao técnica completa — LEIA ESTE ARQUIVO`)
     parts.push(`- **.cockpit/task/discovery.md**: Analise previa do card (se existir)`)
     parts.push(`- **.cockpit/task/interview.md**: Notas da entrevista (se existir)`)
     if (isRetry) {
@@ -115,7 +115,7 @@ function buildImplementationPrompt(config: ImplementConfig, taskPath?: string): 
     if (isRetry) {
       parts.push(`IMPORTANTE: Leia .cockpit/task/feedback.md PRIMEIRO para entender o que deu errado.`)
       parts.push(`Depois leia .cockpit/task/spec.md para contexto completo.`)
-      parts.push(`Corrija os problemas descritos no feedback. Nao refaca tudo — ajuste o que ja foi feito.`)
+      parts.push(`Corrija os problemas descritos no feedback. Não refaca tudo — ajuste o que já foi feito.`)
     } else {
       parts.push(`Leia o arquivo .cockpit/task/spec.md para entender o que implementar.`)
     }
@@ -133,10 +133,10 @@ function buildImplementationPrompt(config: ImplementConfig, taskPath?: string): 
 
     if (isRetry && config.feedback) {
       parts.push('')
-      parts.push(`## FEEDBACK DO USUARIO (tentativa ${(config.attempt || 1) - 1} nao resolveu)`)
+      parts.push(`## FEEDBACK DO USUARIO (tentativa ${(config.attempt || 1) - 1} não resolveu)`)
       parts.push(config.feedback)
       parts.push('')
-      parts.push(`Corrija os problemas acima. Nao refaca tudo — ajuste o que ja foi feito.`)
+      parts.push(`Corrija os problemas acima. Não refaca tudo — ajuste o que já foi feito.`)
     }
   }
 
@@ -144,7 +144,7 @@ function buildImplementationPrompt(config: ImplementConfig, taskPath?: string): 
   parts.push(`## Instrucoes`)
   if (isRetry) {
     parts.push(`1. Leia o feedback do usuario (PRIORIDADE MAXIMA)`)
-    parts.push(`2. Leia o log de implementacao anterior para entender o que ja foi feito`)
+    parts.push(`2. Leia o log de implementação anterior para entender o que já foi feito`)
     parts.push(`3. Corrija APENAS o que o feedback reporta`)
     parts.push(`4. Siga as convencoes do projeto existente`)
     parts.push(`5. Faca um commit descritivo explicando a correcao`)
@@ -153,7 +153,7 @@ function buildImplementationPrompt(config: ImplementConfig, taskPath?: string): 
     parts.push(`2. Implemente TODAS as mudancas descritas nos Requisitos Funcionais`)
     parts.push(`3. Siga as convencoes do projeto existente`)
     parts.push(`4. Crie testes se a spec mencionar`)
-    parts.push(`5. Nao altere arquivos nao relacionados a spec`)
+    parts.push(`5. Não altere arquivos não relacionados a spec`)
     parts.push(`6. Use portugues brasileiro para textos de UI`)
     parts.push(`7. Faca commits atomicos com mensagens descritivas`)
   }
@@ -166,7 +166,7 @@ export async function runImplementation(
   emit: (event: ImplementEvent) => void,
 ): Promise<void> {
   const { createBranch } = config
-  // F9-B — projectPath original NUNCA muda (validacao, lock check, fontes).
+  // F9-B — projectPath original NUNCA muda (validação, lock check, fontes).
   // Quando isolation=worktree, o agent roda em activeProjectPath (worktree).
   // Locks e analises continuam usando origProjectPath.
   const origProjectPath = config.projectPath
@@ -174,7 +174,7 @@ export async function runImplementation(
   let worktree: WorktreeInfo | null = null
 
   // 0. F9-A — pre-check do project lock. Em modo worktree o lock e por path
-  // do worktree (que ainda nao existe), entao soh checamos o lock no modo
+  // do worktree (que ainda não existe), então soh checamos o lock no modo
   // lock (default).
   if ((config.isolation || 'lock') === 'lock') {
     const activeLock = await peekActiveProjectLock(origProjectPath)
@@ -212,7 +212,7 @@ export async function runImplementation(
         phase: 'branching',
         message: isRetry
           ? `Continuando trabalho em ${branchName} (tentativa ${config.attempt})`
-          : `Branch ${branchName} ja existe — fazendo checkout`,
+          : `Branch ${branchName} já existe — fazendo checkout`,
         branch: branchName,
       })
     } else {
@@ -221,7 +221,7 @@ export async function runImplementation(
 
     // Em modo worktree, a branch sera criada/checkout via 'git worktree add'
     // dentro do worktree (linha mais abaixo). Aqui no working tree principal,
-    // nao tocamos pra evitar dirty state.
+    // não tocamos pra evitar dirty state.
     if (!isWorktreeMode) {
       try {
         if (branchAlreadyExists) {
@@ -260,7 +260,7 @@ export async function runImplementation(
     emit({ phase: 'session-started', sessionId })
 
     // F9-B — modo worktree: cria worktree isolado. NAO adquire project lock
-    // (cada worktree e working tree proprio, paralelismo eh seguro).
+    // (cada worktree e working tree próprio, paralelismo eh seguro).
     if (isWorktreeMode && branchName) {
       try {
         worktree = await createWorktree(
@@ -321,10 +321,10 @@ export async function runImplementation(
       branch: branchName || undefined,
     })
     const attemptLabel = config.attempt ? ` (tentativa ${config.attempt})` : ''
-    await TaskWorkspace.appendImplementationLog(config.workspaceSlug, config.cardId, `Implementacao iniciada${attemptLabel} — agent: ${agentName}, branch: ${branchName || 'N/A'}`)
+    await TaskWorkspace.appendImplementationLog(config.workspaceSlug, config.cardId, `Implementação iniciada${attemptLabel} — agent: ${agentName}, branch: ${branchName || 'N/A'}`)
 
     // Copy into project dir so agent can read (sandbox-safe).
-    // Em modo worktree, copia pro worktree (nao no working tree principal).
+    // Em modo worktree, copia pro worktree (não no working tree principal).
     localTaskPath = await TaskWorkspace.copyToProject(config.workspaceSlug, config.cardId, activeProjectPath)
     emit({ phase: 'implementing', message: `Task files copiados para ${localTaskPath}` })
   }
@@ -454,7 +454,7 @@ export async function runImplementation(
     // Save full log to task workspace
     if (config.workspaceSlug && config.cardId) {
       const logEntry = [
-        `\n## Execucao ${new Date().toISOString().slice(0, 19)}`,
+        `\n## Execução ${new Date().toISOString().slice(0, 19)}`,
         `Agent: ${agentName} | Branch: ${branchName || 'N/A'} | Exit: ${result.exitCode} | Duracao: ${Math.round(result.duration / 1000)}s`,
         '',
         ...allOutputLines.map((l) => `  ${l}`),
@@ -486,7 +486,7 @@ export async function runImplementation(
       filesModified: number; filesCreated: number; filesDeleted: number; branch: string | null; prUrl?: string; prNumber?: number
     }
 
-    // Hook after_implement — informativo (nao para fluxo). Roda antes de PR.
+    // Hook after_implement — informativo (não para fluxo). Roda antes de PR.
     if (config.workspaceSlug && config.cardId && sessionId && result.exitCode === 0) {
       const after = await runHook('after_implement', {
         card_id: config.cardId,
@@ -602,12 +602,12 @@ export async function runImplementation(
     stopWatcher?.()
     // F-MCP-T3 — desregistra abort handler (registry vira no-op se chamado de novo)
     if (sessionId) unregisterSessionAbort(sessionId)
-    // F9-A — libera o lock do projeto. Idempotente; nao falha se ja foi
+    // F9-A — libera o lock do projeto. Idempotente; não falha se já foi
     // liberado ou se nunca foi adquirido (worktree mode pula acquire).
     if (sessionId && !isWorktreeMode) releaseProjectLock(origProjectPath, sessionId)
     // F9-B — remove o worktree. forceRemove=false preserva dirty state pra
     // inspecao manual (warning no log do daemon). Path do worktree fica
-    // disponivel via session.summary se branch tinha edits nao commitados.
+    // disponível via session.summary se branch tinha edits não commitados.
     if (worktree && sessionId) {
       try {
         await removeWorktree(origProjectPath, sessionId, { forceRemove: false })

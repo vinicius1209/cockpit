@@ -1,11 +1,11 @@
-// `cockpit doctor` — health + manutencao com severidade.
+// `cockpit doctor` — health + manutenção com severidade.
 //
-// Cada check retorna 0..N Issues. Issues sao agregadas, agrupadas por
+// Cada check retorna 0..N Issues. Issues são agregadas, agrupadas por
 // severidade no output. Modo --json pra scripting (CI, monitoring).
 //
 // Severidades:
 //   critical — bloqueia uso (daemon offline, agents zero, etc)
-//   warning  — atencao necessaria mas funcional (locks orfaos, hooks invalidos)
+//   warning  — atencao necessária mas funcional (locks órfãos, hooks inválidos)
 //   info     — informativo (disk usage, sugestoes)
 //
 // Cada Issue pode ter `fix` opcional → executavel com --fix.
@@ -29,11 +29,11 @@ type Severity = 'critical' | 'warning' | 'info'
 interface Issue {
   id: string
   severity: Severity
-  /** Titulo curto (ex: "project locks orfaos: 3") */
+  /** Titulo curto (ex: "project locks órfãos: 3") */
   title: string
   /** Detalhe adicional opcional */
   detail?: string
-  /** Acao manual sugerida (string ou multilinhas) */
+  /** Ação manual sugerida (string ou multilinhas) */
   hint?: string
   /** Fix automatizado opcional. Retorna `{ ok, msg }`. */
   fix?: () => Promise<{ ok: boolean; msg: string }>
@@ -270,7 +270,7 @@ async function checkProjects(): Promise<CheckGroup> {
       for (const p of projects) {
         const exists = await pathExists(p.path)
         const led = exists ? sym.ok : sym.err
-        const tail = !exists ? c.rose(' [path nao encontrado]') : ''
+        const tail = !exists ? c.rose(' [path não encontrado]') : ''
         lines.push(`${led} ${c.bold(p.name)} ${c.dim(p.path.replace(/^\/Users\/[^/]+\//, '~/'))}${tail}`)
       }
     }
@@ -290,8 +290,8 @@ async function checkGhCli(): Promise<CheckGroup> {
       issues.push({
         id: 'gh-not-installed',
         severity: 'info',
-        title: 'gh CLI nao instalado',
-        hint: 'opcional — necessario apenas para auto-PR. brew install gh',
+        title: 'gh CLI não instalado',
+        hint: 'opcional — necessário apenas para auto-PR. brew install gh',
       })
       return { label: 'GitHub CLI', lines, issues }
     }
@@ -303,8 +303,8 @@ async function checkGhCli(): Promise<CheckGroup> {
       issues.push({
         id: 'gh-not-authed',
         severity: 'info',
-        title: 'gh CLI instalado mas nao autenticado',
-        hint: 'rode: gh auth login (necessario pra auto-PR)',
+        title: 'gh CLI instalado mas não autenticado',
+        hint: 'rode: gh auth login (necessário pra auto-PR)',
       })
     } else {
       const m = combined.match(/account ([^\s]+)/) || combined.match(/as ([^\s]+)/) || combined.match(/Logged in to [^\s]+ as ([^\s]+)/)
@@ -327,7 +327,7 @@ async function checkLocks(): Promise<CheckGroup> {
         issues.push({
           id: 'orphan-locks',
           severity: 'warning',
-          title: `project locks orfaos: ${c.amber(String(orphans.length))}`,
+          title: `project locks órfãos: ${c.amber(String(orphans.length))}`,
           detail: orphans.map((l) => l.path).slice(0, 3).join(', ') + (orphans.length > 3 ? ', ...' : ''),
           fix: async () => {
             const f = await rawFetch('/maintenance/reap-locks', { method: 'POST' })
@@ -338,7 +338,7 @@ async function checkLocks(): Promise<CheckGroup> {
         })
       }
     }
-  } catch { /* daemon ja foi checado */ }
+  } catch { /* daemon já foi checado */ }
   return { label: '', lines: [], issues }
 }
 
@@ -402,7 +402,7 @@ async function checkCockpitInPath(): Promise<CheckGroup> {
       issues.push({
         id: 'cockpit-not-in-path',
         severity: 'info',
-        title: 'cockpit nao esta no PATH',
+        title: 'cockpit não esta no PATH',
         hint: 'rode: bun run cli:install (na raiz do repo) — adiciona symlink em ~/.local/bin',
       })
     }
@@ -427,14 +427,14 @@ async function checkVersionDrift(): Promise<CheckGroup> {
         id: 'daemon-version-drift',
         severity: 'warning',
         title: `daemon rodando v${running} mas source code e v${expected}`,
-        detail: 'voce fez git pull mas esqueceu de reiniciar o daemon',
+        detail: 'você fez git pull mas esqueceu de reiniciar o daemon',
         hint: 'cockpit daemon restart',
       })
     } else {
-      lines.push(`${sym.ok} versao consistente (v${running})`)
+      lines.push(`${sym.ok} versão consistente (v${running})`)
     }
-  } catch { /* daemon ja foi checado */ }
-  return { label: 'Versao', lines, issues }
+  } catch { /* daemon já foi checado */ }
+  return { label: 'Versão', lines, issues }
 }
 
 async function checkOrphanWorktrees(): Promise<CheckGroup> {
@@ -507,7 +507,7 @@ async function checkInvalidHooks(): Promise<CheckGroup> {
       issues.push({
         id: 'invalid-hooks',
         severity: 'warning',
-        title: `hooks com sintaxe invalida: ${c.amber(String(broken.length))}`,
+        title: `hooks com sintaxe inválida: ${c.amber(String(broken.length))}`,
         detail: broken.slice(0, 2).map((b) => `${b.workspace}:${b.hook} → ${b.error}`).join('; '),
         hint: 'Web UI > workspace settings > tab Hooks: corrija a sintaxe',
       })
@@ -521,7 +521,7 @@ async function checkMcpConfig(): Promise<CheckGroup> {
   const issues: Issue[] = []
   const claudeConfig = join(homedir(), '.claude.json')
   if (!existsSync(claudeConfig)) {
-    return { label: 'MCP', lines, issues: [] }  // nao instalado, nao e issue
+    return { label: 'MCP', lines, issues: [] }  // não instalado, não e issue
   }
   try {
     const cfg = JSON.parse(readFileSync(claudeConfig, 'utf-8')) as { mcpServers?: Record<string, { command: string; args?: string[] }> }
@@ -530,7 +530,7 @@ async function checkMcpConfig(): Promise<CheckGroup> {
       issues.push({
         id: 'mcp-not-registered',
         severity: 'info',
-        title: 'MCP cockpit nao registrado em ~/.claude.json',
+        title: 'MCP cockpit não registrado em ~/.claude.json',
         hint: 'rode: bun run mcp:install (na raiz do repo)',
       })
       return { label: 'MCP', lines, issues }
@@ -543,7 +543,7 @@ async function checkMcpConfig(): Promise<CheckGroup> {
         severity: 'warning',
         title: 'MCP cockpit aponta pra path inexistente',
         detail: mcpEntry,
-        hint: 'voce moveu o repo? rode: bun run mcp:install (atualiza o path) — ou use --fix',
+        hint: 'você moveu o repo? rode: bun run mcp:install (atualiza o path) — ou use --fix',
         // I10 fix — auto-fix: deduzir path correto do CLI rodando atualmente.
         // CLI atual está em <repo>/cli/src/index.ts, MCP entry está em
         // <repo>/mcp/src/index.ts. Resolvemos via import.meta.url.
@@ -555,12 +555,12 @@ async function checkMcpConfig(): Promise<CheckGroup> {
             const repoRoot = cliFile.replace(/\/cli\/src\/commands\/doctor\.ts$/, '')
             const newEntry = repoRoot + '/mcp/src/index.ts'
             if (!existsSync(newEntry)) {
-              return { ok: false, msg: `nao consegui resolver path do MCP (esperava ${newEntry})` }
+              return { ok: false, msg: `não consegui resolver path do MCP (esperava ${newEntry})` }
             }
             // Detecta bun no PATH
             const which = Bun.spawn(['which', 'bun'], { stdout: 'pipe', stderr: 'pipe' })
             const bunPath = (await new Response(which.stdout).text()).trim()
-            if (!bunPath) return { ok: false, msg: 'bun nao encontrado no PATH' }
+            if (!bunPath) return { ok: false, msg: 'bun não encontrado no PATH' }
 
             const newCfg = JSON.parse(readFileSync(claudeConfig, 'utf-8')) as { mcpServers?: Record<string, { command: string; args?: string[] }> }
             if (!newCfg.mcpServers) newCfg.mcpServers = {}
@@ -568,7 +568,7 @@ async function checkMcpConfig(): Promise<CheckGroup> {
               command: bunPath,
               args: ['run', newEntry],
             }
-            // Atomic write — write-to-temp + rename (mesmo padrao do C3 fix)
+            // Atomic write — write-to-temp + rename (mesmo padrão do C3 fix)
             const tmp = `${claudeConfig}.tmp.${process.pid}.${Date.now()}`
             const fs = await import('node:fs')
             fs.writeFileSync(tmp, JSON.stringify(newCfg, null, 2), 'utf-8')
@@ -583,7 +583,7 @@ async function checkMcpConfig(): Promise<CheckGroup> {
       lines.push(`${sym.ok} MCP cockpit registrado ${c.dim('(' + (cockpit.command) + ')')}`)
     }
   } catch (err) {
-    issues.push({ id: 'mcp-config-parse-error', severity: 'warning', title: '~/.claude.json invalido', detail: (err as Error).message })
+    issues.push({ id: 'mcp-config-parse-error', severity: 'warning', title: '~/.claude.json inválido', detail: (err as Error).message })
   }
   return { label: 'MCP', lines, issues }
 }
@@ -615,7 +615,7 @@ async function checkDiskUsage(): Promise<CheckGroup> {
         id: 'tasks-disk-large',
         severity: 'info',
         title: `~/.cockpit/tasks/ ocupa ${formatBytes(tasks)}`,
-        hint: 'cards antigos acumulam aqui. Limpe manualmente diretorios de cards descartados.',
+        hint: 'cards antigos acumulam aqui. Limpe manualmente diretórios de cards descartados.',
       })
     }
   } catch { /* ok */ }

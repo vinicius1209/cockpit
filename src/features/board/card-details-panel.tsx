@@ -96,7 +96,7 @@ export function CardDetailsPanel({
 
         {/* Description toggle */}
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Descricao</span>
+          <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Descrição</span>
           {description.trim() && (
             <div className="flex rounded-md border overflow-hidden">
               <button
@@ -190,7 +190,7 @@ export function CardDetailsPanel({
             <Select value={assignee || 'unassigned'} onValueChange={(v) => setAssignee(v === 'unassigned' ? '' : v)} disabled={disabled}>
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="unassigned"><span className="text-muted-foreground">Nao atribuido</span></SelectItem>
+                <SelectItem value="unassigned"><span className="text-muted-foreground">Não atribuido</span></SelectItem>
                 <SelectItem value="eu"><span className="flex items-center gap-1.5"><User className="h-3 w-3" /> Eu</span></SelectItem>
                 <SelectItem value="ai-agent"><span className="flex items-center gap-1.5"><Bot className="h-3 w-3" /> AI Agent</span></SelectItem>
               </SelectContent>
@@ -264,7 +264,7 @@ export function CardDetailsPanel({
             <TelemetryRow
               label="Spec"
               hint={{
-                text: 'Estado da especificacao tecnica do card',
+                text: 'Estado da especificacao técnica do card',
                 detail: 'draft = rascunho · ready = aprovada · in_progress = sendo implementada · review = aguardando revisao · done = concluida',
               }}
             >

@@ -28,8 +28,8 @@ const ROLE_META: Record<AgentRole, { icon: typeof Bot; label: string; tagline: s
   analyzer:     { icon: Sparkles,      label: 'Analyzer',     tagline: 'Analisa cards e sugere abordagens' },
   'spec-writer':{ icon: ScrollText,    label: 'Spec Writer',  tagline: 'Gera especificacoes tecnicas a partir do card' },
   interviewer:  { icon: MessageSquare, label: 'Interviewer',  tagline: 'Faz perguntas para refinar requisitos' },
-  implementer:  { icon: Rocket,        label: 'Implementer',  tagline: 'Planeja a implementacao apos a spec' },
-  reviewer:     { icon: Shield,        label: 'Reviewer',     tagline: 'Revisa o resultado da implementacao' },
+  implementer:  { icon: Rocket,        label: 'Implementer',  tagline: 'Planeja a implementação após a spec' },
+  reviewer:     { icon: Shield,        label: 'Reviewer',     tagline: 'Revisa o resultado da implementação' },
   custom:       { icon: Bot,           label: 'Custom',       tagline: 'Agente personalizado' },
 }
 
@@ -38,7 +38,7 @@ const ROLE_META: Record<AgentRole, { icon: typeof Bot; label: string; tagline: s
 const MODEL_CATALOG: Record<AgentProvider, { id: string; label: string }[]> = {
   claude: [
     { id: 'sonnet', label: 'sonnet — equilibrado (CLI ou API)' },
-    { id: 'haiku',  label: 'haiku — rapido e barato' },
+    { id: 'haiku',  label: 'haiku — rápido e barato' },
     { id: 'opus',   label: 'opus — profundo e caro' },
     { id: 'claude-sonnet-4-7', label: 'claude-sonnet-4-7 (API direta)' },
     { id: 'claude-haiku-4-5',  label: 'claude-haiku-4-5 (API direta)' },
@@ -84,7 +84,7 @@ export function AgentsSettingsPanel({ workspaceId }: AgentsSettingsPanelProps) {
           return (
             <Card key={preset.role}>
               <CardContent className="py-3 flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Preset {preset.name} nao inicializado</span>
+                <span className="text-sm text-muted-foreground">Preset {preset.name} não inicializado</span>
                 <Button
                   size="sm"
                   variant="outline"
@@ -148,7 +148,7 @@ function AgentEditor({ agent, onUpdate }: AgentEditorProps) {
     try {
       const res = await daemonClient.executeAgent(
         cliAgent,
-        'Responda apenas a palavra "OK" se voce conseguir me ouvir.',
+        'Responda apenas a palavra "OK" se você conseguir me ouvir.',
       )
       const duration = Date.now() - start
       if (res.exitCode === 0) {
@@ -311,7 +311,7 @@ function AgentEditor({ agent, onUpdate }: AgentEditorProps) {
               className="h-7 text-[11px] text-muted-foreground"
               onClick={handleReset}
               disabled={!preset}
-              title="Resetar todas as configuracoes deste agente para os valores do preset"
+              title="Resetar todas as configurações deste agente para os valores do preset"
             >
               <RotateCcw className="h-3 w-3 mr-1" />
               Resetar preset
@@ -336,7 +336,7 @@ function AgentEditor({ agent, onUpdate }: AgentEditorProps) {
                 onChange={(e) => setPromptDraft(e.target.value)}
                 rows={8}
                 className="text-xs font-mono resize-none"
-                placeholder="Voce e um..."
+                placeholder="Você e um..."
               />
               <div className="flex gap-2 justify-end">
                 {promptDirty && (

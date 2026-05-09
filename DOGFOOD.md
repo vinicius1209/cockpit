@@ -1,4 +1,4 @@
-# Dogfood — checklist de validação real do Cockpit
+# Dogfood — checklist de válidação real do Cockpit
 
 Antes de adicionar mais features, vale a pena **usar o Cockpit num projeto seu de verdade** e mapear o que trava. Esse arquivo é o roteiro pra esse exercício.
 

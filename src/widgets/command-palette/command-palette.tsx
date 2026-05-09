@@ -2,7 +2,7 @@
 //
 // Escolhas de design:
 // - cmdk fuzzy search nativo nos labels + aliases
-// - Grupos: Workspaces / Cards / Acoes / Navegar
+// - Grupos: Workspaces / Cards / Ações / Navegar
 // - Sempre lista cards do workspace ativo no topo (mais comum)
 // - Atalhos visuais a direita (G B = go board, etc) ensinam aos poucos
 // - Esc fecha; Enter executa; setas navegam
@@ -82,7 +82,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     const ws = workspaces.find((w) => w.id === wsId)
     if (!ws) return
     if (ws.id !== activeWorkspaceId) setActiveWorkspace(ws.id)
-    // Use search params pra abrir o card via dialog (workspace.tsx ja escuta cardId)
+    // Use search params pra abrir o card via dialog (workspace.tsx já escuta cardId)
     navigate(`/workspace/${ws.id}?cardId=${encodeURIComponent(cardId)}`)
   }
 
@@ -91,10 +91,10 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
       open={open}
       onOpenChange={onOpenChange}
       title="Command Palette"
-      description="Pesquise cards, workspaces e dispare acoes rapidas"
+      description="Pesquise cards, workspaces e dispare ações rapidas"
     >
       <CommandInput
-        placeholder="Cards, workspaces, acoes..."
+        placeholder="Cards, workspaces, ações..."
         value={search}
         onValueChange={setSearch}
       />
@@ -175,7 +175,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
         {/* ACOES */}
         <CommandSeparator />
-        <CommandGroup heading="Acoes">
+        <CommandGroup heading="Ações">
           <CommandItem
             value="novo card criar"
             onSelect={() => handleSelect(() => {
@@ -230,7 +230,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
             <BookOpen className="h-4 w-4 text-muted-foreground" />
             <span>Docs Vault</span>
           </CommandItem>
-          <CommandItem value="settings configuracoes go s" onSelect={() => handleSelect(() => navigate('/settings'))}>
+          <CommandItem value="settings configurações go s" onSelect={() => handleSelect(() => navigate('/settings'))}>
             <Settings className="h-4 w-4 text-muted-foreground" />
             <span>Configuracoes</span>
             <CommandShortcut>g s</CommandShortcut>
@@ -244,7 +244,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 void Search
 
 // Hook pra plugar no layout: monta listener Cmd+K (Mac) e Ctrl+K (Win/Linux),
-// alem de atalhos sequenciais "g d" / "g a" / "g b" estilo Vim.
+// além de atalhos sequenciais "g d" / "g a" / "g b" estilo Vim.
 export function useCommandPalette() {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
@@ -260,7 +260,7 @@ export function useCommandPalette() {
         return
       }
 
-      // Atalhos "g <letra>" — soh quando focus nao ta em input/textarea/contenteditable
+      // Atalhos "g <letra>" — soh quando focus não ta em input/textarea/contenteditable
       const target = e.target as HTMLElement
       const inEditable = target?.tagName === 'INPUT'
         || target?.tagName === 'TEXTAREA'
@@ -271,7 +271,7 @@ export function useCommandPalette() {
         lastG = Date.now()
         return
       }
-      // Dentro de 800ms apos g, capta a 2a letra
+      // Dentro de 800ms após g, capta a 2a letra
       if (lastG && Date.now() - lastG < 800) {
         if (e.key === 'd') { navigate('/'); lastG = 0 }
         else if (e.key === 'a') { navigate('/live-agents'); lastG = 0 }

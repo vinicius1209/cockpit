@@ -70,7 +70,7 @@ export function WorkspaceSettingsPage() {
   }, [])
 
   if (!workspace || !workspaceId) {
-    return <div className="p-6 text-muted-foreground">Workspace nao encontrado</div>
+    return <div className="p-6 text-muted-foreground">Workspace não encontrado</div>
   }
 
   const labels = getWorkspaceLabels(workspaceId)
@@ -94,12 +94,12 @@ export function WorkspaceSettingsPage() {
       title: `Excluir workspace "${workspace?.name}"?`,
       description: (
         <>
-          Esta acao remove o workspace, todos os cards, colunas, labels, agentes
+          Esta ação remove o workspace, todos os cards, colunas, labels, agentes
           e projetos vinculados. Os arquivos em
           {' '}<span className="font-mono text-foreground">~/.cockpit/tasks/{workspace?.slug}/</span>
           {' '}permanecem no disco.
           <br /><br />
-          Esta acao <strong>nao pode ser desfeita</strong>.
+          Esta ação <strong>não pode ser desfeita</strong>.
         </>
       ),
       requireText: workspace?.name,
@@ -113,7 +113,7 @@ export function WorkspaceSettingsPage() {
   const handleDeleteProject = async (projectId: string, projectName: string) => {
     const ok = await confirm({
       title: `Remover projeto "${projectName}" do workspace?`,
-      description: <>O projeto sera desvinculado deste workspace. Os arquivos no disco <strong>nao</strong> sao tocados.</>,
+      description: <>O projeto sera desvinculado deste workspace. Os arquivos no disco <strong>não</strong> são tocados.</>,
       confirmLabel: 'Remover projeto',
     })
     if (ok) deleteProject(projectId)
@@ -170,7 +170,7 @@ export function WorkspaceSettingsPage() {
       if (result.filesCreated.length > 0) {
         toast.success(`Bootstrap concluido`, { description: `Criados: ${result.filesCreated.join(', ')}` })
       } else {
-        toast.info('Arquivos ja existem', { description: result.filesSkipped.join(', ') })
+        toast.info('Arquivos já existem', { description: result.filesSkipped.join(', ') })
       }
       handleScanProject(projectPath, projectId)
     } catch (err) {
@@ -209,7 +209,7 @@ export function WorkspaceSettingsPage() {
       const profile = await daemonClient.analyzeGitFlow(projectPath) as { baseBranch: string; ghAccount: string; repoOwner: string; repoName: string; hasPrTemplate: boolean }
       setGitProfiles((prev) => ({ ...prev, [projectId]: profile }))
       toast.success('Git flow analisado', {
-        description: `Base: ${profile.baseBranch} · Conta: ${profile.ghAccount} · Template: ${profile.hasPrTemplate ? 'sim' : 'nao'}`,
+        description: `Base: ${profile.baseBranch} · Conta: ${profile.ghAccount} · Template: ${profile.hasPrTemplate ? 'sim' : 'não'}`,
       })
     } catch (err) {
       toast.error('Analise falhou', { description: err instanceof Error ? err.message : 'Erro' })
@@ -336,7 +336,7 @@ export function WorkspaceSettingsPage() {
                 <Input id="ws-name" value={name} onChange={(e) => setName(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="ws-desc" className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">Descricao</Label>
+                <Label htmlFor="ws-desc" className="text-[10px] font-mono uppercase tracking-[0.14em] text-muted-foreground">Descrição</Label>
                 <Textarea
                   id="ws-desc"
                   value={description}
@@ -619,10 +619,10 @@ export function WorkspaceSettingsPage() {
                       <div className="flex items-center justify-between">
                         <span className="flex items-center gap-2 text-xs">
                           <GitPullRequest className="h-3.5 w-3.5 text-muted-foreground" />
-                          Auto PR apos implementacao
+                          Auto PR após implementação
                           <InfoHint
                             text="Cria PR automaticamente no GitHub quando o agent termina."
-                            detail='Precisa de "gh" CLI autenticado. PR vira em modo draft. Desligue se voce prefere revisar local antes de publicar.'
+                            detail='Precisa de "gh" CLI autenticado. PR vira em modo draft. Desligue se você prefere revisar local antes de publicar.'
                           />
                         </span>
                         <Switch
@@ -660,7 +660,7 @@ export function WorkspaceSettingsPage() {
                           </Button>
                           {proj.config_synced_at && (
                             <span className="text-muted-foreground/60 normal-case tracking-normal">
-                              ultimo sync: {new Date(proj.config_synced_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                              último sync: {new Date(proj.config_synced_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                             </span>
                           )}
                         </div>
@@ -713,7 +713,7 @@ export function WorkspaceSettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Colunas e Automacoes</CardTitle>
-              <CardDescription>Configure automacoes que disparam quando um card entra em cada coluna</CardDescription>
+              <CardDescription>Configure automações que disparam quando um card entra em cada coluna</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -746,7 +746,7 @@ export function WorkspaceSettingsPage() {
 
                     {(!col.automations || col.automations.length === 0) && (
                       <div className="px-3 py-2">
-                        <span className="text-[11px] text-muted-foreground">Sem automacoes</span>
+                        <span className="text-[11px] text-muted-foreground">Sem automações</span>
                       </div>
                     )}
                   </div>
@@ -756,7 +756,7 @@ export function WorkspaceSettingsPage() {
           </Card>
         </TabsContent>
 
-        {/* ─── HOOKS — shell scripts plugados no ciclo de implementacao ─── */}
+        {/* ─── HOOKS — shell scripts plugados no ciclo de implementação ─── */}
         <TabsContent value="hooks" className="space-y-4">
           <HooksPanel
             workspace={workspace}

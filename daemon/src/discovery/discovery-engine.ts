@@ -30,8 +30,8 @@ export async function runDiscovery(projectPath: string, agentName?: string, mode
   // 2. Cards from git status
   if (scanResult.git && scanResult.git.uncommittedChanges > 5) {
     cards.push({
-      title: `${scanResult.git.uncommittedChanges} arquivos nao commitados`,
-      description: `O projeto "${scanResult.name}" tem ${scanResult.git.uncommittedChanges} mudancas nao commitadas na branch ${scanResult.git.branch}. Considere commitar ou fazer stash.`,
+      title: `${scanResult.git.uncommittedChanges} arquivos não commitados`,
+      description: `O projeto "${scanResult.name}" tem ${scanResult.git.uncommittedChanges} mudancas não commitadas na branch ${scanResult.git.branch}. Considere commitar ou fazer stash.`,
       type: 'chore',
       priority: 'medium',
       source: 'scanner',
@@ -43,7 +43,7 @@ export async function runDiscovery(projectPath: string, agentName?: string, mode
   if (!scanResult.agentConfigs.hasAgentsMd && !scanResult.agentConfigs.hasClaudeDir) {
     cards.push({
       title: `Configurar agents para ${scanResult.name}`,
-      description: `O projeto nao tem AGENTS.md nem diretorio .claude/. Configurar isso melhora a experiencia com AI code agents.`,
+      description: `O projeto não tem AGENTS.md nem diretório .claude/. Configurar isso melhora a experiencia com AI code agents.`,
       type: 'improvement',
       priority: 'low',
       source: 'scanner',

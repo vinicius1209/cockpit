@@ -31,7 +31,7 @@ Quando você for adicionar ou modificar UI neste projeto, siga as diretrizes aba
 - **Display/body**: Geist (variable), padrão do Tailwind.
 - **Mono / técnica**: `font-mono` (Geist Mono). Use para:
   - IDs, slugs, paths
-  - Section labels (`━ IDENTIFICACAO`, `━ PIPELINE`, etc)
+  - Section labels (`━ IDENTIFICAÇÃO`, `━ PIPELINE`, etc)
   - Telemetria (chunks, tokens, timer)
   - Tab numbering `[1]..[N]`
 - **Tracking**: textos mono uppercase usam `tracking-[0.14em]` ou `[0.18em]`.
@@ -146,7 +146,7 @@ Sempre. `useConfirm()` retorna promise. Para delete crítico:
 ```tsx
 const ok = await confirm({
   title: 'Excluir workspace "Portfolio"?',
-  description: 'Esta acao nao pode ser desfeita.',
+  description: 'Esta ação não pode ser desfeita.',
   requireText: 'Portfolio',  // força digitar o nome
   confirmLabel: 'Excluir workspace',
 })
@@ -220,20 +220,20 @@ CLI cockpit (Bun standalone)       ──HTTP──▶
 - **Frontend stores**: `src/entities/{card,workspace,agent,docs}/store.ts` —
   Zustand com adapter customizado que persiste no daemon (`createDaemonStorageAdapter`).
 - **Daemon**: `daemon/src/index.ts` (Bun.serve), rotas em `daemon/src/routes/`.
-- **Project lock (F9-A)**: `daemon/src/tasks/project-lock.ts` impede 2 implementacoes simultaneas no mesmo path. Pre-check nas rotas implement retorna 409 com payload `held_by` rico antes de criar session. Locks orfaos sao limpos lazy (peek) + batch (reaper 5min) + boot. Lock NAO afeta spec/discovery/chat/watch — so implementations.
-- **Worktree opt-in (F9-B)**: `daemon/src/git/worktree-manager.ts` cria git worktree separado por session quando `isolation=worktree`. Path: `<projectPath>.cockpit-worktrees/<sessionId>/`. Skipa lock, usa working tree isolado. Cleanup automatico no finally. CLI: `--isolation worktree`. MCP: `isolation: "worktree"` arg.
-- **Card archive (F10)**: `Card.archived_at` field (Zustand-persisted). Web UI tem botao Descartar (amber) separado de Excluir. Board filtra archived por padrao com toggle. Cards archived: opacity-50 + grayscale + border-dashed.
-- **TUI (`cli/src/tui/`)**: engine proprio (alternate screen + raw mode), screens em `cli/src/tui/screens/`. Cada screen implementa interface `Screen` (render + onKey + onEnter/onLeave + tick opcional). Engine gerencia stack (push/pop/replace) e cleanup ANSI no exit. **Render usa moveTo+clearLine por linha** (NAO `\n`) pra evitar staircase em raw mode. Card screen tem actions: i=implement, I=worktree, s=spec hint, a=archive, x=abort.
+- **Project lock (F9-A)**: `daemon/src/tasks/project-lock.ts` impede 2 implementações simultaneas no mesmo path. Pre-check nas rotas implement retorna 409 com payload `held_by` rico antes de criar session. Locks órfãos são limpos lazy (peek) + batch (reaper 5min) + boot. Lock NAO afeta spec/discovery/chat/watch — so implementations.
+- **Worktree opt-in (F9-B)**: `daemon/src/git/worktree-manager.ts` cria git worktree separado por session quando `isolation=worktree`. Path: `<projectPath>.cockpit-worktrees/<sessionId>/`. Skipa lock, usa working tree isolado. Cleanup automático no finally. CLI: `--isolation worktree`. MCP: `isolation: "worktree"` arg.
+- **Card archive (F10)**: `Card.archived_at` field (Zustand-persisted). Web UI tem botao Descartar (amber) separado de Excluir. Board filtra archived por padrão com toggle. Cards archived: opacity-50 + grayscale + border-dashed.
+- **TUI (`cli/src/tui/`)**: engine próprio (alternate screen + raw mode), screens em `cli/src/tui/screens/`. Cada screen implementa interface `Screen` (render + onKey + onEnter/onLeave + tick opcional). Engine gerencia stack (push/pop/replace) e cleanup ANSI no exit. **Render usa moveTo+clearLine por linha** (NAO `\n`) pra evitar staircase em raw mode. Card screen tem actions: i=implement, I=worktree, s=spec hint, a=archive, x=abort.
 - **Session abort (F-MCP-T3)**: `daemon/src/tasks/session-manager.ts` exporta `registerSessionAbort/unregisterSessionAbort/abortSession`. `executeAgentWithCallbacks` aceita `AbortSignal` opcional. `runImplementation` registra/desregistra automaticamente. Endpoint `POST /agents/sessions/<id>/abort`.
 - **Live Agents Panel** (`src/app/routes/live-agents.tsx`): visao cross-workspace de sessions ativas. SSE per-session. File heatmap detecta conflito (2+ sessions tocando mesmo path → sugestao de worktree).
 - **Maintenance** (`daemon/src/routes/maintenance.ts`): endpoints pro `cockpit doctor --fix` chamar (`reap-locks`, `reap-sessions`, listagem).
-- **Command Palette** (`src/widgets/command-palette/command-palette.tsx`): cmdk-based, ⌘K global. `useCommandPalette` hook tambem instala atalhos sequenciais `g d/g a/g b/g m/g s` (Vim-style, fora de input). `workspace.tsx` + `board-view.tsx` escutam `?cardId/?new=1/?archived=1` pra integrar com palette + Live Agents links.
+- **Command Palette** (`src/widgets/command-palette/command-palette.tsx`): cmdk-based, ⌘K global. `useCommandPalette` hook também instala atalhos sequenciais `g d/g a/g b/g m/g s` (Vim-style, fora de input). `workspace.tsx` + `board-view.tsx` escutam `?cardId/?new=1/?archived=1` pra integrar com palette + Live Agents links.
 - **PR status** (`src/features/board/pr-status-badge.tsx` + `daemon/src/routes/git.ts`): live status via `gh pr view --json` no daemon (cache 30s). Card.pr_url salvo automaticamente quando `runImplementation` cria PR. Badge usado no card detail (full) e Live Agents lane (compact).
 - **First-run wizard** (`src/widgets/onboarding/`): Dialog 4-step disparado quando `totalCards === 0` E `localStorage['cockpit-first-run-seen']` ausente. Cria workspace+projeto+card guiado.
-- **InfoHint** (`src/components/ui/info-hint.tsx`): tooltip wrapper pra explicar jargao tecnico (spec status, auto_pr, isolation worktree). Use sempre que adicionar termo novo que pode confundir usuario nao 100% tecnico.
+- **InfoHint** (`src/components/ui/info-hint.tsx`): tooltip wrapper pra explicar jargao técnico (spec status, auto_pr, isolation worktree). Use sempre que adicionar termo novo que pode confundir usuario não 100% técnico.
 - **Tests**: `bun test src/__tests__/` em cada package (cli, mcp, daemon, frontend usa vitest). Total v0.5.0: 175 tests.
 - **Spec gen async** (`daemon/src/spec/spec-runner.ts`): `startSpecGenAsync({cardId, workspaceSlug, projectPath?})` — cria session 'spec', spawna agent com cwd=projectPath (Read/Glob real do codigo), persiste chunks, ao final salva `card.spec_content` direto no kv_stores. Endpoint: `POST /agents/spec/async`. MCP: `cockpit_spec_gen_async`.
-- **Hooks** (`daemon/src/hooks/hook-runner.ts`): `runHook(name, ctx)` carrega script do workspace.hooks no kv_stores e executa em `/bin/sh -c` com env vars. Integrado em `runImplementation` em 3 pontos: `before_implement` (gate, exit != 0 aborta), `after_implement` (apos agent, antes do PR), `after_pr` (apos PR criado). UI em workspace settings tab Hooks.
+- **Hooks** (`daemon/src/hooks/hook-runner.ts`): `runHook(name, ctx)` carrega script do workspace.hooks no kv_stores e executa em `/bin/sh -c` com env vars. Integrado em `runImplementation` em 3 pontos: `before_implement` (gate, exit != 0 aborta), `after_implement` (após agent, antes do PR), `after_pr` (após PR criado). UI em workspace settings tab Hooks.
 - **Atomic kv_stores writes** (`daemon/src/persistence/atomic-store.ts`): TODO write em store passa por `atomicMutate(name, mutator)` (BEGIN IMMEDIATE transaction) ou `writeStoreIfVersion(name, data, expectedVersion)` (optimistic locking via 409). Migration v5 adicionou kv_stores.version. CLI/MCP retry auto em 409 (5 tentativas, backoff). Frontend ainda em compat mode (force-write); v0.8 migrara.
 - **Agent execution**: `daemon/src/executor/agent-executor.ts` — abstrai
   CLI agents (claude-code, opencode, gemini-cli) com `KNOWN_AGENTS` registry.
@@ -246,13 +246,13 @@ CLI cockpit (Bun standalone)       ──HTTP──▶
 
 ## Daemon lifecycle (macOS launchd)
 
-O daemon e o unico processo que precisa ficar rodando — Web/CLI/MCP sao clientes dele. Pra nao depender de subir manualmente toda vez:
+O daemon e o único processo que precisa ficar rodando — Web/CLI/MCP são clientes dele. Pra não depender de subir manualmente toda vez:
 
 ```bash
 cockpit daemon install     # escreve ~/Library/LaunchAgents/dev.cockpit.daemon.plist + load -w
 cockpit daemon status      # health + estado do launchagent + paths
 cockpit daemon logs -f     # tail (stdout: ~/.cockpit/logs/daemon.log)
-cockpit daemon stop        # unload (volta no proximo login)
+cockpit daemon stop        # unload (volta no próximo login)
 cockpit daemon restart     # unload + load
 cockpit daemon uninstall   # unload -w + remove plist
 ```
@@ -260,10 +260,10 @@ cockpit daemon uninstall   # unload -w + remove plist
 Detalhes:
 - Label: `dev.cockpit.daemon` · Plist: `~/Library/LaunchAgents/dev.cockpit.daemon.plist`
 - Logs: `~/.cockpit/logs/{daemon,daemon.err}.log`
-- `KeepAlive: true` + `ThrottleInterval: 10` — respawn automatico se crashar
+- `KeepAlive: true` + `ThrottleInterval: 10` — respawn automático se crashar
 - `RunAtLoad: true` + `load -w` — sobe em todo login
 
-Em Linux/Windows nao ha launchd; o comando emite instrucao pra usar systemd/Task Scheduler. Pra dev iterativo continua valendo `bun run dev:daemon` (foreground).
+Em Linux/Windows não ha launchd; o comando emite instrucao pra usar systemd/Task Scheduler. Pra dev iterativo continua valendo `bun run dev:daemon` (foreground).
 
 ## Comandos úteis
 

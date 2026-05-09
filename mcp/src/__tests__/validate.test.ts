@@ -38,11 +38,11 @@ describe('validateInput — required', () => {
     }
     expect(err).toBeInstanceOf(McpInputError)
     expect(err!.field).toBe('name')
-    expect(err!.message).toContain('obrigatorio')
+    expect(err!.message).toContain('obrigatório')
   })
 
   test('required null throws', () => {
-    expect(() => validateInput<unknown>({ name: null }, { name: { type: 'string', required: true } })).toThrow(/obrigatorio/)
+    expect(() => validateInput<unknown>({ name: null }, { name: { type: 'string', required: true } })).toThrow(/obrigatório/)
   })
 
   test('optional ausente passa', () => {
@@ -58,12 +58,12 @@ describe('validateInput — string', () => {
 
   test('minLength', () => {
     expect(() => validateInput<unknown>({ name: '' }, { name: { type: 'string', required: true, minLength: 3 } }))
-      .toThrow(/comprimento minimo 3/)
+      .toThrow(/comprimento mínimo 3/)
   })
 
   test('maxLength', () => {
     expect(() => validateInput<unknown>({ name: 'abcdef' }, { name: { type: 'string', maxLength: 3 } }))
-      .toThrow(/comprimento maximo 3/)
+      .toThrow(/comprimento máximo 3/)
   })
 })
 
@@ -73,8 +73,8 @@ describe('validateInput — number', () => {
   })
 
   test('min/max', () => {
-    expect(() => validateInput<unknown>({ n: -1 }, { n: { type: 'number', min: 0 } })).toThrow(/minimo 0/)
-    expect(() => validateInput<unknown>({ n: 100 }, { n: { type: 'number', max: 50 } })).toThrow(/maximo 50/)
+    expect(() => validateInput<unknown>({ n: -1 }, { n: { type: 'number', min: 0 } })).toThrow(/mínimo 0/)
+    expect(() => validateInput<unknown>({ n: 100 }, { n: { type: 'number', max: 50 } })).toThrow(/máximo 50/)
   })
 
   test('NaN/Infinity rejeitados', () => {

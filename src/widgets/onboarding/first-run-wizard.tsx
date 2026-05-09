@@ -1,8 +1,8 @@
 // First-run wizard — 3 passos guiados pra usuario que abre Cockpit pela
 // primeira vez (ou pra quem nunca criou um card real).
 //
-// Filosofia: nao bloquear (modal pode ser fechado), apenas reduzir friccao
-// pra "qual o primeiro passo?". Foco em pessoa nao 100% tecnica que
+// Filosofia: não bloquear (modal pode ser fechado), apenas reduzir friccao
+// pra "qual o primeiro passo?". Foco em pessoa não 100% técnica que
 // instalou via README sem entender o modelo workspace/projeto/card.
 
 import { useEffect, useMemo, useState } from 'react'
@@ -44,7 +44,7 @@ export function FirstRunWizard({ open, onClose }: FirstRunWizardProps) {
     if (open) setStep('welcome')
   }, [open])
 
-  // Pula direto pra projeto se ja tem workspaces
+  // Pula direto pra projeto se já tem workspaces
   useEffect(() => {
     if (open && step === 'workspace' && workspaces.length > 0) {
       // Pre-selecionar primeiro workspace existente
@@ -155,8 +155,8 @@ export function FirstRunWizard({ open, onClose }: FirstRunWizardProps) {
               <FieldBlock icon={Folders} label="Nome do workspace" hint='Ex: "Trabalho", "Projetos pessoais", "Cliente XPTO"'>
                 <Input value={wsName} onChange={(e) => setWsName(e.target.value)} placeholder="Meu Workspace" autoFocus />
               </FieldBlock>
-              <FieldBlock label="Descricao (opcional)">
-                <Textarea value={wsDesc} onChange={(e) => setWsDesc(e.target.value)} placeholder="O que voce vai gerenciar aqui?" rows={2} />
+              <FieldBlock label="Descrição (opcional)">
+                <Textarea value={wsDesc} onChange={(e) => setWsDesc(e.target.value)} placeholder="O que você vai gerenciar aqui?" rows={2} />
               </FieldBlock>
               <div className="text-xs text-muted-foreground font-mono">
                 slug: <span className="text-foreground">#{slug}</span> <span className="opacity-50">(usado em URLs e no CLI)</span>
@@ -167,15 +167,15 @@ export function FirstRunWizard({ open, onClose }: FirstRunWizardProps) {
           {step === 'project' && (
             <div className="space-y-4">
               <div className="rounded-md bg-muted/30 border p-3 text-xs text-muted-foreground">
-                <strong className="text-foreground">Por que vincular um projeto?</strong> Quando voce mandar implementar um card,
-                o agent vai trabalhar nesse diretorio (criar branch, editar codigo, abrir PR). Pode pular agora se ainda nao tem
+                <strong className="text-foreground">Por que vincular um projeto?</strong> Quando você mandar implementar um card,
+                o agent vai trabalhar nesse diretório (criar branch, editar codigo, abrir PR). Pode pular agora se ainda não tem
                 projeto e adicionar depois em <em>Workspace settings &gt; Projetos</em>.
               </div>
-              <FieldBlock icon={FolderGit2} label="Path absoluto do projeto" hint='Ex: /Users/voce/projetos/meu-app'>
+              <FieldBlock icon={FolderGit2} label="Path absoluto do projeto" hint='Ex: /Users/você/projetos/meu-app'>
                 <Input value={projPath} onChange={(e) => setProjPath(e.target.value)} placeholder="/Users/..." autoFocus />
               </FieldBlock>
               <FieldBlock label="Nome (opcional)">
-                <Input value={projName} onChange={(e) => setProjName(e.target.value)} placeholder="default: nome do diretorio" />
+                <Input value={projName} onChange={(e) => setProjName(e.target.value)} placeholder="default: nome do diretório" />
               </FieldBlock>
             </div>
           )}
@@ -183,13 +183,13 @@ export function FirstRunWizard({ open, onClose }: FirstRunWizardProps) {
           {step === 'card' && (
             <div className="space-y-4">
               <div className="rounded-md bg-muted/30 border p-3 text-xs text-muted-foreground">
-                Cards sao tarefas. Cada card pode virar uma <em>spec</em> e depois uma <em>implementacao</em> automatizada.
-                Comece com algo simples — voce pode editar tudo depois.
+                Cards são tarefas. Cada card pode virar uma <em>spec</em> e depois uma <em>implementação</em> automatizada.
+                Comece com algo simples — você pode editar tudo depois.
               </div>
               <FieldBlock icon={FileText} label="Titulo do primeiro card">
                 <Input value={cardTitle} onChange={(e) => setCardTitle(e.target.value)} placeholder='Ex: "Refatorar tela de login"' autoFocus />
               </FieldBlock>
-              <FieldBlock label="Descricao (opcional)">
+              <FieldBlock label="Descrição (opcional)">
                 <Textarea value={cardDesc} onChange={(e) => setCardDesc(e.target.value)} placeholder="Detalhes que ajudam o agent a entender o problema." rows={3} />
               </FieldBlock>
             </div>
@@ -270,7 +270,7 @@ function WelcomePane() {
           Cockpit organiza seus projetos e dispara <strong className="text-foreground">agents AI</strong> pra implementar tarefas.
         </p>
         <p className="text-sm text-muted-foreground">
-          Em <strong className="text-foreground">3 passos rapidos</strong> voce vai ter:
+          Em <strong className="text-foreground">3 passos rapidos</strong> você vai ter:
           {' '}<span className="font-mono text-[11px]">workspace → projeto → primeiro card</span>.
         </p>
       </div>
@@ -330,7 +330,7 @@ function stepTitle(s: Step): string {
 }
 function stepSubtitle(s: Step): string {
   return {
-    welcome: 'Tour rapido — em ~1 minuto voce ta usando',
+    welcome: 'Tour rápido — em ~1 minuto você ta usando',
     workspace: 'Workspace agrupa cards + projetos relacionados',
     project: 'Onde os agents vao trabalhar (cria branches, edita codigo)',
     card: 'Tarefa concreta — bug, feature, refactor, qualquer coisa',

@@ -70,7 +70,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           priority: { type: 'string', enum: ['critical', 'high', 'medium', 'low'] },
           spec_status: { type: 'string', enum: ['draft', 'ready', 'in_progress', 'review', 'done'] },
           column_slug: { type: 'string', description: 'Filter by column (inbox, ready, in-progress, etc)' },
-          include_archived: { type: 'boolean', description: 'Inclui cards descartados (default false — arquivados nao aparecem)', default: false },
+          include_archived: { type: 'boolean', description: 'Inclui cards descartados (default false — arquivados não aparecem)', default: false },
           only_archived: { type: 'boolean', description: 'Mostra APENAS descartados', default: false },
           limit: { type: 'number', description: 'Max results (default 50)' },
         },
@@ -80,14 +80,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       name: 'cockpit_show_card',
       description:
         'Get details of a card: title, description, status, type, priority, workspace, project, dates. ' +
-        'Spec content e interview notes ficam OFF por padrao (privacidade — podem ter contexto sensivel). ' +
-        'Pase include_spec: true SOMENTE quando o usuario explicitamente pede pra ver a spec/entrevista. ' +
+        'Spec content e interview notes ficam OFF por padrão (privacidade — podem ter contexto sensivel). ' +
+        'Passe include_spec: true SOMENTE quando o usuario explicitamente pede pra ver a spec/entrevista. ' +
         'Sem include_spec, retorna spec_summary com preview de 200 chars + hint pra opt-in.',
       inputSchema: {
         type: 'object',
         properties: {
           card_id: { type: 'string', description: 'Card short ID (SW78) or full ID' },
-          include_spec: { type: 'boolean', description: 'Inclui spec_content e interview_notes na resposta. Default false (privacidade — specs podem ter notas internas, credentials de exemplo, contexto sensivel). Pase true se o usuario explicitamente pedir "mostre a spec".', default: false },
+          include_spec: { type: 'boolean', description: 'Inclui spec_content e interview_notes na resposta. Default false (privacidade — specs podem ter notas internas, credentials de exemplo, contexto sensivel). Passe true se o usuario explicitamente pedir "mostre a spec".', default: false },
         },
         required: ['card_id'],
       },
@@ -147,8 +147,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: 'cockpit_archive_card',
       description:
-        'Descarta um card (archive). NAO eh delete — mantem spec, entrevista, sessions e todo historico no DB. ' +
-        'Some do board mas pode ser reativado. Use isso quando o usuario decide nao fazer ou abandonou um card. ' +
+        'Descarta um card (archive). NAO eh delete — mantem spec, entrevista, sessions e todo histórico no DB. ' +
+        'Some do board mas pode ser reativado. Use isso quando o usuario decide não fazer ou abandonou um card. ' +
         'Para restaurar, use cockpit_unarchive_card.',
       inputSchema: {
         type: 'object',
@@ -172,9 +172,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: 'cockpit_spec_gen_async',
       description:
-        'Gera a spec tecnica de um card usando AI em background (fire-and-forget). ' +
+        'Gera a spec técnica de um card usando AI em background (fire-and-forget). ' +
         'Use quando o usuario fala "escreve uma spec pro SW79" ou "transforma esse card em spec". ' +
-        'Pre-req: card precisa ter titulo + (descricao OU notas de entrevista) pra ter contexto suficiente. ' +
+        'Pre-req: card precisa ter titulo + (descrição OU notas de entrevista) pra ter contexto suficiente. ' +
         'Salva o resultado em card.spec_content + spec_status="draft" quando terminar. ' +
         'Retorna sessionId — use cockpit_get_session pra acompanhar progresso, ou cockpit_show_card pra ver spec ao final.',
       inputSchema: {
@@ -203,7 +203,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           isolation: {
             type: 'string',
             enum: ['lock', 'worktree'],
-            description: 'lock (default) serializa por projeto. worktree cria git worktree separado pra esta session — paralelismo real no mesmo projeto, com custo (disco + node_modules nao compartilhado + portas conflitam). Use worktree quando o usuario quer rodar 2+ implements no mesmo projeto AO MESMO TEMPO.',
+            description: 'lock (default) serializa por projeto. worktree cria git worktree separado pra esta session — paralelismo real no mesmo projeto, com custo (disco + node_modules não compartilhado + portas conflitam). Use worktree quando o usuario quer rodar 2+ implements no mesmo projeto AO MESMO TEMPO.',
             default: 'lock',
           },
         },
@@ -213,9 +213,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: 'cockpit_edit_card',
       description:
-        'Atualiza campos de um card existente (titulo, tipo, prioridade, descricao, assignee, due_date). ' +
+        'Atualiza campos de um card existente (titulo, tipo, prioridade, descrição, assignee, due_date). ' +
         'Use quando o usuario pede pra mudar info de um card sem precisar abrir o dialog. Apenas campos ' +
-        'incluidos sao alterados — campos omitidos ficam como estao.',
+        'incluidos são alterados — campos omitidos ficam como estão.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -234,13 +234,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       name: 'cockpit_create_workspace',
       description:
         'Cria um workspace novo. Use quando o usuario fala "novo workspace pra X" ou quer organizar trabalho de um cliente/projeto novo. ' +
-        'Workspaces sao a unidade de organizacao topo: agrupam cards + projetos + colunas/automacoes proprias.',
+        'Workspaces são a unidade de organização topo: agrupam cards + projetos + colunas/automações próprias.',
       inputSchema: {
         type: 'object',
         properties: {
           name: { type: 'string', description: 'Nome humano (ex: "Cliente XPTO", "Side projects")' },
           slug: { type: 'string', description: 'Slug curto, lowercase, sem espacos. Default: derivado do nome.' },
-          description: { type: 'string', description: 'Descricao opcional (1 linha)' },
+          description: { type: 'string', description: 'Descrição opcional (1 linha)' },
           color: { type: 'string', description: 'Cor hex (ex: #3b82f6). Default: azul.' },
         },
         required: ['name'],
@@ -248,7 +248,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'cockpit_list_projects',
-      description: 'Lista projetos vinculados a um ou todos workspaces. Util pra ver onde os cards podem rodar implementacoes.',
+      description: 'Lista projetos vinculados a um ou todos workspaces. Util pra ver onde os cards podem rodar implementações.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -259,15 +259,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: 'cockpit_link_project',
       description:
-        'Vincula um diretorio local como projeto a um workspace. Path deve existir. Use quando usuario fala ' +
+        'Vincula um diretório local como projeto a um workspace. Path deve existir. Use quando usuario fala ' +
         '"vincula o projeto /path ao workspace X" ou "esse repo aqui em /Users/.../foo agora roda no workspace X".',
       inputSchema: {
         type: 'object',
         properties: {
           workspace: { type: 'string', description: 'Workspace slug ou nome (default: workspace ativo)' },
           name: { type: 'string', description: 'Nome do projeto (default: basename do path)' },
-          path: { type: 'string', description: 'Path absoluto do diretorio local (precisa existir)' },
-          auto_pr: { type: 'boolean', description: 'Cria PR automatico ao final do implement (precisa de gh autenticado)', default: false },
+          path: { type: 'string', description: 'Path absoluto do diretório local (precisa existir)' },
+          auto_pr: { type: 'boolean', description: 'Cria PR automático ao final do implement (precisa de gh autenticado)', default: false },
         },
         required: ['path'],
       },
@@ -275,7 +275,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: 'cockpit_set_card_project',
       description:
-        'Atribui um projeto especifico a um card. Use quando o workspace tem N projetos e voce quer garantir que ' +
+        'Atribui um projeto especifico a um card. Use quando o workspace tem N projetos e você quer garantir que ' +
         'o card vai implementar no projeto certo (em vez de pegar o primeiro). Passe project_id="" pra desvincular.',
       inputSchema: {
         type: 'object',
@@ -291,7 +291,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       description:
         'Muda o workspace ativo (compartilhado entre CLI e MCP via ~/.cockpit/cli.json). ' +
         'Afeta o "default workspace" usado por cockpit_create_card e por comandos CLI sem --ws. ' +
-        'O Web UI tem seu proprio active workspace (sidebar) que nao e afetado.',
+        'O Web UI tem seu próprio active workspace (sidebar) que não e afetado.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -304,8 +304,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       name: 'cockpit_abort_session',
       description:
         'Aborta uma session em curso (mata o processo do agent, marca phase=error). ' +
-        'Use quando o usuario pede pra parar uma implementacao que esta andando errada ou demorando demais. ' +
-        'Idempotente — se a session ja terminou, retorna o estado atual sem erro.',
+        'Use quando o usuario pede pra parar uma implementação que esta andando errada ou demorando demais. ' +
+        'Idempotente — se a session já terminou, retorna o estado atual sem erro.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -363,7 +363,7 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       default: throw new Error(`unknown tool: ${name}`)
     }
   } catch (err) {
-    // I6 fix — McpInputError tem mensagem ja amigavel pro LLM (campo + razao).
+    // I6 fix — McpInputError tem mensagem já amigavel pro LLM (campo + razão).
     // Demais erros: prefixa "Error:" pra LLM saber que falhou.
     if (err instanceof McpInputError) {
       return {
@@ -485,7 +485,7 @@ async function toolShowCard(rawArgs: unknown): Promise<unknown> {
   // Specs frequentemente tem notas internas, credentials de exemplo,
   // contexto sensivel. LLM pode ecoar isso em respostas / training data.
   // Opt-in explicito via include_spec=true. Sempre retorna o
-  // spec_status (metadata leve, util pra tomar decisao).
+  // spec_status (metadata leve, util pra tomar decisão).
   const includeSpec = args.include_spec === true
   const specSummary = card.spec_content
     ? { length: card.spec_content.length, preview: card.spec_content.slice(0, 200) + (card.spec_content.length > 200 ? '...' : '') }
@@ -681,10 +681,10 @@ async function toolSetActiveWorkspace(args: { workspace: string }): Promise<unkn
   const workspaces = await loadWorkspaces()
   const ws = resolveWorkspace(args.workspace, workspaces)
   if (!ws) {
-    throw new Error(`workspace nao encontrado: ${args.workspace}. Disponiveis: ${workspaces.map((w) => w.slug).join(', ')}`)
+    throw new Error(`workspace não encontrado: ${args.workspace}. Disponíveis: ${workspaces.map((w) => w.slug).join(', ')}`)
   }
 
-  // C3 fix — escreve atomic via write-to-temp + rename. CLI tambem escreve
+  // C3 fix — escreve atomic via write-to-temp + rename. CLI também escreve
   // neste arquivo; sem o atomic, escritas concorrentes corrompiam o JSON.
   const { homedir } = await import('node:os')
   const { join, dirname } = await import('node:path')
@@ -720,7 +720,7 @@ async function toolAbortSession(args: { session_id: string }): Promise<unknown> 
   })
   const data = await res.json().catch(() => null) as Record<string, unknown> | null
   if (res.status === 404) {
-    throw new Error(`session nao encontrada: ${args.session_id}`)
+    throw new Error(`session não encontrada: ${args.session_id}`)
   }
   return {
     session_id: args.session_id,
@@ -752,7 +752,7 @@ async function toolCreateWorkspace(args: CreateWorkspaceArgs): Promise<unknown> 
   const workspaces = await loadWorkspaces()
   const slug = args.slug ? slugify(args.slug) : slugify(args.name)
   if (workspaces.some((w) => w.slug === slug)) {
-    throw new Error(`workspace com slug "${slug}" ja existe. Use slug diferente ou cockpit_show_card pra ver os existentes.`)
+    throw new Error(`workspace com slug "${slug}" já existe. Use slug diferente ou cockpit_show_card pra ver os existentes.`)
   }
 
   const id = `ws-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`
@@ -826,11 +826,11 @@ async function toolLinkProject(args: LinkProjectArgs): Promise<unknown> {
   const { stat } = await import('node:fs/promises')
   const { basename } = await import('node:path')
   if (!existsSync(args.path)) {
-    throw new Error(`path nao existe: ${args.path}`)
+    throw new Error(`path não existe: ${args.path}`)
   }
   const st = await stat(args.path)
   if (!st.isDirectory()) {
-    throw new Error(`path nao e diretorio: ${args.path}`)
+    throw new Error(`path não e diretório: ${args.path}`)
   }
 
   const workspaces = await loadWorkspaces()
@@ -910,7 +910,7 @@ async function toolSetCardProject(args: { card_id: string; project_id: string })
   if (args.project_id !== '') {
     const projects = await loadProjects()
     project = projects.find((p) => p.id === args.project_id)
-    if (!project) throw new Error(`project not found: ${args.project_id}. Use cockpit_list_projects pra ver disponiveis.`)
+    if (!project) throw new Error(`project not found: ${args.project_id}. Use cockpit_list_projects pra ver disponíveis.`)
     if (project.workspace_id !== card.workspace_id) {
       throw new Error('projeto pertence a workspace diferente do card. Cards e projetos precisam estar no mesmo workspace.')
     }
@@ -1054,7 +1054,7 @@ async function toolSpecGenAsync(args: SpecGenAsyncArgs): Promise<unknown> {
     project: project?.name,
     follow_up: {
       poll: `cockpit_get_session({ session_id: "${res.sessionId}" })`,
-      result: `cockpit_show_card({ card_id: "${shortId(card.id)}" })  # apos status='done', ve spec_content`,
+      result: `cockpit_show_card({ card_id: "${shortId(card.id)}" })  # após status='done', ve spec_content`,
     },
   }
 }
@@ -1106,13 +1106,13 @@ async function toolImplementAsync(rawArgs: unknown): Promise<unknown> {
   } catch (err) {
     if (err instanceof ProjectLockedError) {
       // F9-A — surface payload estruturado pra o LLM saber que ha outra
-      // session rodando no mesmo projeto e oferecer ao usuario opcoes claras.
+      // session rodando no mesmo projeto e oferecer ao usuario opções claras.
       const ageMin = err.heldBy.age_seconds ? Math.floor(err.heldBy.age_seconds / 60) : 0
       const ageStr = err.heldBy.age_seconds && err.heldBy.age_seconds < 60
         ? `${err.heldBy.age_seconds}s`
         : `${ageMin}m${(err.heldBy.age_seconds || 0) % 60}s`
       throw new Error(
-        `project_locked — outra implementacao ja roda neste projeto.\n` +
+        `project_locked — outra implementação já roda neste projeto.\n` +
         `held_by:\n` +
         `  session: ${err.heldBy.session_id}\n` +
         (err.heldBy.card_id ? `  card: #${shortId(err.heldBy.card_id)}\n` : '') +

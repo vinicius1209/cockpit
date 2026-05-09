@@ -91,7 +91,7 @@ async function main(): Promise<void> {
             err: !!flags.err || !!flags.stderr,
           })
         }
-        return errorExit(`subcomando daemon nao reconhecido: ${sub}`)
+        return errorExit(`subcomando daemon não reconhecido: ${sub}`)
       }
 
       case 'ws':
@@ -115,7 +115,7 @@ async function main(): Promise<void> {
           if (!rest[0]) return errorExit('uso: cockpit ws delete <name> [--force]')
           return wsDelete(rest[0], !!flags.force)
         }
-        return errorExit(`subcomando ws nao reconhecido: ${sub}`)
+        return errorExit(`subcomando ws não reconhecido: ${sub}`)
       }
 
       case 'board': {
@@ -177,7 +177,7 @@ async function main(): Promise<void> {
             due: flags.due as string | undefined,
           })
         }
-        return errorExit(`subcomando card nao reconhecido: ${sub}`)
+        return errorExit(`subcomando card não reconhecido: ${sub}`)
       }
 
       case 'implement': {
@@ -185,7 +185,7 @@ async function main(): Promise<void> {
         if (!sub) return errorExit('uso: cockpit implement <id> [--watch] [--feedback "..."] [--isolation worktree]')
         const iso = flags.isolation as string | undefined
         if (iso && iso !== 'lock' && iso !== 'worktree') {
-          return errorExit(`--isolation invalido: "${iso}". Use lock ou worktree.`)
+          return errorExit(`--isolation inválido: "${iso}". Use lock ou worktree.`)
         }
         return implement(sub, {
           feedback: flags.feedback as string | undefined,
@@ -248,7 +248,7 @@ async function main(): Promise<void> {
           if (!rest[0]) return errorExit('uso: cockpit agent test <name> [--prompt "..."]')
           return agentTest(rest[0], { prompt: flags.prompt as string | undefined })
         }
-        return errorExit(`subcomando agent nao reconhecido: ${sub}`)
+        return errorExit(`subcomando agent não reconhecido: ${sub}`)
       }
 
       case 'init': {
@@ -296,7 +296,7 @@ async function main(): Promise<void> {
           if (!rest[0]) return errorExit('uso: cockpit spec save-vault <id>')
           return specSaveVault(rest[0])
         }
-        return errorExit(`subcomando spec nao reconhecido: ${sub}`)
+        return errorExit(`subcomando spec não reconhecido: ${sub}`)
       }
 
       default:
@@ -313,10 +313,10 @@ async function main(): Promise<void> {
 
 function errorExit(msg: string): never {
   console.error(c.rose('✕ ') + msg)
-  // Hint comum: zsh com interactive_comments trata `#` como inicio de
+  // Hint comum: zsh com interactive_comments trata `#` como início de
   // comentario, fazendo o argumento sumir antes de chegar no CLI.
   if (msg.includes('<id>') || msg.includes('<column-slug>')) {
-    console.error(c.dim('  dica: nao use # antes do id (#SW78). zsh/bash tratam como comentario.'))
+    console.error(c.dim('  dica: não use # antes do id (#SW78). zsh/bash tratam como comentario.'))
     console.error(c.dim('         use apenas: ') + c.bold('cockpit card show SW78'))
   }
   process.exit(1)

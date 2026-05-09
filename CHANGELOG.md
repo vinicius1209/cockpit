@@ -22,7 +22,7 @@ Catches que engoliam erros viraram visíveis:
 
 ### Fixed — I6: validator runtime nos MCP handlers
 
-**Antes**: 19 handlers faziam `args as unknown as XArgs` sem validação. LLM passando `{title: null}` → crashes confusos.
+**Antes**: 19 handlers faziam `args as unknown as XArgs` sem válidação. LLM passando `{title: null}` → crashes confusos.
 
 **Agora**: novo módulo `mcp/src/validate.ts` (zero deps, ~100 linhas). Cada handler crítico declara spec (required, type, min/max length, enum values). Erro vira `McpInputError` → resposta MCP `Validation error: campo "X" — razão` que o LLM entende.
 
@@ -134,7 +134,7 @@ Foco: **fechar 100% dos críticos do code review**. C1 já era v0.7. C2-C6 entre
 
 - Novo `validateSessionId()` em `validation.ts` (regex `/^[a-zA-Z0-9-]+$/` + max 128)
 - Aplicado em `maintenance.ts` cleanup-worktrees (linha de defesa antes de `rm`)
-- Defense-in-depth: `worktree-manager.removeWorktree` também valida (mesmo input vindo do daemon-internal)
+- Defense-in-depth: `worktree-manager.removeWorktree` também válida (mesmo input vindo do daemon-internal)
 - 5 tests cobrindo `../etc/passwd`, null byte, shell injection, espaços, length cap
 
 ### Fixed — C3: `~/.cockpit/cli.json` races 🔴

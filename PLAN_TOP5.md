@@ -1,6 +1,6 @@
-# Plano de Execucao — Top 5 Acoes Imediatas
+# Plano de Execução — Top 5 Ações Imediatas
 
-Resultado do eval completo (2026-05-03). Cada acao e independente — podem ser executadas em paralelo.
+Resultado do eval completo (2026-05-03). Cada ação e independente — podem ser executadas em paralelo.
 
 ---
 
@@ -54,7 +54,7 @@ Atualizar as 2 chamadas a `corsHeaders()` em `fetch()` para passar `req`.
 **Esforco**: 30 min
 
 ### Arquivos
-- `daemon/src/executor/agent-executor.ts` (funcoes `executeAgent`, `executeAgentWithCallbacks`, `executeAgentStreaming`)
+- `daemon/src/executor/agent-executor.ts` (funções `executeAgent`, `executeAgentWithCallbacks`, `executeAgentStreaming`)
 
 ### O que fazer
 
@@ -71,7 +71,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 ```
 
-2. Envolver `await proc.exited` com timeout nas 3 funcoes:
+2. Envolver `await proc.exited` com timeout nas 3 funções:
 
 ```ts
 // executeAgent (linha 187)
@@ -98,7 +98,7 @@ const exitCode = await withTimeout(proc.exited, AGENT_TIMEOUT_MS, request.agent)
 }
 ```
 
-4. `executeAgentStreaming` (linha 283) tambem precisa do `usePipe` para prompts grandes (hoje esta faltando):
+4. `executeAgentStreaming` (linha 283) também precisa do `usePipe` para prompts grandes (hoje esta faltando):
 
 ```ts
 const usePipe = request.prompt.length > 4000
@@ -180,7 +180,7 @@ Repetir para SpecPanel, ImplementPanel, AgentChat.
 
 ## A4 — Centralizar DAEMON_URL
 
-**Risco**: 6 definicoes duplicadas de `DAEMON_URL`, inconsistencia e manutencao.
+**Risco**: 6 definicoes duplicadas de `DAEMON_URL`, inconsistencia e manutenção.
 **Esforco**: 15 min
 
 ### Arquivos afetados (remover declaracao local)
@@ -189,7 +189,7 @@ Repetir para SpecPanel, ImplementPanel, AgentChat.
 3. `src/shared/lib/daemon-client.ts` (linha 3)
 4. `src/shared/lib/persistence/adapters/daemon-storage.ts` (linha 3)
 5. `src/features/implement/implement-panel.tsx` (linha 17)
-6. `src/app/routes/discovery.tsx` (linha 169, dentro de funcao)
+6. `src/app/routes/discovery.tsx` (linha 169, dentro de função)
 
 ### O que fazer
 
@@ -225,7 +225,7 @@ Hoje `agent-service.ts` tem 3 caminhos:
 
 ### Arquivos
 - `daemon/src/routes/chat.ts` — adicionar suporte a provider direto
-- `daemon/src/persistence/secrets-store.ts` — ja armazena keys
+- `daemon/src/persistence/secrets-store.ts` — já armazena keys
 - `src/features/agent-runner/agent-service.ts` — simplificar, sempre rotear pelo daemon
 
 ### O que fazer
@@ -248,7 +248,7 @@ if (path === '/chat/api' && req.method === 'POST') {
 
   const apiKey = getSecret(body.provider)
   if (!apiKey) {
-    return jsonResponse({ error: `API key para ${body.provider} nao configurada` }, 400)
+    return jsonResponse({ error: `API key para ${body.provider} não configurada` }, 400)
   }
 
   // Fazer a chamada pra API usando a key do secrets store
@@ -256,7 +256,7 @@ if (path === '/chat/api' && req.method === 'POST') {
 }
 ```
 
-Implementar cada provider (Claude, OpenAI, Gemini) no daemon, reutilizando a logica que hoje esta no `agent-service.ts` (linhas 117-256). Mover as funcoes `runClaude`, `runOpenAI`, `runGemini` para o daemon.
+Implementar cada provider (Claude, OpenAI, Gemini) no daemon, reutilizando a lógica que hoje esta no `agent-service.ts` (linhas 117-256). Mover as funções `runClaude`, `runOpenAI`, `runGemini` para o daemon.
 
 **Frontend — simplificar `agent-service.ts`:**
 
@@ -264,29 +264,29 @@ Implementar cada provider (Claude, OpenAI, Gemini) no daemon, reutilizando a log
 export async function runAgent(config, messages, apiKey, callbacks, signal, projectPath) {
   // Sempre rotear pelo daemon
   // Se tem API key configurada no daemon → usa API direta (via /chat/api)
-  // Se nao → usa CLI agent (via /chat/run)
+  // Se não → usa CLI agent (via /chat/run)
   return runViaDaemon(config, messages, callbacks, signal, projectPath)
 }
 ```
 
-O frontend nao precisa mais saber a API key. O daemon decide qual caminho usar baseado nas keys que tem no secrets store.
+O frontend não precisa mais saber a API key. O daemon decide qual caminho usar baseado nas keys que tem no secrets store.
 
 ### Verificacao
 1. Configurar API key via Settings → daemon armazena
-2. Chat/Spec/Interview usa API direta → request vai pro daemon, nao pro provider
+2. Chat/Spec/Interview usa API direta → request vai pro daemon, não pro provider
 3. DevTools Network → nenhuma chamada pra api.anthropic.com/openai/google
 4. Sem API key → continua usando CLI agent via daemon
 
 ---
 
-## Ordem de Execucao Sugerida
+## Ordem de Execução Sugerida
 
 ```
 A1 (5 min)  →  A4 (15 min)  →  A3 (15 min)  →  A2 (30 min)  →  A5 (1h)
    CORS          DRY             Safety          Stability        Security
 ```
 
-A1 e A4 sao rapidos e independentes — podem ir primeiro.
+A1 e A4 são rapidos e independentes — podem ir primeiro.
 A3 protege o UX imediatamente.
 A2 evita travamento do daemon.
 A5 e a maior mudanca mas a mais importante pra seguranca.

@@ -87,11 +87,11 @@ async function alarmOne(ref: string, opts: AlarmOpts): Promise<void> {
   const { workspaces, cards } = await loadAll()
   const card = resolveCard(ref, cards)
   if (!card) {
-    console.error(c.rose('✕ card nao encontrado: ') + ref)
+    console.error(c.rose('✕ card não encontrado: ') + ref)
     process.exit(1)
   }
   const ws = workspaces.find((w) => w.id === card.workspace_id)
-  if (!ws) { console.error(c.rose('✕ workspace nao encontrado')); process.exit(1) }
+  if (!ws) { console.error(c.rose('✕ workspace não encontrado')); process.exit(1) }
 
   const r = await api.getLatestSession(ws.slug, card.id, opts.action)
   const session = r.session
@@ -103,7 +103,7 @@ async function alarmOne(ref: string, opts: AlarmOpts): Promise<void> {
     // Ja terminou — notifica agora mesmo
     const ok = session.phase !== 'error'
     await notifyTerminal({ card: shortId(card.id), title: card.title, action: session.action, ok, exitCode: session.exitCode || 0, error: session.error || undefined }, opts)
-    console.log(c.dim(`  session ja havia terminado · ${ok ? 'done' : 'error'}`))
+    console.log(c.dim(`  session já havia terminado · ${ok ? 'done' : 'error'}`))
     return
   }
 
@@ -158,7 +158,7 @@ async function alarmAll(opts: AlarmOpts): Promise<void> {
     sound: opts.sound || 'Glass',
   }, { silent: opts.silent })
   console.log()
-  console.log(`  ${ok ? sym.ok : sym.warn} ${ok ? c.emerald('todas notificadas') : c.amber('notify indisponivel — usei stdout')}`)
+  console.log(`  ${ok ? sym.ok : sym.warn} ${ok ? c.emerald('todas notificadas') : c.amber('notify indisponível — usei stdout')}`)
 }
 
 interface SessionContext {
@@ -221,6 +221,6 @@ async function notifyTerminal(
     (meta.ok ? c.emerald('● ') : c.rose('● ')) +
     `#${meta.card} ${verb}` +
     c.dim(` · ${meta.action} · exit=${meta.exitCode}`) +
-    (notified ? '' : c.dim(' · notify indisponivel'))
+    (notified ? '' : c.dim(' · notify indisponível'))
   )
 }

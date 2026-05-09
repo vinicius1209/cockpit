@@ -1,17 +1,17 @@
 // Hook runner — executa shell scripts definidos no workspace em momentos
-// do ciclo de implementacao. Padrao "hooks" estilo git: usuario pluga
+// do ciclo de implementação. Padrão "hooks" estilo git: usuario pluga
 // scripts pra lint, deploy preview, slack notify, etc — sem precisar
 // modificar o daemon.
 //
 // Filosofia:
 //  - Scripts rodam em /bin/sh -c <script> com env vars injetadas
-//  - Timeout de 60s (hook nao deve travar o fluxo)
+//  - Timeout de 60s (hook não deve travar o fluxo)
 //  - Stdout/stderr capturado pra log + emit no SSE
 //  - before_implement com exit != 0 ABORTA o implement (gate)
-//  - Outros hooks (after_*) sao informativos — nao param o fluxo
+//  - Outros hooks (after_*) são informativos — não param o fluxo
 //
 // Seguranca: hooks rodam com permissoes do daemon (mesma do usuario).
-// Nao rodar scripts que voce nao confia.
+// Não rodar scripts que você não confia.
 
 import { getDB } from '../persistence/db'
 
@@ -37,7 +37,7 @@ export interface HookResult {
   stdout: string
   stderr: string
   durationMs: number
-  /** Se script tinha codigo mas nao executou (timeout, erro spawn, etc). */
+  /** Se script tinha codigo mas não executou (timeout, erro spawn, etc). */
   error?: string
 }
 
@@ -45,7 +45,7 @@ const HOOK_TIMEOUT_MS = 60_000
 
 /**
  * Carrega script do hook a partir do workspace (kv_stores).
- * Retorna string vazia se hook desabilitado/nao definido/workspace inexistente.
+ * Retorna string vazia se hook desabilitado/não definido/workspace inexistente.
  */
 export function loadHookScript(workspaceSlug: string, hook: HookName): string {
   const db = getDB()
@@ -61,7 +61,7 @@ export function loadHookScript(workspaceSlug: string, hook: HookName): string {
 }
 
 /**
- * Executa hook. Sempre retorna um HookResult — nao throw. Se script
+ * Executa hook. Sempre retorna um HookResult — não throw. Se script
  * vazio, retorna ran=false sem rodar nada.
  */
 export async function runHook(
@@ -131,7 +131,7 @@ export async function runHook(
 
 /** Formata resultado em uma linha curta pra emitir via SSE. */
 export function formatHookResultLine(hook: HookName, result: HookResult): string {
-  if (!result.ran) return `[hook ${hook}] (nao definido)`
+  if (!result.ran) return `[hook ${hook}] (não definido)`
   const status = result.exitCode === 0 ? 'ok' : `falhou (exit=${result.exitCode})`
   const dur = result.durationMs < 1000 ? `${result.durationMs}ms` : `${(result.durationMs / 1000).toFixed(1)}s`
   return `[hook ${hook}] ${status} · ${dur}`

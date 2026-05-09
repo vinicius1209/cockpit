@@ -63,7 +63,7 @@ export function InterviewPanel({ card, workspaceId }: InterviewPanelProps) {
 Titulo: ${card.title}
 Tipo: ${card.type}
 Prioridade: ${card.priority}
-Descricao: ${card.description || 'Sem descricao detalhada'}
+Descrição: ${card.description || 'Sem descrição detalhada'}
 
 Faca a primeira pergunta para entender melhor esse card.`,
       timestamp: new Date().toISOString(),
@@ -323,7 +323,7 @@ Faca a primeira pergunta para entender melhor esse card.`,
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={isComplete ? 'Entrevista concluida. Faca mais perguntas se necessario...' : 'Sua resposta...'}
+                  placeholder={isComplete ? 'Entrevista concluida. Faca mais perguntas se necessário...' : 'Sua resposta...'}
                   rows={2}
                   className="resize-none text-sm min-h-[44px]"
                 />

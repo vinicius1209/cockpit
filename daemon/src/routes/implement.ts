@@ -6,7 +6,7 @@ import { peekActiveProjectLock, ProjectLockedError } from '../tasks/project-lock
 function lockErrorBody(err: ProjectLockedError) {
   return {
     error: 'project_locked',
-    message: 'Outra implementacao ja esta rodando neste projeto',
+    message: 'Outra implementação já esta rodando neste projeto',
     project_path: err.path,
     held_by: {
       session_id: err.heldBy.sessionId,
@@ -47,7 +47,7 @@ export async function handleImplementRoutes(req: Request, url: URL): Promise<Res
     body.projectPath = validPath
 
     // F9-A — pre-check do lock soh em modo lock (default). Em isolation=worktree
-    // dois implements no mesmo projeto sao OK (worktrees separados).
+    // dois implements no mesmo projeto são OK (worktrees separados).
     if ((body.isolation || 'lock') === 'lock') {
       const existingLock = await peekActiveProjectLock(body.projectPath)
       if (existingLock) {
@@ -135,7 +135,7 @@ export async function handleImplementRoutes(req: Request, url: URL): Promise<Res
         }
 
         // Anti-buffering: flush imediato + heartbeat. SSE comments (`: ...\n\n`)
-        // sao ignorados pelo browser mas forcam o flush do socket. Sem isso,
+        // são ignorados pelo browser mas forcam o flush do socket. Sem isso,
         // Bun.serve pode acumular eventos pequenos por minutos antes de mandar.
         safeEnqueue(': stream-open\n\n')
         const heartbeat = setInterval(() => safeEnqueue(': hb\n\n'), 1500)

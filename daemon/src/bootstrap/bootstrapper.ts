@@ -52,7 +52,7 @@ export async function bootstrapProject(projectPath: string, force = false): Prom
     await writeFile(agentsMdPath, generateAgentsMd(scan), 'utf-8')
     created.push('AGENTS.md')
   } else {
-    skipped.push('AGENTS.md (ja existe)')
+    skipped.push('AGENTS.md (já existe)')
   }
 
   // 2. CLAUDE.md
@@ -61,7 +61,7 @@ export async function bootstrapProject(projectPath: string, force = false): Prom
     await writeFile(claudeMdPath, generateClaudeMd(scan), 'utf-8')
     created.push('CLAUDE.md')
   } else {
-    skipped.push('CLAUDE.md (ja existe)')
+    skipped.push('CLAUDE.md (já existe)')
   }
 
   // 3. .claude/commands/
@@ -81,7 +81,7 @@ export async function bootstrapProject(projectPath: string, force = false): Prom
     await writeFile(annotatePath, generateAnnotateCommand(), 'utf-8')
     created.push('.claude/commands/annotate.md')
   } else {
-    skipped.push('.claude/commands/annotate.md (ja existe)')
+    skipped.push('.claude/commands/annotate.md (já existe)')
   }
 
   // review command
@@ -90,7 +90,7 @@ export async function bootstrapProject(projectPath: string, force = false): Prom
     await writeFile(reviewPath, generateReviewCommand(), 'utf-8')
     created.push('.claude/commands/review.md')
   } else {
-    skipped.push('.claude/commands/review.md (ja existe)')
+    skipped.push('.claude/commands/review.md (já existe)')
   }
 
   return {

@@ -22,7 +22,7 @@ export type AutomationAction = typeof AUTOMATION_ACTIONS[number]
 export const AUTOMATION_ACTION_LABELS: Record<AutomationAction, string> = {
   run_card_discovery: 'Card Discovery (agent investiga o card)',
   generate_spec: 'Gerar spec automaticamente',
-  run_implementation: 'Executar implementacao',
+  run_implementation: 'Executar implementação',
   run_review: 'Executar reviewer',
   save_to_vault: 'Salvar spec no Docs Vault',
   notify: 'Notificar (card movido)',
@@ -70,10 +70,10 @@ export interface Card {
   labels: CardLabel[]
   created_at: string
   updated_at: string
-  /** F10 — quando setado, card foi descartado. Mantido no DB pra historico/busca,
-   *  filtrado fora do board por padrao. ISO timestamp. null = ativo. */
+  /** F10 — quando setado, card foi descartado. Mantido no DB pra histórico/busca,
+   *  filtrado fora do board por padrão. ISO timestamp. null = ativo. */
   archived_at: string | null
-  /** F-PR — URL do ultimo PR criado pra este card. Atualizado pelo daemon
+  /** F-PR — URL do último PR criado pra este card. Atualizado pelo daemon
    *  ao final do `implement` (auto_pr). UI usa pra fetch live status. */
   pr_url: string | null
 }

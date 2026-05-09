@@ -162,8 +162,8 @@ export async function executeJobAsync(jobId: string): Promise<void> {
     // Git status
     if (scanResult.git && scanResult.git.uncommittedChanges > 5) {
       cards.push({
-        title: `${scanResult.git.uncommittedChanges} arquivos nao commitados`,
-        description: `O projeto tem ${scanResult.git.uncommittedChanges} mudancas nao commitadas na branch ${scanResult.git.branch}.`,
+        title: `${scanResult.git.uncommittedChanges} arquivos não commitados`,
+        description: `O projeto tem ${scanResult.git.uncommittedChanges} mudancas não commitadas na branch ${scanResult.git.branch}.`,
         type: 'chore',
         priority: 'medium',
         source: 'scanner',
@@ -175,7 +175,7 @@ export async function executeJobAsync(jobId: string): Promise<void> {
     if (!scanResult.agentConfigs.hasAgentsMd && !scanResult.agentConfigs.hasClaudeDir) {
       cards.push({
         title: `Configurar agents para ${scanResult.name}`,
-        description: `O projeto nao tem AGENTS.md nem diretorio .claude/.`,
+        description: `O projeto não tem AGENTS.md nem diretório .claude/.`,
         type: 'improvement',
         priority: 'low',
         source: 'scanner',

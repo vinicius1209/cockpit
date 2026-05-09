@@ -69,7 +69,7 @@ async function runViaApiProxy(
       const errBody = await response.json().catch(() => ({ error: response.statusText }))
       const errMsg = (errBody as { error?: string }).error || `API proxy error ${response.status}`
       // If API key not configured, fall back to CLI agent
-      if (response.status === 400 && errMsg.includes('nao configurada')) {
+      if (response.status === 400 && errMsg.includes('não configurada')) {
         return runViaDaemon(config, messages, callbacks, signal, projectPath, options)
       }
       callbacks.onError(errMsg)

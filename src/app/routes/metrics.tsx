@@ -88,7 +88,7 @@ export function MetricsPage() {
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-6">
         <KpiTile code="TOT" label="Total de cards" value={metrics.totalCards} icon={Zap} color="primary" sub="em todos os workspaces" />
         <KpiTile code="DONE" label="Concluidos" value={metrics.totalDone} icon={TrendingUp} color="emerald" sub={donePercent !== null ? `${donePercent}% do total` : '—'} />
-        <KpiTile code="LEAD" label="Lead time medio" value={metrics.avgLeadTimeDays ?? 0} icon={Clock} color="amber" sub="dias (criacao → conclusao)" />
+        <KpiTile code="LEAD" label="Lead time medio" value={metrics.avgLeadTimeDays ?? 0} icon={Clock} color="amber" sub="dias (criação → conclusao)" />
         <KpiTile code="RUNS" label="Sessoes de agent" value={metrics.sessions.total} icon={Bot} color="violet" sub={`${metrics.sessions.done} ok · ${metrics.sessions.errors} erro${metrics.sessions.errors !== 1 ? 's' : ''}`} />
       </div>
 

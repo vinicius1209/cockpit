@@ -37,11 +37,11 @@ export interface SpecGenResult {
   sessionId: string
 }
 
-const DEFAULT_SYSTEM_PROMPT = `Voce e um spec-writer experiente. Seu papel e transformar um card de
-trabalho (titulo + descricao + entrevista) em uma especificacao tecnica
+const DEFAULT_SYSTEM_PROMPT = `Você e um spec-writer experiente. Seu papel e transformar um card de
+trabalho (titulo + descrição + entrevista) em uma especificacao técnica
 clara, acionavel, e bem estruturada em Markdown.
 
-Estrutura padrao da spec:
+Estrutura padrão da spec:
 
 ## Contexto
 Por que esta tarefa existe (1-2 paragrafos).
@@ -53,7 +53,7 @@ O que precisa estar feito ao final (criterios de aceite).
 - O que esta incluido (lista)
 - O que NAO esta incluido (lista)
 
-## Plano tecnico
+## Plano técnico
 Decisoes de design, arquivos a tocar, abordagem.
 
 ## Riscos / pontos de atencao
@@ -61,10 +61,10 @@ Edge cases, possiveis quebras, dependencias.
 
 Regras:
 - Use portugues brasileiro
-- Seja especifico, nao generico
-- Se voce tem acesso ao codigo (cwd), LEIA arquivos relevantes antes de
+- Seja especifico, não generico
+- Se você tem acesso ao codigo (cwd), LEIA arquivos relevantes antes de
   inferir. Mencione paths concretos quando relevante.
-- Evite cerimonia: ir direto ao ponto`
+- Evite cerimônia: ir direto ao ponto`
 
 interface CardRow {
   id: string
@@ -87,7 +87,7 @@ function loadCard(cardId: string): CardRow | null {
 
 function buildUserMessage(card: CardRow): string {
   const parts = [
-    `Gere uma spec tecnica para o seguinte card:`,
+    `Gere uma spec técnica para o seguinte card:`,
     ``,
     `## Card`,
     `Titulo: ${card.title}`,
@@ -95,14 +95,14 @@ function buildUserMessage(card: CardRow): string {
     `Prioridade: ${card.priority}`,
   ]
   if (card.description?.trim()) {
-    parts.push(``, `## Descricao`, card.description.trim())
+    parts.push(``, `## Descrição`, card.description.trim())
   }
   if (card.interview_notes?.trim()) {
     parts.push(``, `## Notas da entrevista`, card.interview_notes.trim())
   }
   parts.push(
     ``,
-    `Se voce tem acesso ao codigo-fonte (cwd setado), leia arquivos`,
+    `Se você tem acesso ao codigo-fonte (cwd setado), leia arquivos`,
     `relevantes antes de inferir. Use paths concretos quando aplicavel.`,
   )
   return parts.join('\n')
@@ -133,7 +133,7 @@ function updateCardSpecContent(cardId: string, specContent: string): void {
 
 /**
  * Dispara geracao de spec em background. Retorna sessionId imediatamente
- * (em ate ~100ms — apenas a criacao da session). O agent continua rodando
+ * (em até ~100ms — apenas a criação da session). O agent continua rodando
  * e o card e atualizado quando completar.
  */
 export async function startSpecGenAsync(config: SpecGenConfig): Promise<SpecGenResult> {
@@ -149,7 +149,7 @@ export async function startSpecGenAsync(config: SpecGenConfig): Promise<SpecGenR
     agentName = claude?.name || installed[0].name
   }
 
-  // Cria session sincrono pra retornar id rapido
+  // Cria session sincrono pra retornar id rápido
   const session = await createSession(config.workspaceSlug, config.cardId, {
     agent: agentName,
     branch: null,
@@ -197,9 +197,9 @@ async function runSpecGenInBackground(
 
   let allOutput = ''
   // I9 fix — antes usava `allOutput.length % 1000 < chunk.length` que e
-  // heuristica fragil: chunk grande pode pular varios "marcos" sem
+  // heuristica fragil: chunk grande pode pular vários "marcos" sem
   // persistir. Agora throttle temporal: persiste se passou >2s desde o
-  // ultimo persist E ha conteudo novo. Garante max 1 update/2s e min
+  // último persist E ha conteudo novo. Garante max 1 update/2s e min
   // 1 update por janela ativa de 2s.
   let lastPersistAt = 0
   const PERSIST_THROTTLE_MS = 2000

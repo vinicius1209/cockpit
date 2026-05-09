@@ -246,7 +246,7 @@ function ProcessingFooter({ processing }: { processing: ProcessingState }) {
               e.stopPropagation()
               processing.abort?.()
             }}
-            title="Abortar execucao"
+            title="Abortar execução"
           >
             <Square className="h-2 w-2" fill="currentColor" />
             ABORT

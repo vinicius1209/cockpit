@@ -1,5 +1,5 @@
 // Sessions screen — lista todas as sessions running, atualizada por tick.
-// Setas movem selecao, enter abre detalhe da session (live tail).
+// Setas movem seleção, enter abre detalhe da session (live tail).
 
 import type { Screen, KeyResult } from '../engine'
 import type { Key } from '../keys'

@@ -57,13 +57,13 @@ O instalador:
 | `cockpit_archive_card` | Descarta card (preserva spec/sessions) | card_id* |
 | `cockpit_unarchive_card` | Reativa card descartado | card_id* |
 | `cockpit_set_active_workspace` | Muda workspace ativo (compartilhado CLI+MCP via cli.json) | workspace* |
-| `cockpit_spec_gen_async` | Gera spec tecnica via AI em background (salva em card.spec_content) | card_id*, agent, model, system_prompt |
+| `cockpit_spec_gen_async` | Gera spec técnica via AI em background (salva em card.spec_content) | card_id*, agent, model, system_prompt |
 | `cockpit_implement_async` | Dispara `implement` em background, retorna sessionId | card_id*, feedback, no_pr, **isolation** (`lock`/`worktree`) |
 | `cockpit_get_session` | Status de uma session (phase + últimas chunks) | session_id*, tail_chunks |
 | `cockpit_abort_session` | Aborta session em curso (mata processo, marca error, libera lock/worktree) | session_id* |
 | `cockpit_create_workspace` | Cria workspace novo (slug auto-derivado se omitido) | name*, slug, description, color |
 | `cockpit_list_projects` | Lista projetos vinculados a um/todos workspaces | workspace |
-| `cockpit_link_project` | Vincula diretorio local como projeto (path precisa existir) | path*, workspace, name, auto_pr |
+| `cockpit_link_project` | Vincula diretório local como projeto (path precisa existir) | path*, workspace, name, auto_pr |
 | `cockpit_set_card_project` | Atribui projeto especifico a um card (ou desvincula com "") | card_id*, project_id* |
 
 ## Resources
@@ -162,7 +162,7 @@ Implementadas em v0.3.0 (Tier 3):
 Implementadas em v0.4.0 (Tier 4):
 - ✅ `cockpit_create_workspace` — bootstrap workspace
 - ✅ `cockpit_list_projects` — descobrir projetos
-- ✅ `cockpit_link_project` — vincular diretorio local
+- ✅ `cockpit_link_project` — vincular diretório local
 - ✅ `cockpit_set_card_project` — atribuir projeto a card
 
 Implementadas em v0.6.0 (Tier 5):

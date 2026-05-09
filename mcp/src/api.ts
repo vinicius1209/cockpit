@@ -1,6 +1,6 @@
-// HTTP client minimo para o daemon. Reutiliza mesma URL que o CLI usa.
+// HTTP client mínimo para o daemon. Reutiliza mesma URL que o CLI usa.
 
-// Resolve URL no momento da chamada (nao no load) — permite testes
+// Resolve URL no momento da chamada (não no load) — permite testes
 // sobrescreverem COCKPIT_DAEMON_URL via beforeAll.
 export function getDaemonUrl(): string {
   return process.env.COCKPIT_DAEMON_URL || 'http://127.0.0.1:4800'
@@ -14,7 +14,7 @@ export async function daemonGet<T>(path: string): Promise<T> {
 
 // F9-A — payload retornado pelo daemon quando o lock estah retido.
 // O MCP tool `cockpit_implement_async` formata isso como texto rico
-// pra o LLM entender a opcao de aguardar/abortar.
+// pra o LLM entender a opção de aguardar/abortar.
 export interface LockHeldBy {
   session_id: string
   card_id?: string
@@ -50,7 +50,7 @@ export async function daemonPost<T>(path: string, body: unknown): Promise<T> {
     const rawText = await res.text().catch(() => res.statusText)
     if (res.status === 409) {
       let data: { error?: string; project_path?: string; held_by?: LockHeldBy; hints?: string[] } | null = null
-      try { data = JSON.parse(rawText) } catch { /* nao json */ }
+      try { data = JSON.parse(rawText) } catch { /* não json */ }
       if (data?.error === 'project_locked' && data.held_by && data.project_path) {
         throw new ProjectLockedError(data.project_path, data.held_by, data.hints || [])
       }
@@ -175,7 +175,7 @@ export async function patchCardsStore<T extends { cards: Card[] }>(
   let lastErr: Error | null = null
   for (let attempt = 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++) {
     const envWithVersion = await daemonGet<PersistEnvelope<T> & { version?: number }>('/api/data/cards')
-    if (!envWithVersion?.state) throw new Error('cards store nao inicializado')
+    if (!envWithVersion?.state) throw new Error('cards store não inicializado')
 
     const { version, ...envOnly } = envWithVersion
     const next = {
@@ -202,7 +202,7 @@ export async function patchCardsStore<T extends { cards: Card[] }>(
       throw e  // outros erros — propaga sem retry
     }
   }
-  throw new Error(`patchCardsStore: ${MAX_RETRY_ATTEMPTS} tentativas falharam por version_conflict — store muito disputado. Ultimo erro: ${lastErr?.message}`)
+  throw new Error(`patchCardsStore: ${MAX_RETRY_ATTEMPTS} tentativas falharam por version_conflict — store muito disputado. Último erro: ${lastErr?.message}`)
 }
 
 // ── Helpers ──
@@ -210,7 +210,7 @@ export async function patchCardsStore<T extends { cards: Card[] }>(
 /**
  * C5 fix — redact paths absolutos antes de retornar ao LLM.
  * Substitui /Users/<user>/ por ~/, /home/<user>/ por ~/.
- * Tambem trunca paths muito longos (rare mas defensivo).
+ * Também trunca paths muito longos (rare mas defensivo).
  *
  * Por que: tools como cockpit_show_card, list_projects, link_project
  * antes retornavam paths brutos tipo /Users/vinicius1209/projetos/foo —
@@ -218,7 +218,7 @@ export async function patchCardsStore<T extends { cards: Card[] }>(
  * homedir e estrutura de pastas pessoais.
  *
  * Mantemos path absoluto INTERNAMENTE quando precisamos passar pra
- * implementacoes (link_project, implement_async). Aqui soh sanitizamos
+ * implementações (link_project, implement_async). Aqui soh sanitizamos
  * o que sai pro lado do cliente MCP.
  */
 export function redactPath(path: string | null | undefined): string | null {

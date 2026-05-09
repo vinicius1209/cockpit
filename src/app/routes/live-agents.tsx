@@ -1,6 +1,6 @@
 // Live Agents Panel — visao cross-workspace de TODAS sessions ativas em
 // tempo real. Cada session ganha um lane com header (card, agent, phase,
-// elapsed) + tail das ultimas chunks live + heatmap de arquivos tocados.
+// elapsed) + tail das últimas chunks live + heatmap de arquivos tocados.
 //
 // SSE per-session via EventSource. Auto-reconcile a cada 5s pra novas sessions.
 
@@ -64,8 +64,8 @@ export function LiveAgentsPage() {
     return () => clearInterval(id)
   }, [])
 
-  // Reconcile periodico — descobre sessions novas, abre SSE pras que ainda
-  // nao temos lane. Tambem detecta sessions que sumiram do listRunning
+  // Reconcile periódico — descobre sessions novas, abre SSE pras que ainda
+  // não temos lane. Também detecta sessions que sumiram do listRunning
   // (terminaram entre updates) — marca como finished.
   useEffect(() => {
     let cancelled = false
@@ -82,10 +82,10 @@ export function LiveAgentsPage() {
             openLane(s as AgentSessionDto)
           }
         }
-        // Sessions que estavam abertas mas nao aparecem mais → encerrou
+        // Sessions que estavam abertas mas não aparecem mais → encerrou
         for (const [sid] of lanesRef.current) {
           if (!seen.has(sid)) {
-            // Pode ja estar marcada finished pelo SSE 'done'/'error' — nao mexe
+            // Pode já estar marcada finished pelo SSE 'done'/'error' — não mexe
             // Mas fecha o EventSource pra liberar conexao
             sourcesRef.current.get(sid)?.close()
             sourcesRef.current.delete(sid)
@@ -207,14 +207,14 @@ export function LiveAgentsPage() {
           return
         }
       } catch (parseErr) {
-        // I5 fix — log parse errors em vez de silent. Ainda nao mostra ao
-        // usuario (UI ja eh barulhenta), mas ajuda debug se chunks comecarem
+        // I5 fix — log parse errors em vez de silent. Ainda não mostra ao
+        // usuario (UI já eh barulhenta), mas ajuda debug se chunks comecarem
         // a vir corrompidos.
         console.warn('[live-agents] SSE parse error:', parseErr, 'data:', event.data?.slice(0, 200))
       }
     }
     es.onerror = () => {
-      // EventSource auto-reconnect — nao fechamos. Mas cap de 60s ja vem do daemon.
+      // EventSource auto-reconnect — não fechamos. Mas cap de 60s já vem do daemon.
     }
   }
 
@@ -344,7 +344,7 @@ function Lane({ lane }: { lane: LaneState }) {
       {/* Live tail */}
       <div className="px-3 py-2 font-mono text-[11px] text-muted-foreground space-y-0.5 max-h-48 overflow-y-auto">
         {lane.liveChunks.length === 0 ? (
-          <div className="text-muted-foreground/50 italic">aguardando saida do agent...</div>
+          <div className="text-muted-foreground/50 italic">aguardando saída do agent...</div>
         ) : (
           lane.liveChunks.slice(-8).map((line, i) => (
             <div key={i} className="truncate">{line}</div>
@@ -411,7 +411,7 @@ function FileHeatmap({ files }: { files: Array<{ path: string; count: number; se
         <div className="font-mono uppercase tracking-wider flex items-center gap-1.5">
           <span>guia</span>
           <InfoHint
-            text="Quando 2 sessions tocam o mesmo arquivo, voce pode acabar com conflitos de merge."
+            text="Quando 2 sessions tocam o mesmo arquivo, você pode acabar com conflitos de merge."
             detail="O modo --isolation worktree (CLI ou MCP) cria um working tree separado por session — paralelismo real, sem stomping. Custo: full checkout duplicado e node_modules separado."
             side="left"
           />
@@ -432,7 +432,7 @@ function EmptyState() {
       <div>
         <p className="font-medium text-sm">Nenhuma session em curso</p>
         <p className="text-xs text-muted-foreground mt-1">
-          Dispare uma implementacao via card → tab Implementar, ou pelo Claude Code com{' '}
+          Dispare uma implementação via card → tab Implementar, ou pelo Claude Code com{' '}
           <code className="font-mono text-foreground/80">cockpit_implement_async</code>.
         </p>
       </div>
@@ -452,5 +452,5 @@ function ErrorBox({ msg }: { msg: string }) {
   )
 }
 
-// Suprime warning de uso nao-pratico (RefreshCw fica disponivel pra acoes futuras)
+// Suprime warning de uso não-pratico (RefreshCw fica disponível pra ações futuras)
 void RefreshCw

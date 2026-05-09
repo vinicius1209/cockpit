@@ -31,7 +31,7 @@ export function clip(s: string, maxWidth: number, suffix = '…'): string {
   return out + '\x1b[0m' + suffix
 }
 
-/** Pad direito ate width. Usa visibleLength. */
+/** Pad direito até width. Usa visibleLength. */
 export function padRight(s: string, width: number, ch = ' '): string {
   const v = visibleLength(s)
   if (v >= width) return clip(s, width, '')

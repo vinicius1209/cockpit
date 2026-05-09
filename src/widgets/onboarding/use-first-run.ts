@@ -1,4 +1,4 @@
-// Detecta primeiro uso e gerencia "ja viu o tutorial?" via localStorage.
+// Detecta primeiro uso e gerencia "já viu o tutorial?" via localStorage.
 // Triggers wizard automaticamente quando: zero cards (mesmo com seed
 // workspaces) E o usuario nunca viu o tutorial.
 
@@ -16,7 +16,7 @@ export function useFirstRun(): {
   const cards = useCardStore((s) => s.cards)
 
   useEffect(() => {
-    // Soh dispara uma vez por sessao do browser
+    // Soh dispara uma vez por sessão do browser
     if (typeof window === 'undefined') return
     const seen = localStorage.getItem(SEEN_KEY)
     if (seen) return

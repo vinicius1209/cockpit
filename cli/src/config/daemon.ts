@@ -29,14 +29,14 @@ export async function readConfigAsync(): Promise<CliConfig> {
 
 /**
  * C3 fix — atomic write via write-to-temp + rename. POSIX rename(2) e
- * atomico, entao readers nunca veem arquivo truncado / parcialmente
+ * atomico, então readers nunca veem arquivo truncado / parcialmente
  * escrito. Sem isso, CLI + MCP escrevendo concorrentemente podiam corromper
  * o cli.json.
  *
  * Read-modify-write ainda tem janela de race entre o read (linha "cur")
  * e o write — duas mutacoes simultaneas podem sobrescrever uma a outra.
  * Mas isso eh "lost update" (recuperavel rodando o comando dnv) vs file
- * corruption (nao recuperavel). Atomic write fixa o problema critico.
+ * corruption (não recuperavel). Atomic write fixa o problema critico.
  */
 export async function writeConfig(patch: Partial<CliConfig>): Promise<void> {
   const cur = readConfig()
@@ -45,7 +45,7 @@ export async function writeConfig(patch: Partial<CliConfig>): Promise<void> {
 }
 
 /**
- * Helper export pra ser usado tambem pelo MCP (mcp/src/index.ts) que
+ * Helper export pra ser usado também pelo MCP (mcp/src/index.ts) que
  * escreve no mesmo arquivo. Atomic = no truncated reads.
  */
 export async function atomicWriteJson(filePath: string, data: unknown): Promise<void> {

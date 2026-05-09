@@ -66,7 +66,7 @@ export async function wsUse(ref: string): Promise<void> {
   const { workspaces } = await loadAll()
   const ws = resolveWorkspace(ref, workspaces)
   if (!ws) {
-    console.error(c.rose('✕ workspace nao encontrado: ') + ref)
+    console.error(c.rose('✕ workspace não encontrado: ') + ref)
     console.log(c.dim('  use ' + c.bold('cockpit ws') + ' para listar'))
     process.exit(1)
   }
@@ -83,7 +83,7 @@ export async function wsInfo(ref?: string): Promise<void> {
     : workspaces.find((w) => w.slug === cliState.activeWorkspaceSlug)
 
   if (!target) {
-    console.error(c.rose('✕ workspace ativo nao definido'))
+    console.error(c.rose('✕ workspace ativo não definido'))
     console.log(c.dim('  use: cockpit ws use <name>'))
     process.exit(1)
   }
@@ -127,7 +127,7 @@ interface WsNewOpts {
 
 export async function wsNew(name: string, opts: WsNewOpts = {}): Promise<void> {
   if (!name || name.trim().length === 0) {
-    console.error(c.rose('✕ nome obrigatorio'))
+    console.error(c.rose('✕ nome obrigatório'))
     console.log(c.dim('  uso: cockpit ws new "Nome"'))
     process.exit(1)
   }
@@ -135,7 +135,7 @@ export async function wsNew(name: string, opts: WsNewOpts = {}): Promise<void> {
   const slug = name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')
   const { workspaces } = await loadAll()
   if (workspaces.some((w) => w.slug === slug)) {
-    console.error(c.rose('✕ ja existe workspace com slug ' + slug))
+    console.error(c.rose('✕ já existe workspace com slug ' + slug))
     process.exit(1)
   }
 
@@ -156,7 +156,7 @@ export async function wsNew(name: string, opts: WsNewOpts = {}): Promise<void> {
 
   console.log(`${c.emerald('✓')} workspace criado: ${c.bold(name)} ${c.dim('#' + slug)}`)
   console.log(`  ${c.dim('cor:')} ${color}`)
-  console.log(`  ${c.dim('ja virou ativo (CLI). use:')}`)
+  console.log(`  ${c.dim('já virou ativo (CLI). use:')}`)
   console.log(`  ${c.dim('  cockpit board')} ${c.dim('— ver kanban')}`)
   console.log(`  ${c.dim('  cockpit card new "Titulo"')} ${c.dim('— criar card')}`)
 }
@@ -165,7 +165,7 @@ export async function wsDelete(ref: string, force = false): Promise<void> {
   const { workspaces, cards } = await loadAll()
   const ws = resolveWorkspace(ref, workspaces)
   if (!ws) {
-    console.error(c.rose('✕ workspace nao encontrado: ') + ref)
+    console.error(c.rose('✕ workspace não encontrado: ') + ref)
     process.exit(1)
   }
 
@@ -173,7 +173,7 @@ export async function wsDelete(ref: string, force = false): Promise<void> {
   if (!force) {
     console.log(c.amber('⚠ vai excluir workspace ' + c.bold(ws.name)))
     console.log(c.dim(`  ${wsCards.length} card${wsCards.length === 1 ? '' : 's'} sera${wsCards.length === 1 ? '' : 'o'} removido${wsCards.length === 1 ? '' : 's'}`))
-    console.log(c.dim('  use --force para confirmar (nao tem undo)'))
+    console.log(c.dim('  use --force para confirmar (não tem undo)'))
     process.exit(0)
   }
 

@@ -3,7 +3,7 @@
 // backspace, fn-keys basicas, ctrl+letra, alt+letra, char normal.
 
 export interface Key {
-  /** Nome canonico: 'up', 'down', 'enter', 'a'..'z', '0'..'9', etc */
+  /** Nome canônico: 'up', 'down', 'enter', 'a'..'z', '0'..'9', etc */
   name: string
   /** Sequencia raw (debug). */
   sequence: string
@@ -17,7 +17,7 @@ export interface Key {
 
 const ESC = '\x1b'
 
-/** Decodifica um chunk de stdin em uma ou mais Keys (paste pode ter varias). */
+/** Decodifica um chunk de stdin em uma ou mais Keys (paste pode ter várias). */
 export function parseKey(chunk: string): Key[] {
   const keys: Key[] = []
   let i = 0

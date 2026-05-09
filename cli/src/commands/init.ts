@@ -12,7 +12,7 @@ interface InitOpts {
 }
 
 // Bootstrap .cockpit/config.json no projeto atual e vincula ao workspace.
-// Usa /projects/sync-config (N7) que ja existe no daemon.
+// Usa /projects/sync-config (N7) que já existe no daemon.
 export async function init(opts: InitOpts = {}): Promise<void> {
   const cwd = process.cwd()
   const projectName = opts.name || cwd.split('/').pop() || 'projeto'
@@ -33,7 +33,7 @@ export async function init(opts: InitOpts = {}): Promise<void> {
     || workspaces[0]
 
   if (!ws) {
-    console.error(c.rose('✕ nenhum workspace disponivel'))
+    console.error(c.rose('✕ nenhum workspace disponível'))
     console.log(c.dim('  crie um: cockpit ws new "<nome>"'))
     process.exit(1)
   }

@@ -1,10 +1,10 @@
 // F9-A — project-level lock para evitar working tree stomping quando 2
 // implementations rodam no mesmo projeto. Tabela project_locks(path PK,
-// session_id, kind, acquired_at). Cleanup de orfaos (cuja session ja
-// terminou) acontece no boot e via reaper periodico.
+// session_id, kind, acquired_at). Cleanup de órfãos (cuja session já
+// terminou) acontece no boot e via reaper periódico.
 //
 // Quando worktree mode chegar (F9-B), basta passar bypass=true ou usar
-// uma kind diferente — locks de paths distintos nao colidem.
+// uma kind diferente — locks de paths distintos não colidem.
 
 import { getDB } from '../persistence/db'
 import { getAgentSession } from './session-manager'
@@ -53,14 +53,14 @@ function rowToInfo(row: LockRow): ProjectLockInfo {
 }
 
 /**
- * Tenta adquirir lock para um projeto. Lanca ProjectLockedError se ja tomado
- * por outra session ATIVA. Locks orfaos (cuja session ja terminou) sao
+ * Tenta adquirir lock para um projeto. Lanca ProjectLockedError se já tomado
+ * por outra session ATIVA. Locks órfãos (cuja session já terminou) são
  * automaticamente liberados antes da tentativa.
  *
- * C6 fix — versao atomica via SQLite transaction. Antes era:
+ * C6 fix — versão atomica via SQLite transaction. Antes era:
  *   INSERT (fail on UNIQUE) → SELECT → getAgentSession (async!) → DELETE → recursao.
  * Entre o SELECT e o DELETE, outra request podia adquirir o lock recem-liberado.
- * Agora: a transacao serializa o caminho de "checa orfao + substitui",
+ * Agora: a transacao serializa o caminho de "checa órfão + substitui",
  * eliminando a janela de race. Sem recursao.
  */
 export async function acquireProjectLock(
@@ -91,13 +91,13 @@ export async function acquireProjectLock(
       } catch (err) {
         const msg = (err as Error).message
         if (!msg.includes('UNIQUE') && !msg.includes('constraint')) throw err
-        // alguem inseriu antes de nos — proxima iteracao do loop le o estado novo
+        // alguem inseriu antes de nos — próxima iteracao do loop le o estado novo
         continue
       }
     }
 
     // Ha lock. Cheka se holding session ainda esta ativa (await async aqui
-    // — fora da transacao SQLite, intencional pra nao bloquear DB com I/O).
+    // — fora da transacao SQLite, intencional pra não bloquear DB com I/O).
     const holdingSession = await getAgentSession(currentLock.session_id)
     const stillActive = holdingSession
       && !holdingSession.completedAt
@@ -113,10 +113,10 @@ export async function acquireProjectLock(
       throw new ProjectLockedError(path, info)
     }
 
-    // Lock orfao — substitui ATOMICAMENTE em uma unica transacao.
+    // Lock órfão — substitui ATOMICAMENTE em uma única transacao.
     // ON CONFLICT garante que se outra request adquiriu nesse meio-tempo,
-    // nao fazemos overwrite cego: apenas substituimos se ainda for o
-    // mesmo orfao. Caso contrario, proxima iteracao re-avalia.
+    // não fazemos overwrite cego: apenas substituimos se ainda for o
+    // mesmo órfão. Caso contrario, próxima iteracao re-avalia.
     const orphanSessionId = currentLock.session_id
     const replaceResult = db.query(`
       UPDATE project_locks
@@ -135,7 +135,7 @@ export async function acquireProjectLock(
 }
 
 /**
- * Libera lock. Idempotente — nao falha se lock ja foi liberado.
+ * Libera lock. Idempotente — não falha se lock já foi liberado.
  * Soh remove se a session_id bater (defesa contra release acidental por outra session).
  */
 export function releaseProjectLock(path: string, sessionId: string): void {
@@ -160,7 +160,7 @@ export async function getProjectLock(path: string): Promise<ProjectLockInfo | nu
 
 /**
  * Retorna info do lock SOMENTE se ele esta sendo ATIVAMENTE detido por uma
- * session que ainda nao terminou. Locks orfaos retornam null (e a row e
+ * session que ainda não terminou. Locks órfãos retornam null (e a row e
  * limpa como side effect). Usado por rotas pra retornar 409 ANTES de invocar
  * runImplementation (evita criar sessions zumbis quando o projeto esta bloqueado).
  */
@@ -175,7 +175,7 @@ export async function peekActiveProjectLock(path: string): Promise<ProjectLockIn
     && session.phase !== 'error'
 
   if (!stillActive) {
-    // Lock orfao — limpa e retorna null pra o caller proceder.
+    // Lock órfão — limpa e retorna null pra o caller proceder.
     getDB().query('DELETE FROM project_locks WHERE path = ?').run(path)
     return null
   }
@@ -188,7 +188,7 @@ export async function peekActiveProjectLock(path: string): Promise<ProjectLockIn
 }
 
 /**
- * Cleanup de locks orfaos — todos cuja session ja terminou OU nao existe mais.
+ * Cleanup de locks órfãos — todos cuja session já terminou OU não existe mais.
  * Rodar no boot e periodicamente. Retorna numero de locks limpos.
  */
 export async function reapOrphanLocks(): Promise<number> {
