@@ -106,7 +106,11 @@ async function consumeSSE(res: Response, onEvent: SseHandler, opts: SseOpts): Pr
           try {
             onEvent(JSON.parse(data) as SseEvent)
           } catch {
-            // skip malformed
+            // I5 fix — antes silent. Agora loga em debug mode (env COCKPIT_DEBUG)
+            // pra investigar corruption sem poluir output normal.
+            if (process.env.COCKPIT_DEBUG) {
+              process.stderr.write(`[sse drop] malformed: ${data.slice(0, 100)}\n`)
+            }
           }
         }
       }

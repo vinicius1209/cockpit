@@ -2,8 +2,12 @@
 
 > Cabine de comando pra orquestrar code agents (Claude Code, OpenCode, Gemini CLI, Aider) em workspaces multi-projeto.
 
+[![version](https://img.shields.io/badge/version-1.0.0-emerald)](https://github.com/vinicius1209/cockpit/releases/tag/v1.0.0)
+[![tests](https://img.shields.io/badge/tests-253%20passing-emerald)](https://github.com/vinicius1209/cockpit/actions)
+[![license](https://img.shields.io/badge/license-MIT-gray)](./LICENSE)
+
 ```
-▰▰▰▰▰  COCKPIT v0.9.0
+▰▰▰▰▰  COCKPIT v1.0.0
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ━ ACTIVE WORKSPACE
@@ -235,7 +239,10 @@ cockpit tui
 | **Empty states** + tooltips em jargão técnico (InfoHint) | ✅ |
 | **Tests** — 235 tests no total (24 frontend + 102 daemon + 80 cli + 29 mcp) | ✅ |
 | **6/6 CRITICAL do code review fechados** (Lost Update, path traversal, file races, TUI cleanup, MCP path redaction, lock TOCTOU) | ✅ |
-| **6/11 IMPORTANT fechados** (EventSource leak, PR badge dedup, proc órfão, appendFile TOCTOU, chunks throttle, TUI error freeze) | ✅ |
+| **17/17 IMPORTANT+CRITICAL do code review fechados** | ✅ |
+| **MCP runtime validator** (zero deps, McpInputError com mensagens amigáveis pro LLM) | ✅ |
+| **`show_card` privacy** (`spec_content` opt-in via `include_spec`, default summary) | ✅ |
+| **Stable API surface** (HTTP/MCP/CLI/SQLite — breaking só em major bump) | ✅ |
 | **`cockpit doctor` com severidade + JSON + 5 checks** | ✅ |
 | **Spec gen via chat** (`cockpit_spec_gen_async`) — 20 tools no total | ✅ |
 | **Hooks** (`before_implement`, `after_implement`, `after_pr` shell scripts) | ✅ |

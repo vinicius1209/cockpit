@@ -131,7 +131,7 @@ export async function handleMaintenanceRoutes(req: Request, url: URL): Promise<R
     return jsonResponse({
       // version eh atualizada pelo bump (sed em release). Fonte unica
       // pra doctor comparar com /health.
-      daemon_version: '0.9.0',
+      daemon_version: '1.0.0',
       cockpit_dir: cockpitDir,
       paths: {
         data: dataDir,

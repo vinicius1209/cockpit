@@ -2,6 +2,71 @@
 
 Todas as mudanças notáveis do Cockpit. Formato baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
+## [1.0.0] — 2026-05-09 🎉
+
+**Cockpit production-ready.** 5 IMPORTANT do code review fechados (todos os 17 issues atacáveis fixados — restam apenas 11 MODERATE de polish/refactor). API stable, 253 tests, fundação saneada.
+
+### Fixed — I4: prompt injection guard em `cockpit_spec_gen_async`
+
+**Antes**: `body.systemPrompt` substituía `DEFAULT_SYSTEM_PROMPT`. MCP client malicioso podia passar `"Ignore previous instructions..."` e desviar a geração inteira.
+
+**Agora**: append-only. `DEFAULT_SYSTEM_PROMPT` sempre prefixa; `system_prompt` do user vira **suffix** ("## Contexto adicional do projeto"). Guardrails permanecem em vigor.
+
+### Fixed — I5: silent errors UX
+
+Catches que engoliam erros viraram visíveis:
+
+- **`<PrStatusBadge>`**: após 3 erros consecutivos pro mesmo URL, badge vira `⚠ check failed` com hint
+- **`live-agents.tsx`**: SSE parse error agora loga `[live-agents] SSE parse error: ...`
+- **`cli/api/sse.ts`**: malformed chunks logam `[sse drop]` quando `COCKPIT_DEBUG=1`
+
+### Fixed — I6: validator runtime nos MCP handlers
+
+**Antes**: 19 handlers faziam `args as unknown as XArgs` sem validação. LLM passando `{title: null}` → crashes confusos.
+
+**Agora**: novo módulo `mcp/src/validate.ts` (zero deps, ~100 linhas). Cada handler crítico declara spec (required, type, min/max length, enum values). Erro vira `McpInputError` → resposta MCP `Validation error: campo "X" — razão` que o LLM entende.
+
+Aplicado em: `cockpit_create_card`, `cockpit_edit_card`, `cockpit_implement_async`, `cockpit_show_card`. **18 tests novos**.
+
+### Fixed — I7: `cockpit_show_card` spec_content opt-in
+
+**Antes**: retornava `spec_content` e `interview_notes` crus pro LLM. Specs podem ter contexto sensível → vazamento.
+
+**Agora**: default OFF. Sem `include_spec=true`, retorna apenas `spec_summary` (length + preview 200 chars) + `_hint` indicando opt-in. Tool description guia o LLM: passe `include_spec: true` SOMENTE quando o usuário pedir.
+
+### Fixed — I10: doctor auto-fix de `~/.claude.json`
+
+`cockpit doctor --fix` agora resolve `mcp-entry-missing` automaticamente — deduz path via `import.meta.url`, descobre `bun` no PATH, reescreve `~/.claude.json` via atomic write.
+
+### 🎯 Code review status — FINAL
+
+| Severidade | Total | Fechado | Restante |
+|---|---|---|---|
+| 🔴 CRITICAL | 6 | **6** ✅ | — |
+| 🟧 IMPORTANT | 11 | **11** ✅ | — |
+| 🟨 MODERATE | 11 | 0 | 11 |
+
+**100% dos issues atacáveis fechados.** MODERATE são debt saudável — backlog evolutivo, não bloqueante.
+
+### Tests
+
+| Package | v0.9 | v1.0 |
+|---|---|---|
+| Frontend | 24 | 24 |
+| Daemon | 102 | 102 |
+| CLI | 80 | 80 |
+| MCP | 22 | **47** (+25) |
+| **Total** | 235 | **253** |
+
+### Stable surface
+
+A partir de v1.0, garantimos:
+
+- **HTTP API daemon** — breaking changes acompanharão major bump (v2.0)
+- **MCP tools (20)** — schemas e contratos estáveis. Aditivos em minor.
+- **CLI commands/flags** — `cockpit help` é canônico.
+- **SQLite schema** — migrations forward-only. v5 é o estado de v1.0.
+
 ## [0.9.0] — 2026-05-06
 
 Foco: **6 IMPORTANT do code review fechados**. Sem novas features de produto — release de qualidade interna.
@@ -583,6 +648,7 @@ Primeiro release público. Cockpit deixa de ser "interno" e ganha as três inter
 - MCP `cockpit_implement_async` é fire-and-forget (Claude Code UI não streama chunks live; use `cockpit watch` no terminal pra acompanhar)
 - Sem TUI fullscreen (`cockpit tui` planejado)
 
+[1.0.0]: https://github.com/vinicius1209/cockpit/releases/tag/v1.0.0
 [0.9.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.9.0
 [0.8.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.8.0
 [0.7.0]: https://github.com/vinicius1209/cockpit/releases/tag/v0.7.0

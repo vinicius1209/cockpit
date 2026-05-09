@@ -40,10 +40,15 @@ interface CacheEntry {
   err: string | null
   loading: boolean
   fetchedAt: number  // ms timestamp
-  subscribers: Set<(snapshot: { status: PrStatus | null; err: string | null; loading: boolean }) => void>
+  /** I5 fix — contagem de erros consecutivos. Apos N falhas, mostra
+   *  badge "⚠ check failed" pra avisar que o status pode estar stale. */
+  consecutiveErrors: number
+  subscribers: Set<(snapshot: { status: PrStatus | null; err: string | null; loading: boolean; consecutiveErrors: number }) => void>
   timer: ReturnType<typeof setInterval> | null
   inFlight: Promise<void> | null
 }
+
+const RECURRING_ERROR_THRESHOLD = 3
 
 const cache = new Map<string, CacheEntry>()
 
@@ -57,26 +62,34 @@ async function fetchStatusInto(entry: CacheEntry, url: string): Promise<void> {
       if (!res.ok) {
         entry.err = `HTTP ${res.status}`
         entry.loading = false
+        entry.consecutiveErrors++
       } else {
         entry.status = await res.json() as PrStatus
         entry.err = null
         entry.loading = false
+        entry.consecutiveErrors = 0  // I5: reset on success
       }
       entry.fetchedAt = Date.now()
     } catch (e) {
       entry.err = (e as Error).message
       entry.loading = false
+      entry.consecutiveErrors++
+      // I5 fix — log recurring errors. Antes era silent (so console.log se debug).
+      // Agora dev/operator vê no console quando algo está consistentemente falhando.
+      if (entry.consecutiveErrors >= RECURRING_ERROR_THRESHOLD) {
+        console.warn(`[pr-status] ${entry.consecutiveErrors} erros consecutivos pra ${url}: ${entry.err}`)
+      }
     } finally {
       entry.inFlight = null
       // Notifica todos os subscribers
-      const snapshot = { status: entry.status, err: entry.err, loading: entry.loading }
+      const snapshot = { status: entry.status, err: entry.err, loading: entry.loading, consecutiveErrors: entry.consecutiveErrors }
       for (const fn of entry.subscribers) fn(snapshot)
     }
   })()
   return entry.inFlight
 }
 
-function subscribe(url: string, callback: (snapshot: { status: PrStatus | null; err: string | null; loading: boolean }) => void): () => void {
+function subscribe(url: string, callback: (snapshot: { status: PrStatus | null; err: string | null; loading: boolean; consecutiveErrors: number }) => void): () => void {
   let entry = cache.get(url)
   if (!entry) {
     entry = {
@@ -84,6 +97,7 @@ function subscribe(url: string, callback: (snapshot: { status: PrStatus | null; 
       err: null,
       loading: true,
       fetchedAt: 0,
+      consecutiveErrors: 0,
       subscribers: new Set(),
       timer: null,
       inFlight: null,
@@ -101,7 +115,7 @@ function subscribe(url: string, callback: (snapshot: { status: PrStatus | null; 
     }, REFRESH_MS)
   } else if (entry.fetchedAt > 0) {
     // Ja temos dado em cache — entrega snapshot imediato pro novo subscriber
-    callback({ status: entry.status, err: entry.err, loading: entry.loading })
+    callback({ status: entry.status, err: entry.err, loading: entry.loading, consecutiveErrors: entry.consecutiveErrors })
   }
 
   return () => {
@@ -120,12 +134,14 @@ export function PrStatusBadge({ url, compact }: PrStatusBadgeProps) {
   const [status, setStatus] = useState<PrStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
+  const [recurring, setRecurring] = useState(false)
 
   useEffect(() => {
     const unsubscribe = subscribe(url, (snapshot) => {
       setStatus(snapshot.status)
       setErr(snapshot.err)
       setLoading(snapshot.loading)
+      setRecurring(snapshot.consecutiveErrors >= RECURRING_ERROR_THRESHOLD)
     })
     return unsubscribe
   }, [url])
@@ -134,6 +150,31 @@ export function PrStatusBadge({ url, compact }: PrStatusBadgeProps) {
     return compact
       ? <span className="text-[10px] text-muted-foreground/70 font-mono">PR ...</span>
       : <div className="text-xs text-muted-foreground italic">checando PR...</div>
+  }
+
+  // I5 fix — recurring errors viram badge visivel "⚠ check failed". Antes
+  // era completamente silencioso (so console).
+  if (recurring && err) {
+    return compact
+      ? (
+        <a href={url} target="_blank" rel="noreferrer" className="text-[10px] text-amber-500 hover:text-amber-400 font-mono inline-flex items-center gap-1" title={`falha repetida: ${err}`}>
+          <span>⚠</span>
+          <span>PR ↗</span>
+        </a>
+      )
+      : (
+        <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-2 text-xs space-y-1">
+          <div className="flex items-center gap-1.5 text-amber-500">
+            <span>⚠</span>
+            <span className="font-mono">PR check failed ({err})</span>
+            <a href={url} target="_blank" rel="noreferrer" className="ml-auto hover:text-foreground">
+              <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+          <div className="text-muted-foreground/70 truncate">{url}</div>
+          <div className="text-[10px] text-muted-foreground/50">verifique gh CLI auth ou se o repo ainda existe</div>
+        </div>
+      )
   }
 
   if (err || !status) {

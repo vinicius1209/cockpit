@@ -206,7 +206,12 @@ export function LiveAgentsPage() {
           sourcesRef.current.delete(s.id)
           return
         }
-      } catch { /* ignore parse error */ }
+      } catch (parseErr) {
+        // I5 fix — log parse errors em vez de silent. Ainda nao mostra ao
+        // usuario (UI ja eh barulhenta), mas ajuda debug se chunks comecarem
+        // a vir corrompidos.
+        console.warn('[live-agents] SSE parse error:', parseErr, 'data:', event.data?.slice(0, 200))
+      }
     }
     es.onerror = () => {
       // EventSource auto-reconnect — nao fechamos. Mas cap de 60s ja vem do daemon.

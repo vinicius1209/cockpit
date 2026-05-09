@@ -184,7 +184,15 @@ async function runSpecGenInBackground(
 ): Promise<void> {
   const startedAt = Date.now()
   const userMessage = buildUserMessage(card)
-  const systemPrompt = config.systemPrompt || DEFAULT_SYSTEM_PROMPT
+  // I4 fix — append-only systemPrompt. Antes: config.systemPrompt
+  // SUBSTITUIA o DEFAULT, permitindo prompt injection se MCP client
+  // malicioso passasse "Ignore previous instructions...". Agora: DEFAULT
+  // sempre prefixa, custom (se houver) vai como suffix de "## Contexto
+  // adicional" — guardrails do DEFAULT permanecem em vigor.
+  const customSuffix = config.systemPrompt?.trim()
+  const systemPrompt = customSuffix
+    ? `${DEFAULT_SYSTEM_PROMPT}\n\n## Contexto adicional do projeto\n${customSuffix}`
+    : DEFAULT_SYSTEM_PROMPT
   const fullPrompt = `${systemPrompt}\n\n---\n\n${userMessage}`
 
   let allOutput = ''

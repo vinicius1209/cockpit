@@ -5,7 +5,7 @@
 // Communication: stdio (JSON-RPC 2.0). Auto-launched by the client.
 // Backend: HTTP requests to the local daemon (127.0.0.1:4800).
 //
-// Tools exposed (20 total — v0.9.0):
+// Tools exposed (20 total — v1.0.0):
 //   READ:  cockpit_health, cockpit_list_workspaces, cockpit_list_cards,
 //          cockpit_show_card, cockpit_search, cockpit_metrics,
 //          cockpit_get_session, cockpit_list_projects
@@ -34,8 +34,9 @@ import {
   ProjectLockedError,
   type AgentSession,
 } from './api'
+import { validateInput, McpInputError, COMMON_SPECS } from './validate'
 
-const VERSION = '0.9.0'
+const VERSION = '1.0.0'
 
 const server = new Server(
   { name: 'cockpit', version: VERSION },
@@ -78,12 +79,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: 'cockpit_show_card',
       description:
-        'Get full details of a card including title, description, spec content, interview notes, and metadata. ' +
-        'Accepts short ID (SW78) or full ID. Use this when user asks "what is card X about" or to read spec.',
+        'Get details of a card: title, description, status, type, priority, workspace, project, dates. ' +
+        'Spec content e interview notes ficam OFF por padrao (privacidade — podem ter contexto sensivel). ' +
+        'Pase include_spec: true SOMENTE quando o usuario explicitamente pede pra ver a spec/entrevista. ' +
+        'Sem include_spec, retorna spec_summary com preview de 200 chars + hint pra opt-in.',
       inputSchema: {
         type: 'object',
         properties: {
           card_id: { type: 'string', description: 'Card short ID (SW78) or full ID' },
+          include_spec: { type: 'boolean', description: 'Inclui spec_content e interview_notes na resposta. Default false (privacidade — specs podem ter notas internas, credentials de exemplo, contexto sensivel). Pase true se o usuario explicitamente pedir "mostre a spec".', default: false },
         },
         required: ['card_id'],
       },
@@ -179,7 +183,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           card_id: { type: 'string', description: 'Card short ID (SW78) ou full ID' },
           agent: { type: 'string', description: 'Agent CLI a usar. Default: claude-code (ou primeiro detectado)' },
           model: { type: 'string', description: 'Modelo (sonnet/haiku/opus). Default: agent escolhe' },
-          system_prompt: { type: 'string', description: 'Override do system prompt (avancado). Default: template embutido' },
+          system_prompt: { type: 'string', description: 'Contexto adicional do projeto (anexado ao template embutido como suffix — NAO substitui guardrails)' },
         },
         required: ['card_id'],
       },
@@ -339,14 +343,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'cockpit_health':       return ok(await toolHealth())
       case 'cockpit_list_workspaces': return ok(await toolListWorkspaces())
       case 'cockpit_list_cards':   return ok(await toolListCards(args as ListCardsArgs))
-      case 'cockpit_show_card':    return ok(await toolShowCard(args as { card_id: string }))
-      case 'cockpit_create_card':  return ok(await toolCreateCard(args as unknown as CreateCardArgs))
+      case 'cockpit_show_card':    return ok(await toolShowCard(args))
+      case 'cockpit_create_card':  return ok(await toolCreateCard(args))
       case 'cockpit_move_card':    return ok(await toolMoveCard(args as { card_id: string; column_slug: string }))
       case 'cockpit_archive_card':   return ok(await toolArchiveCard(args as { card_id: string }))
       case 'cockpit_unarchive_card': return ok(await toolUnarchiveCard(args as { card_id: string }))
       case 'cockpit_search':       return ok(await toolSearch(args as { query: string; in?: string; limit?: number }))
       case 'cockpit_metrics':      return ok(await toolMetrics())
-      case 'cockpit_edit_card':    return ok(await toolEditCard(args as unknown as EditCardArgs))
+      case 'cockpit_edit_card':    return ok(await toolEditCard(args))
       case 'cockpit_create_workspace': return ok(await toolCreateWorkspace(args as unknown as CreateWorkspaceArgs))
       case 'cockpit_list_projects': return ok(await toolListProjects(args as { workspace?: string }))
       case 'cockpit_link_project':  return ok(await toolLinkProject(args as unknown as LinkProjectArgs))
@@ -354,11 +358,19 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
       case 'cockpit_set_active_workspace': return ok(await toolSetActiveWorkspace(args as { workspace: string }))
       case 'cockpit_abort_session':  return ok(await toolAbortSession(args as { session_id: string }))
       case 'cockpit_spec_gen_async':  return ok(await toolSpecGenAsync(args as unknown as SpecGenAsyncArgs))
-      case 'cockpit_implement_async': return ok(await toolImplementAsync(args as unknown as ImplementAsyncArgs))
+      case 'cockpit_implement_async': return ok(await toolImplementAsync(args))
       case 'cockpit_get_session':  return ok(await toolGetSession(args as { session_id: string; tail_chunks?: number }))
       default: throw new Error(`unknown tool: ${name}`)
     }
   } catch (err) {
+    // I6 fix — McpInputError tem mensagem ja amigavel pro LLM (campo + razao).
+    // Demais erros: prefixa "Error:" pra LLM saber que falhou.
+    if (err instanceof McpInputError) {
+      return {
+        content: [{ type: 'text' as const, text: `Validation error: ${err.message}\n(corrija o campo e tente de novo)` }],
+        isError: true,
+      }
+    }
     const msg = err instanceof Error ? err.message : String(err)
     return {
       content: [{ type: 'text' as const, text: `Error: ${msg}` }],
@@ -455,7 +467,11 @@ async function toolListCards(args: ListCardsArgs): Promise<unknown> {
     })
 }
 
-async function toolShowCard(args: { card_id: string }): Promise<unknown> {
+async function toolShowCard(rawArgs: unknown): Promise<unknown> {
+  const args = validateInput<{ card_id: string; include_spec?: boolean }>(rawArgs, {
+    card_id: COMMON_SPECS.card_id,
+    include_spec: { type: 'boolean' },
+  })
   const [workspaces, cards, columns, projects] = await Promise.all([
     loadWorkspaces(), loadCards(), loadColumns(), loadProjects(),
   ])
@@ -465,6 +481,16 @@ async function toolShowCard(args: { card_id: string }): Promise<unknown> {
   const col = (columns[card.workspace_id] || []).find((co) => co.id === card.column_id)
   const project = card.project_id ? projects.find((p) => p.id === card.project_id) : null
 
+  // I7 fix — spec_content e interview_notes default OFF (privacidade).
+  // Specs frequentemente tem notas internas, credentials de exemplo,
+  // contexto sensivel. LLM pode ecoar isso em respostas / training data.
+  // Opt-in explicito via include_spec=true. Sempre retorna o
+  // spec_status (metadata leve, util pra tomar decisao).
+  const includeSpec = args.include_spec === true
+  const specSummary = card.spec_content
+    ? { length: card.spec_content.length, preview: card.spec_content.slice(0, 200) + (card.spec_content.length > 200 ? '...' : '') }
+    : null
+
   return {
     id: shortId(card.id),
     full_id: card.id,
@@ -473,8 +499,17 @@ async function toolShowCard(args: { card_id: string }): Promise<unknown> {
     priority: card.priority,
     description: card.description,
     spec_status: card.spec_status,
-    spec_content: card.spec_content,
-    interview_notes: card.interview_notes,
+    ...(includeSpec
+      ? { spec_content: card.spec_content, interview_notes: card.interview_notes }
+      : {
+          spec_summary: specSummary,
+          interview_summary: card.interview_notes
+            ? { length: card.interview_notes.length, preview: card.interview_notes.slice(0, 200) + (card.interview_notes.length > 200 ? '...' : '') }
+            : null,
+          _hint: (card.spec_content || card.interview_notes)
+            ? 'use cockpit_show_card({ card_id, include_spec: true }) pra ver conteudo completo'
+            : undefined,
+        }),
     workspace: { name: ws?.name, slug: ws?.slug },
     column: col?.slug,
     project: project ? { name: project.name, path: redactPath(project.path) } : null,
@@ -494,7 +529,15 @@ interface CreateCardArgs {
   column_slug?: string
 }
 
-async function toolCreateCard(args: CreateCardArgs): Promise<unknown> {
+async function toolCreateCard(rawArgs: unknown): Promise<unknown> {
+  const args = validateInput<CreateCardArgs>(rawArgs, {
+    title: { type: 'string', required: true, minLength: 1, maxLength: 500 },
+    type: COMMON_SPECS.type,
+    priority: COMMON_SPECS.priority,
+    description: { type: 'string', maxLength: 50000 },
+    workspace: COMMON_SPECS.workspace,
+    column_slug: { type: 'string', minLength: 1, maxLength: 100 },
+  })
   const [workspaces, columns] = await Promise.all([loadWorkspaces(), loadColumns()])
   const ws = args.workspace
     ? resolveWorkspace(args.workspace, workspaces)
@@ -592,7 +635,16 @@ interface EditCardArgs {
   due_date?: string
 }
 
-async function toolEditCard(args: EditCardArgs): Promise<unknown> {
+async function toolEditCard(rawArgs: unknown): Promise<unknown> {
+  const args = validateInput<EditCardArgs>(rawArgs, {
+    card_id: COMMON_SPECS.card_id,
+    title: { type: 'string', minLength: 1, maxLength: 500 },
+    type: COMMON_SPECS.type,
+    priority: COMMON_SPECS.priority,
+    description: { type: 'string', maxLength: 50000 },
+    assignee: { type: 'string', maxLength: 100 },
+    due_date: { type: 'string', maxLength: 30 },
+  })
   const cards = await loadCards()
   const card = resolveCard(args.card_id, cards)
   if (!card) throw new Error(`card not found: ${args.card_id}`)
@@ -1007,7 +1059,13 @@ async function toolSpecGenAsync(args: SpecGenAsyncArgs): Promise<unknown> {
   }
 }
 
-async function toolImplementAsync(args: ImplementAsyncArgs): Promise<unknown> {
+async function toolImplementAsync(rawArgs: unknown): Promise<unknown> {
+  const args = validateInput<ImplementAsyncArgs>(rawArgs, {
+    card_id: COMMON_SPECS.card_id,
+    feedback: { type: 'string', maxLength: 5000 },
+    no_pr: { type: 'boolean' },
+    isolation: COMMON_SPECS.isolation,
+  })
   const [workspaces, cards, projects] = await Promise.all([
     loadWorkspaces(), loadCards(), loadProjects(),
   ])

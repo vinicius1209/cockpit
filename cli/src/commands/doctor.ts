@@ -543,7 +543,41 @@ async function checkMcpConfig(): Promise<CheckGroup> {
         severity: 'warning',
         title: 'MCP cockpit aponta pra path inexistente',
         detail: mcpEntry,
-        hint: 'voce moveu o repo? rode: bun run mcp:install (atualiza o path)',
+        hint: 'voce moveu o repo? rode: bun run mcp:install (atualiza o path) — ou use --fix',
+        // I10 fix — auto-fix: deduzir path correto do CLI rodando atualmente.
+        // CLI atual está em <repo>/cli/src/index.ts, MCP entry está em
+        // <repo>/mcp/src/index.ts. Resolvemos via import.meta.url.
+        fix: async () => {
+          try {
+            const cliFile = new URL(import.meta.url).pathname
+            // cliFile = .../cockpit/cli/src/commands/doctor.ts
+            // Subir 3 niveis até <repo>, descer pra mcp/src/index.ts
+            const repoRoot = cliFile.replace(/\/cli\/src\/commands\/doctor\.ts$/, '')
+            const newEntry = repoRoot + '/mcp/src/index.ts'
+            if (!existsSync(newEntry)) {
+              return { ok: false, msg: `nao consegui resolver path do MCP (esperava ${newEntry})` }
+            }
+            // Detecta bun no PATH
+            const which = Bun.spawn(['which', 'bun'], { stdout: 'pipe', stderr: 'pipe' })
+            const bunPath = (await new Response(which.stdout).text()).trim()
+            if (!bunPath) return { ok: false, msg: 'bun nao encontrado no PATH' }
+
+            const newCfg = JSON.parse(readFileSync(claudeConfig, 'utf-8')) as { mcpServers?: Record<string, { command: string; args?: string[] }> }
+            if (!newCfg.mcpServers) newCfg.mcpServers = {}
+            newCfg.mcpServers.cockpit = {
+              command: bunPath,
+              args: ['run', newEntry],
+            }
+            // Atomic write — write-to-temp + rename (mesmo padrao do C3 fix)
+            const tmp = `${claudeConfig}.tmp.${process.pid}.${Date.now()}`
+            const fs = await import('node:fs')
+            fs.writeFileSync(tmp, JSON.stringify(newCfg, null, 2), 'utf-8')
+            fs.renameSync(tmp, claudeConfig)
+            return { ok: true, msg: `entry MCP atualizado: ${newEntry}` }
+          } catch (e) {
+            return { ok: false, msg: `auto-fix falhou: ${(e as Error).message}` }
+          }
+        },
       })
     } else {
       lines.push(`${sym.ok} MCP cockpit registrado ${c.dim('(' + (cockpit.command) + ')')}`)
